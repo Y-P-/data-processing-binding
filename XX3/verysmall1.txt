@@ -1,0 +1,24 @@
+
+
+
+
+a = { b = 1 c = { x = 0 } }
+name = "Grand Campaign (1836)"
+header = { 
+    tag = "" 
+    set_ai_aggresive = 67
+    tutorial = yes 
+    startdate = { year = 1869 month = january day = 13 } 
+    enddate = { year = 1936 month = january day = 0 } 
+    saved = yes 
+    list = { 1 2 }
+    list = { 1 }
+    struct = { a = {} b = { c = 1 d = 2 }}
+    array = {
+      { x = 4 y = 2 }
+      { x = 5  y = { 3 4 } }
+    }
+    id = { id=4 type=10 }
+    id = { id=5 type=10 }
+}
+history = { 345 876 9843 }
