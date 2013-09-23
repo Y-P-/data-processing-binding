@@ -22,7 +22,7 @@ final protected class RegexTagMap extends TagMap { self=>
   //fields or field/attribute definitions
   //implementation choice: standard fields are expected to be much more common that partitioned ones (such as attributes)
   //the following map is direct for standard fields and carries no overhead.
-  //partitioned fields are prefixed by their partition name followed by '°'
+  //partitioned fields are prefixed by their partition name followed by 'ï¿½'
   private var flds = RegexMap(HashMap.empty[String,Context#FieldMapping])
   /** indicates sequences are expected */
   lazy val hasSeqs = flds!=null && flds.exists(_._2.annot.isSeq)
