@@ -30,11 +30,11 @@ object CtxCore {
         case _         => null
       }
       //the 'official' list of names that uniquely identify that loader ; seq numbers or list index are used where necessary.
-      def nameSeq:Traversable[String] = for (e<-this) yield e.localName
+      def nameSeq:Traversable[String] = for (e<-this) yield e.rankedName
     
       //the name of this element, accounting for the fact that is can be anonymous, in which case its name becomes its rank
-      def localName = if (fd.isSeq) s"${if(!name.isEmpty) s"$name." else ""}${idx.toString}" else name
-      override def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.localName}"))
+      def rankedName = if (fd.isSeq) s"${if(!name.isEmpty) s"$name." else ""}${idx.toString}" else name
+      override def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.rankedName}"))
     }
 
     //parent is undefined here

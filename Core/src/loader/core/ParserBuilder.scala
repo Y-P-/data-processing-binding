@@ -7,6 +7,7 @@ import loader.core.events.Event
 import scala.reflect.runtime.universe._
 import ParserBuilder.skip
 import ParserBuilder.skipEnd
+import loader.core.names.QName
 
 trait Locator {
   /** A string that explicits where the parser is */
@@ -64,9 +65,6 @@ trait ParserBuilder {
     }
   }
   
-  /** tells if the parser natively supports attributes ; if not, we will rely on a naming scheme */
-  protected val nativeAttribs = false
-  
   trait Impl extends Locator {
     def parsClass = getClass
     val start:BaseProcessor#Top[Kind]
@@ -105,7 +103,6 @@ trait ParserBuilder {
       if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
       r
     }
-    //XXX final protected val isAttr:(String)=>Boolean = if (!nativeAttribs && features.isAttr!=null) (s:String)=>features.isAttr.matcher(s).matches else null
     //XXX final protected[this] val subst:(Kind)=>Kind = if (userCtx.vars==null) null else features.substBuilder(userCtx.vars)(cur,_) //variable substitution call
     /** Read data from an URI.
      */
@@ -127,6 +124,11 @@ trait ParserBuilder {
      *  do nothing if not possible.
      */
     def skipping(): Unit = ()
+    /** build a QName from a string input.
+     *  The default returns null and is handled as a QName that is not an attribute and has no namespace.
+     */
+    def qName(s:String):QName = new QName(s)
+
         
     //All exceptions handled in the same way:
     // - process exception event

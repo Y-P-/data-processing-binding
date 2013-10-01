@@ -10,6 +10,7 @@ import loader.audit.IdScheme
 import java.io.OutputStream
 import utils.RegexReplacer
 import java.util.regex.Pattern
+import loader.core.names.QName
 
 
 object Test {
@@ -19,7 +20,11 @@ object Test {
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5))
       override def isInclude(elt:E)(s:elt.Kind):Boolean = !elt.isInstanceOf[loader.core.CtxCore.Def#Terminal]
       override def solveInclude(elt:E)(s:elt.Kind) = new loader.parsers.Struct(false).run(new java.io.File("verysmall1.txt").toURI, "UTF-8")
-      override def outName(elt:E) = elt.name.capitalize
+      override def qName(elt:E) = {
+        val q=super.qName(elt)
+        if (q!=null) new QName(elt.name.capitalize,q.prefix,q.isAttrib)
+        else         new QName(elt.name.capitalize)
+      }
     }
     val p = new parsers.Struct(false)
     

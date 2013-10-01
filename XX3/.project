@@ -3,6 +3,8 @@
 	<name>XX3</name>
 	<comment></comment>
 	<projects>
+		<project>Core</project>
+		<project>Utils</project>
 	</projects>
 	<buildSpec>
 		<buildCommand>

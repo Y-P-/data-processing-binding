@@ -1,9 +1,9 @@
 package loader.core
 
-import loader.core.events.Event
 import scala.reflect.ClassTag
 import exceptions._
 import reflect.runtime.universe.TypeTag
+import loader.core.events.Event
 
 object definition {
   import scala.language.implicitConversions
@@ -81,6 +81,7 @@ object definition {
     /** Reason for which Impl exists.
      *  Defines how the parser events are processed.
      *  Holds the data necessary to process these events.
+     *  You probably don't want to ever override any of these methods.
      */
     abstract class Elt extends Traversable[Element] with BaseElt { self:Element=>
       def myself:Element = this
@@ -98,9 +99,11 @@ object definition {
       def build(p:Parser, s:Status, b:Bld):Element = childBuilder(p, self, s, b)
       /** building a child spawning children of the same nature */
       def build(p:Parser, s:Status):Element = build(p, s, childBuilder)
-      /** the name for this element for the processor */
-      def outName:String = userCtx.outName(this)
       
+      /** builds the qualified name for the output */
+      def qName = userCtx.qName(this)
+      /** builds the local name for the output */
+      def localName = userCtx.localName(this)
       //handle an event:
       // - ignore if no handler defined
       // - do nothing if handler not configured for that event
@@ -150,6 +153,7 @@ object definition {
       /** Checks when a given value received on this element is to be solved as an include. */
       protected def isInclude(s:Kind):Boolean = userCtx.isInclude(this)(s)
       
+      //XXX heck! what was this ????
       //abstract override protected def onVal(s:String): Ret = if (isInclude(s:String)) doInclude(s) else super.onVal(s)
       
       /** Some convenient methods.

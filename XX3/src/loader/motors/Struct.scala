@@ -55,8 +55,9 @@ object Struct extends Processor {self=>
       //to avoid unwanted output on the top element.
       protected def getData(parent:Element,s:Status):Data = new Data((if (parent!=null) parent.data.tabs+indent else -indent))
 
+      //XXX  use a qName formatter
       private def newLine(e:Element):Unit   = out.write(if (indent>0) Indent(e.data.tabs) else " ")
-      private def tag(e:Element):Unit       = { newLine(e); if (!e.name.isEmpty) { quote(e.outName); out.write(s" = ") } }
+      private def tag(e:Element):Unit       = { newLine(e); if (!e.name.isEmpty) { quote(e.localName); out.write(s" = ") } }
       private def quote(s:String):Unit      = out.write(if(parser.px.Data.isChar(s)) s else s""""$s"""")
       private def writeBeg(e:Element):Unit  = if (e!=null && e.parent!=null && !e.data.written) { tag(e); out.write("{"); e.data.written=true }
   

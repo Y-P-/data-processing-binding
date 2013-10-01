@@ -69,12 +69,13 @@ object ConfigContext {
   /** Reader for TagField definitions
    *  Note that even though fields are mutable, external code cannot access them due to various private accessor restrictions.
    */
-  final private class TagFldHelper extends FieldAnnot with Named {
+  final private class TagFldHelper extends FieldAnnot with Named { //XXX restore
     var name:String = _
-    @TagField var inName:String  = ""
-    @TagField var outName:String = ""
-    @TagField var loader:String  = ""
-    @TagField var tagEnd:String  = ""
+    @TagField var inName         = ""
+    @TagField var outName        = ""
+    @TagField var qName          = null
+    @TagField var loader         = ""
+    @TagField var tagEnd         = ""
     @TagField var min            = 0
     @TagField var max            = 0
     @TagField var check          = ""
@@ -85,6 +86,7 @@ object ConfigContext {
     @TagField var isList         = false
     @TagField var isSeq          = false
     @TagField var isFld          = false
+    @TagField var rank           = 0
     @TagEnd def end = {
       if (inName.isEmpty) inName=name
       if (!isList && !isSeq) max=1

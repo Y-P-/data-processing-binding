@@ -8,6 +8,7 @@ import loader.annotations.TagEnd
 import loader.core.exceptions.DynamicInvocation
 import java.io.Writer
 import loader.annotations.TagField
+import loader.core.names.QName
 
 /** The default implementation uses RegexTagMap
  */
@@ -81,7 +82,7 @@ class SerialContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
     }
     final private class TagFieldHelper(f:Field) extends FieldAnnot {
       val inName:String      = f.getName
-      val outName:String     = f.getName
+      def qName              = QName.noProc
       def min:Int            = 0
       def max:Int            = 1
       def check:String       = ""
@@ -94,10 +95,11 @@ class SerialContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       val loader:String      = loaderId(f,false)
       def tagEnd:String      = null
       def isFld:Boolean      = loader==null
+      def rank               = 0
     }
     final private class TagListHelper(f:Field) extends FieldAnnot {
       val inName:String      = f.getName
-      val outName:String     = f.getName
+      def qName              = QName.noProc
       def min:Int            = 0
       def max:Int            = 0
       def check:String       = ""
@@ -110,10 +112,11 @@ class SerialContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       val loader:String      = loaderId(f,true)
       def tagEnd:String      = null
       def isFld:Boolean      = loader==null
+      def rank               = 0
     }
     final private class TagMapHelper(f:Field) extends FieldAnnot {
       val inName:String      = f.getName
-      val outName:String     = f.getName
+      def qName              = QName.noProc
       def min:Int            = 0
       def max:Int            = 0
       def check:String       = ""
@@ -126,6 +129,7 @@ class SerialContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       val loader:String      = classOf[Assoc[_,_]].getName  //map elements are loaded in an Assoc
       def tagEnd:String      = null
       def isFld:Boolean      = loader==null
+      def rank               = 0
     }
     final private class TagStructHelper(val clzz:Class[_<:AnyRef]) extends StructAnnot {
       println(s"struct helper for $clzz")

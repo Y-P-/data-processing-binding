@@ -1,5 +1,7 @@
 package loader.core.context
 
+import loader.core.names.QName
+
 
 /** This class lists all relevant information pertaining to a given 'structure'.
  *  It provides support for reading 'structure' information from varied sources.
@@ -18,8 +20,9 @@ abstract class Context(tagMapBuilder: =>TagMap) {
   
   protected def top(id:String,name0:String) = new FieldAnnot {
     val inName     = name0
-    val outName    = name0
     val loader     = id
+    def rank       = 0
+    def qName      = QName.noProc
     def isSeq      = false
     def isList     = false
     def isFld      = false
@@ -85,7 +88,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     class FldStatus extends Val
     val unknown,struct,list,terminal=new FldStatus
   }
-  /** A trait that regroups all information about a given field mapping.
+  /** A class that groups all information about a given field mapping.
    *  Note that this has no relationship to objects fields/methods, even though we may get this information by reading from such items.
    *  When we have to connect to such an item, we have to use the binding method.
    */
@@ -101,7 +104,8 @@ abstract class Context(tagMapBuilder: =>TagMap) {
       if (!annot.isList) throw new IllegalStateException
       new FieldMapping(new FieldAnnot {
         def inName:String  = ""
-        def outName:String = ""
+        def rank:Int       = annot.rank
+        def qName          = QName.noProc
         def min:Int        = annot.min
         def max:Int        = annot.max
         def check:String   = annot.check

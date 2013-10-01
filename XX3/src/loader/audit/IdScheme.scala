@@ -17,7 +17,7 @@ object IdScheme {
       val b = new StringBuffer
       ld.foreach { x:Element=>
         if (b.length>0) b.append(".")
-        b.append(x.localName)
+        b.append(x.rankedName)
       }
       b
     }

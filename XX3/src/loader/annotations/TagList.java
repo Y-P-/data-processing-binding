@@ -7,18 +7,21 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Inherited;
 
 import loader.context.ClassContext;
+import loader.core.names.QName;
 
 @Inherited
 @Target({ElementType.FIELD, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
 public @interface TagList {
-	String inName()   default "";
-  String outName()  default "";
+  String inName()   default "";
+  String outName()  default "=";
+  Class<? extends QName.Processor> qName() default QName.NoProc.class;
   Class<?> loader() default ClassContext.Unknown.class;
   int min()         default 0;
   int max()         default 0;
-	String check()    default "";
-	String valid()    default "";
-	String param()    default "";
+  String check()    default "";
+  String valid()    default "";
+  String param()    default "";
   String audit()    default "";
+  int rank()        default 0;
 }

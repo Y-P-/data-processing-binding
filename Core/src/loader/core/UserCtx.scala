@@ -4,7 +4,7 @@ import definition._
 import callbacks.Callback
 import events.EventHandler
 import context.Context
-import names.QualifiedName
+import loader.core.names.QName
 
 abstract class UserContext[-Elt<:Def#Elt] {
   type E = Elt
@@ -13,15 +13,13 @@ abstract class UserContext[-Elt<:Def#Elt] {
   //parameter that asks the parser to accelerate where it can (i.e. skip unecessary data)
   val fast = true
   //for name conversions
-  def outName(elt:E):String = elt.name
-  //parameters for substitution
+  def qName(elt:E):QName = QName(elt)
+  //for local name fast access when this applies. Override this if neither parser not processor use namespaces/attributes
+  def localName(elt:E):String = qName(elt).local
+  //XXX to be removed parameters for substitution
   val vars:scala.collection.Map[String,String] = null
   //dynamic solver
   def solveDynamic(elt:E,fd:Context#FieldMapping):Context#FieldMapping = null
-  //Qualified name builder
-  def qname(elt:E):QualifiedName.Scheme
-  //Qualified name builder
-  def nameConverter(elt:E):QualifiedName.Converter
   
   /** For includes */
   //detects includes: called only in onVal calls.

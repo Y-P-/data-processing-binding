@@ -2,10 +2,11 @@ package loader.context
 import java.lang.annotation.Annotation
 import java.lang.reflect.{Method,Field,Modifier,Member,AnnotatedElement}
 import scala.collection.mutable.{ListBuffer,HashMap}
-import loader.annotations.{TagField,TagStruct,TagSeq,TagList,TagEnd}
 import loader.core.context._
-import loader.reflect.Analyze
 import loader.core.exceptions.DynamicInvocation
+import loader.core.names.QName
+import loader.annotations.{TagField,TagStruct,TagSeq,TagList,TagEnd}
+import loader.reflect.Analyze
 
 /** The default implementation uses RegexTagMap
  */
@@ -47,6 +48,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       }
     }
     private object Info {
+      //XXX val no = classOf[QName.NoProc]
       import scala.language.implicitConversions
       implicit protected final def canonicalName(m:Method) = { //XXX unused
         val n = m.getName
@@ -63,12 +65,28 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
         }
       }
     }
-    /** Translate TagField into something usable
+    
+    /** qName Builder for a TagField
+     */
+    protected def qName(n:String, cz:Class[_<:QName.Processor]) = {
+      if (cz==classOf[QName.NoProc])
+        if      (n=="=")           QName.Const(null)
+        else if (n.charAt(0)=='>') QName.Local(n.substring(1))
+        else                       QName.Const(n)
+      else
+        cz.getConstructor(classOf[String]).newInstance(n);
+    }
+    /** Translate TagField into something usable.
+     *  Rules for QName with the default (NoProc) processor:
+     *  - outName = '>...'  => Local(...)   (note that outName='>!' means Local(inName)
+     *  - outName = '='     => Const(null)  : use parsed name
+     *  - outName other     => Const        : use outName
      */
     final private class TagFieldHelper(f:TagField,i:Info) extends FieldAnnot {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
-      def outName:String     = if (f.outName().isEmpty) inName else f.outName()
+      def qName              = tagManager.qName(f.outName(),f.qName());
+      def rank:Int           = f.rank()
       def min:Int            = f.min()
       def max:Int            = 1
       def check:String       = f.check()
@@ -85,6 +103,8 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
     final private class TagSeqHelper(f:TagSeq,i:Info) extends FieldAnnot {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
+      def qName              = tagManager.qName(f.outName(),f.qName());
+      def rank:Int           = f.rank()
       def outName:String     = if (f.outName().isEmpty) inName else f.outName()
       def min:Int            = f.min()
       def max:Int            = f.max()
@@ -102,7 +122,8 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
     final private class TagListHelper(f:TagList,i:Info) extends FieldAnnot {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
-      def outName:String     = if (f.outName().isEmpty) inName else f.outName()
+      def qName              = tagManager.qName(f.outName(),f.qName());
+      def rank:Int           = f.rank()
       def min:Int            = f.min()
       def max:Int            = f.max()
       def check:String       = f.check()
