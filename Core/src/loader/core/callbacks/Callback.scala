@@ -46,6 +46,7 @@ import loader.core.definition._
 abstract class Callback[-E0,-S0,-R0,K>:Null] { self=>
   class Inner(protected[this] val elt:E0) {
     def onName[S<:S0](name:String, f: (String)=>S):S           = f(name)
+    def onInit(f: =>Unit):Unit                                 = f
     def onBeg(f: =>Unit):Unit                                  = f
     def onVal[R<:R0](s:K,f: (K) =>R):R                         = f(s)
     def isInclude(s:K,f: (K) =>Boolean):Boolean                = f(s)
@@ -63,6 +64,7 @@ abstract class Callback[-E0,-S0,-R0,K>:Null] { self=>
       else if (cbOut==null) cbIn
       else                  new Inner(elt) {
         override def onName[S<:S1](name:String, f: (String)=>S):S           = cbOut.onName(name,cbIn.onName(_,f))
+        override def onInit(f: =>Unit):Unit                                 = cbOut.onInit(cbIn.onBeg(f))
         override def onBeg(f: =>Unit):Unit                                  = cbOut.onBeg(cbIn.onBeg(f))
         override def onVal[R<:R1](s:K,f: (K)=>R):R                          = cbOut.onVal(s,cbIn.onVal(_,f))
         override def isInclude(s:K,f: (K)=>Boolean):Boolean                 = cbOut.isInclude(s,cbIn.isInclude(_,f))

@@ -108,7 +108,7 @@ object CtxCore {
       protected def onName(e:Element,name:String): Status  = null
       
       //concrete definitions
-      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val childBuilder:Bld, val data:Data) extends Processor with Element {
+      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val childBuilder:Bld, val data:Data) extends Processor with Element with WithSeq {
         def this(parser:Parser, s:Status, parent:Element, childBuilder:Bld) = this(parser,s.name,parent,s.fd,s.idx,childBuilder,motor.getData(parent, s))
         def getData(s: Status) = motor.getData(this,s)
       }

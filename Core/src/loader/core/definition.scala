@@ -1,13 +1,12 @@
 package loader.core
 
-import scala.reflect.ClassTag
 import exceptions._
-import reflect.runtime.universe.TypeTag
 import loader.core.events.Event
+import loader.core.sequencers.Sequencer
 
 object definition {
   import scala.language.implicitConversions
-  
+    
   //the compiler seems to require a little help, so this class seems necessary
   //we also need it to build fake Tops for includes
   protected abstract class Top[-Kind,+D<:Def](val processor:D, kindClass:Class[_<:Kind]) {
@@ -68,14 +67,16 @@ object definition {
       type Kind     = selfDef.Kind
       type Parser   = selfDef.Parser
       def parser : Parser
+      def sequencer:Sequencer[Element] = null
       def definition:Def.this.type = Def.this
       protected def onName(name: String): Status
-      protected def onBeg(): Unit
-      protected def onVal(v: Kind): Ret
+      protected def onInit(): Unit                //called on all elements on creation
+      protected def onBeg(): Unit                 //called on beginning of a struct
+      protected def onVal(v: Kind): Ret           //called when receiving a value
+      protected def onEnd(): Ret                  //called at the end of a struct
+      protected def onChild(child: Element, r: Ret): Unit
       protected def isInclude(v: Kind): Boolean
       protected def onInclude(v: Kind): Ret
-      protected def onEnd(): Ret
-      protected def onChild(child: Element, r: Ret): Unit
     }
     
     /** Reason for which Impl exists.
@@ -112,11 +113,19 @@ object definition {
         case h    => h.applyOrElse((this,evt),(x:(Element,Event))=>())
       }
       
-      /** The push/pull interface on the processor side
-       */
-      def pull()         = parent.onChild(this, onEnd())
-      def push(n:String) = { val c=build(parser,onName(n),childBuilder); c.onBeg(); c }
-      def pull(v:Kind)   = { parent.onChild(this, if (isInclude(v)) onInclude(v) else onVal(v)) }
+      /** Ensure the call to doBeg is done as late as possible, but in time. begDone ~ lazy val */
+      private var begDone=false
+      private def doBeg():Unit = if (!begDone) { begDone=true; if (parent!=null) parent.doBeg; onBeg; }
+      
+      /** current depth in the hierarchy; 0 is top */
+      def depth:Int = if (parent==null) 0 else parent.depth+1
+      
+      /** The push/pull interface on the processor side */
+      def push(n:String)  = { val c=build(parser,onName(n),childBuilder); c.onInit(); c }
+      def pullX()         = { doBeg(); parent.onChild(this, onEnd()) }
+      def pullX(v:Kind)   = if (isInclude(v)) parent.onChild(this,onInclude(v)) else { parent.doBeg; parent.onChild(this,onVal(v)) }
+      def pull(v:Kind)    = pullX(v)
+      def pull()          = pullX()
       
       /** standard invoker, used on the top level element */
       def invoke(f: =>Unit): Ret = {
@@ -181,6 +190,9 @@ object definition {
       def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.name}"))
       override def toString = { val s=new java.io.StringWriter; print(s); s.toString }      
     }
+    object Elt {
+      implicit def apply(e:Elt):Element = e.myself
+    }
     
     class Top[-K](val mapper:(Element,K)=>Kind,kindClass:Class[_<:K],builder:EltBuilder,s:Status,cbks: Cbks*) extends definition.Top[K,Def.this.type](Def.this,kindClass) {
       def init:Parser=>processor.Element = if (cbks.isEmpty) builder(_,s) else builder(_,s,cbks:_*)
@@ -206,6 +218,21 @@ object definition {
       def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld): Element
       def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld, cbks: Cbks*): Element with WithCallbacks
       def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld, cb: Cbk, cbks: Cbks*): Element with WithCallback
+    }
+    
+    /** Adds a sequencer to the item.
+     *  Sequencers are used to change the actual processing order of children.
+     *  Once an item has a sequencer, all children must have one, because if an item is on hold (cannot be processed immediately),
+     *  then all sub-children are also on hold
+     */
+    trait WithSeq extends Elt { this: Element =>
+      import sequencers._
+      override val sequencer:Sequencer[Element] = userCtx.getSeq(this) 
+      protected val v:scala.collection.mutable.ArrayBuffer[()=>Unit]
+      protected var active:Boolean = false
+      //def checkDo:Boolean = parent.active && sequencer.canDo(this)
+      override def pull()       = parent.sequencer.pull0(this)
+      override def pull(v:Kind) = parent.sequencer.pull1(this)(v)
     }
 
     /** Modifies the current element behavior by using a callback
@@ -297,7 +324,9 @@ object definition {
       // Forwarded methods
       protected def onInit():Unit
       protected def onExit():Result
+      // Forwarded methods
       protected def onName(self: Element, name: String): Status
+      protected def onInit(self: Element):Unit
       protected def onBeg(self: Element): Unit
       protected def onVal(self: Element, v: Kind): Ret
       protected def onEnd(self: Element): Ret
@@ -306,6 +335,7 @@ object definition {
       trait Processor extends Elt { self:ElementBase=>
         def userCtx = motor.userCtx
         protected def onName(name: String): Status          = motor.onName(this,name)
+        protected def onInit(): Unit                        = motor.onInit(this)
         protected def onBeg(): Unit                         = motor.onBeg(this)
         protected def onVal(v: Kind): Ret                   = motor.onVal(this,v)
         protected def onEnd(): Ret                          = motor.onEnd(this)

@@ -81,12 +81,14 @@ trait ParserBuilder {
     
     final val builder:ParserBuilder.this.type = ParserBuilder.this
     val top = start.init(this)
+  
     private var cur:top.Element = top
     private var ignore:Int = 0
     def current = cur
     def userCtx = top.userCtx
-    def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()  } catch { errHandler } finally { cur=cur.parent }
+    def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull() } catch { errHandler } finally { cur=cur.parent }
     def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(start.map(cur,v)) } catch { errHandler } finally { cur=cur.parent }
+        
     def push(name: String): Boolean = if (ignore>0) true else {
       import ParserBuilder.{ skip, skipEnd }
       try { cur=cur.push(name); true } catch {

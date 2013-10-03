@@ -5,6 +5,7 @@ import callbacks.Callback
 import events.EventHandler
 import context.Context
 import loader.core.names.QName
+import loader.core.sequencers.Sequencer
 
 abstract class UserContext[-Elt<:Def#Elt] {
   type E = Elt
@@ -16,6 +17,8 @@ abstract class UserContext[-Elt<:Def#Elt] {
   def qName(elt:E):QName = QName(elt)
   //for local name fast access when this applies. Override this if neither parser not processor use namespaces/attributes
   def localName(elt:E):String = qName(elt).local
+  //sequencer to use
+  def getSeq(elt:E):Sequencer[E] = loader.core.sequencers.ImmediateTraced
   //XXX to be removed parameters for substitution
   val vars:scala.collection.Map[String,String] = null
   //dynamic solver
