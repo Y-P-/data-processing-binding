@@ -104,6 +104,8 @@ object definition {
       def qName = userCtx.qName(this)
       /** builds the local name for the output */
       def localName = userCtx.localName(this)
+      /** current stack depth */
+      def depth:Int = if (parent==null) 0 else parent.depth+1
       //handle an event:
       // - ignore if no handler defined
       // - do nothing if handler not configured for that event
