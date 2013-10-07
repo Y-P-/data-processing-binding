@@ -1,5 +1,6 @@
 package parser.java;
 
+
 public abstract class TokenReader {
   final public static int End   = -1;
   final public static int Error = -2;
@@ -20,15 +21,8 @@ public abstract class TokenReader {
 	this.encoding = encoding;
   }
   
-  public void reset() {
-	position = -1;
-	line     =  0;
-  }
-  
   /**
-   * Fills last with the next token.
-   * Accounts for position, newline and struct level, removes comments and spaces
-   * End of flow results in the End token.
+   * Used to write a Token. Useful for debug.
    */
   protected abstract String tokenName(int kind);
   
@@ -43,12 +37,20 @@ public abstract class TokenReader {
     public String baseString() { //the String as read
       try {
     	if (kind==TokenReader.End) return "<<EOF>>";
-        return new String(data,pos,length,encoding);
+    	if (data[pos]=='"') {
+       	    byte[] b = new byte[length];
+    	    int i=0;
+    	    int j=0;
+    	    for (i=0; i<length; i++) { byte c=data[pos+i]; if (c=='\\' && (data[pos+i+1]=='\\' || data[pos+i+1]=='"')) i+=1; b[j++]=data[pos+i]; }
+            return new String(b,0,j,encoding);
+    	} else {
+    		return new String(data,pos,length,encoding);
+    	}
       } catch (Exception e) {
         throw new RuntimeException(e);
       }
     }
-    public String unquotedString() { //the String unquotted
+    public String unquotedString() { //the String unquoted
       String s = baseString();
       return (s.charAt(0)=='"' && s.charAt(s.length()-1)=='"') ? s.substring(1,s.length()-1) : s;
     }

@@ -27,7 +27,7 @@ public class Data {
 	static int[] bString = new int[]{
 		      0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,   //\n
 		      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   //
-		      0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,   //"
+		      0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,   //"
 		      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   //
 		      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   //
 		      0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,   //
@@ -36,7 +36,7 @@ public class Data {
 	};
 	
 	static public boolean isChar(String s) {
-		for (char c : s.toCharArray()) if (bClass[c]!=1) return false;
+		for (char c : s.toCharArray()) if (c<128 && bClass[c]!=1) return false;
 	    return true;
 	}
 }

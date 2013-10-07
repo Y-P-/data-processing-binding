@@ -2,7 +2,7 @@ package parser.px
 import parser.TokenRing
 import parser.Source
 import parser.px.Data.{bClass,bString}
-import scala.annotation.tailrec
+import scala.annotation.{tailrec,switch}
 
 
 /**
@@ -32,16 +32,33 @@ class Tokenizer(val src:Source) extends TokenRing(8,5,src) {
      */
     @inline @tailrec protected final def doParse(p:Int):Int = {
       var q = p+1
-      bClass(data(q)) match {
+      var k = bClass(data(q))
+      (k: @switch) match {  //note that the case values are constants from Tokenizer
         case `{` => kind=Open;  pos=q; length=1; q
         case `}` => kind=Close; pos=q; length=1; q
         case `=` => kind=Equal; pos=q; length=1; q
-        case `"` => pos=q; { var c:Byte=0; var k=0; do { q+=1; c=data(q) } while (c<0 || bString(c)==0) }; if (c==10) { kind=Error; pos=p; length=0 } else { kind=Data; length=q+1-pos }; q
+        case `"` => readStr(q)
         case `#` => do { q+=1 } while(data(q)!=10); doParse(q-1)
         case `n` => line+=1; doParse(q)
         case ` ` => do { q+=1 } while (bClass(data(q))==` `); doParse(q-1)
         case `c` => pos=q; do { q+=1 } while (bClass(data(q))==`c`); kind=Data; length=q-pos; q-1
       }
+    }
+    @inline private final def readStr(q0:Int):Int = {
+      var q=q0; pos=q0
+      do {
+        q+=1
+        val k = data(q) match {
+          case x if x<0 => 0
+          case x        => bString(x)
+        }
+        (k: @switch) match {
+          case 0 => //continue
+          case 1 => kind=Error; pos=q0; length=0; return q  //unexpected EOL
+          case 2 => if (data(q-1)!='\\') { kind=Data; length=q+1-pos; return q } //character ", possibly escaped
+        }
+      } while (true)
+      0  //never reached
     }
     final def fill:Unit = {
       try {

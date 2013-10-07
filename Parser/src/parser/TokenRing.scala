@@ -22,13 +22,6 @@ abstract class TokenRing(stkSz:Int,stkFw:Int,src:Source) extends TokenReader(src
   /** First element to fetch. */
   final val start = rb.build(stkSz)  
   start.toRead.pop(stkFw)
-  
-  /** initializes the token stack */
-  override def reset = {
-    super.reset
-    for (t <- this) { t.kind=TokenReader.End; t.length=0; t.pos = -1; }
-    start.toRead.pop(stkFw)
-  }
 
   abstract class TokenElem extends TokenRingElem[T](this) { this:T =>
       
