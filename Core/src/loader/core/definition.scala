@@ -70,12 +70,13 @@ object definition {
       def parser : Parser
       def definition:Def.this.type = Def.this
       protected def onName(name: String): Status
-      protected def onBeg(): Unit
-      protected def onVal(v: Kind): Ret
+      protected def onInit(): Unit                //called on all elements on creation
+      protected def onBeg(): Unit                 //called on beginning of a struct
+      protected def onVal(v: Kind): Ret           //called when receiving a value
+      protected def onEnd(): Ret                  //called at the end of a struct
+      protected def onChild(child: Element, r: Ret): Unit
       protected def isInclude(v: Kind): Boolean
       protected def onInclude(v: Kind): Ret
-      protected def onEnd(): Ret
-      protected def onChild(child: Element, r: Ret): Unit
     }
     
     /** Reason for which Impl exists.
@@ -104,7 +105,7 @@ object definition {
       def qName = userCtx.qName(this)
       /** builds the local name for the output */
       def localName = userCtx.localName(this)
-      /** current stack depth */
+      /** current depth in the hierarchy; 0 is top */
       def depth:Int = if (parent==null) 0 else parent.depth+1
       //handle an event:
       // - ignore if no handler defined
@@ -114,11 +115,15 @@ object definition {
         case h    => h.applyOrElse((this,evt),(x:(Element,Event))=>())
       }
       
+      /** Ensure the call to doBeg is done as late as possible, but in time. begDone ~ lazy val */
+      private var begDone=false
+      private def doBeg():Unit = if (!begDone) { begDone=true; if (parent!=null) parent.doBeg; onBeg; }
+      
       /** The push/pull interface on the processor side
        */
-      def pull()         = parent.onChild(this, onEnd())
-      def push(n:String) = { val c=build(parser,onName(n),childBuilder); c.onBeg(); c }
-      def pull(v:Kind)   = { parent.onChild(this, if (isInclude(v)) onInclude(v) else onVal(v)) }
+      def push(n:String) = { val c=build(parser,onName(n),childBuilder); c.onInit(); c }
+      def pull()         = { doBeg(); parent.onChild(this, onEnd()) }
+      def pull(v:Kind)   = if (isInclude(v)) parent.onChild(this,onInclude(v)) else { parent.doBeg; parent.onChild(this,onVal(v)) }
       
       /** standard invoker, used on the top level element */
       def invoke(f: =>Unit): Ret = {
@@ -296,10 +301,12 @@ object definition {
       type ElementBase<:Element
       // context fields for a motor
       def userCtx:UserCtx
-      // Forwarded methods
+      
       protected def onInit():Unit
       protected def onExit():Result
+      // Forwarded methods
       protected def onName(self: Element, name: String): Status
+      protected def onInit(self: Element):Unit
       protected def onBeg(self: Element): Unit
       protected def onVal(self: Element, v: Kind): Ret
       protected def onEnd(self: Element): Ret
@@ -308,6 +315,7 @@ object definition {
       trait Processor extends Elt { self:ElementBase=>
         def userCtx = motor.userCtx
         protected def onName(name: String): Status          = motor.onName(this,name)
+        protected def onInit(): Unit                        = motor.onInit(this)
         protected def onBeg(): Unit                         = motor.onBeg(this)
         protected def onVal(v: Kind): Ret                   = motor.onVal(this,v)
         protected def onEnd(): Ret                          = motor.onEnd(this)

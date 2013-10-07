@@ -46,6 +46,7 @@ import loader.core.definition._
 abstract class Callback[-E0,-S0,-R0,K>:Null] { self=>
   class Inner(protected[this] val elt:E0) {
     def onName[S<:S0](name:String, f: (String)=>S):S           = f(name)
+    def onInit(f: =>Unit):Unit                                 = f
     def onBeg(f: =>Unit):Unit                                  = f
     def onVal[R<:R0](s:K,f: (K) =>R):R                         = f(s)
     def isInclude(s:K,f: (K) =>Boolean):Boolean                = f(s)
