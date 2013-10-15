@@ -149,6 +149,7 @@ trait Analyzer {
     val debugJump = false
     var jumped = 0
     val tkr   = new Tokenizer(src)
+    val t0 = System.nanoTime
     tokenizer = tkr
     var first = tkr.start           //first token of the stack in the current state
     var tk    = first               //token under analysis ; usually first, but maybe forward exploring
@@ -255,6 +256,7 @@ trait Analyzer {
       } while(v>=0)
       if (depth!=0 || k!=0) err(tk)
       try {
+        println(System.nanoTime-t0)
         end
       } catch { //this is not an analyzer problem
         case e:Throwable => throw new NonAnalyzerException(e)

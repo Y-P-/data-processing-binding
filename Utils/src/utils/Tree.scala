@@ -8,7 +8,7 @@ import java.io.Writer
 
 
 /**
- * This class lets define a tree (not binary.)
+ * This class lets define a named tree (not binary.)
  * Each node and leaf has a name. A sequence from top to leaf forms a path.
  * The order is defined by the underlying map type used. This is defined
  * by the empty map in the builder.
@@ -119,7 +119,7 @@ trait TreeLikeBuilder[X,T,This<:TreeLike[X,T,This]] {
       develop(data).foreach { x =>  //don't use map: wrong Map type due to no canBuildFrom
         r.put(x._1,fromCanonical(x._1,x._2._1,x._2._2,res,builder))
       }
-      res=builder(name,cur,r,prev)
+      res=builder(name,cur,r,prev)  //important! sets the captured res in the previous closure ( =>res )
       res
     }
   }
@@ -212,7 +212,7 @@ object StrongTree {
   def empty[X,T] = builder[X,T]().empty
 }
 
-/** A standard implementation for strong immutbale tree bindings, likely sufficient for most needs.
+/** A standard implementation for strong mutable tree bindings, likely sufficient for most needs.
  */
 class StrongMutableTree[X,T](val name:X,val cur:Option[T],val self:scala.collection.mutable.Map[X,StrongMutableTree[X,T]],prv: =>StrongMutableTree[X,T]) extends scala.collection.mutable.MapProxy[X,StrongMutableTree[X,T]] with StrongTreeLike[X,T,StrongMutableTree[X,T]] with Mutable[X,T,StrongMutableTree[X,T]] {
   val builder = StrongMutableTree.builder[X,T]()
@@ -233,3 +233,44 @@ object StrongMutableTree {
   def empty[X,T] = builder[X,T]().empty
 }
 
+
+object StringTree {
+    //finds the next char c. -1 if not found. 'until' excluded.
+    protected def find(s:CharSequence,c:Char,from:Int,until:Int):Int = {
+      var i=from; if (i<until) do { if (s.charAt(i)==c) return i else i+=1 } while (i<until); -1
+    }
+    //finds the next closing char c that matches the opening char o. assumes that s(from-1)=o. -1 if not found. 'until' excluded.
+    protected def findMatch(s:CharSequence,o:Char,c:Char,from:Int,until:Int):Int = {
+      var i=from; var k=1; if (i<until) do { val x=s.charAt(i); if (x==c) { k-=1; if (k==0) return i; } else if (x==o) k+=1; i+=1 } while (i<until); -1
+    }
+    //returns the param value: (composite,beg,end) ; end excluded, until excluded.
+    protected def param(s:CharSequence,o:Char,c:Char,e:Char,sep:Char,from:Int,until:Int):(Boolean,String,Int,Int) = {
+      val n = find(s,e,from,until)
+      if (n<0) throw new IllegalStateException(s"<$e> was expected in <$s>")
+      val name = s.subSequence(from,n).toString
+      if (s.charAt(n+1)=='(') {
+        val r = findMatch(s,'(',')',n+2,until)
+        if (r<0) throw new IllegalStateException(s"opening <$o> unmatched in <$s>")
+        (true,name,n+2,r)
+      } else {
+        val r=find(s,sep,n+1,until)
+        (false,name,n+1,if (r<0) until else r)
+      }
+    }
+    protected def params(prev: =>StrongTree[String,String],name:String,cur:Option[String],s:CharSequence,o:Char,c:Char,e:Char,sep:Char,from:Int,until:Int):StrongTree[String,String] = {
+      var i = from
+      var res:StrongTree[String,String] = null
+      val r = scala.collection.mutable.Map.empty[String,StrongTree[String,String]]
+      do {
+        val recur  = param(s,o,c,e,sep,i,until)
+        val cur0   = if (recur._1) None else Some(s.subSequence(recur._3, recur._4).toString)
+        val next   = if (recur._1) params(res,recur._2,cur0,s,o,c,e,sep,recur._3,recur._4) else StrongTree.builder[String,String].build(recur._2,cur0,scala.collection.mutable.Map.empty,res)
+        r.put(recur._2,next)
+        i = find(s,sep,recur._4,until)+1
+      } while (i<until && i>0);
+      res = StrongTree.builder[String,String].build(name,cur,r,prev)
+      res
+    }
+    /** reads a hierarchical string tree in developed form */
+    def apply(s:CharSequence) = params(null,null,None,s,'(',')','=',';',0,s.length)
+}
