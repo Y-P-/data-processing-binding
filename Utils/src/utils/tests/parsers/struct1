@@ -1,0 +1,18 @@
+  glossary= {                     #testing sub layer
+    title="^"example glossary^""  #testing comments & escaped quotes
+    "'Gloss^t Div^u0065'"= {      #testing more escaped special, escaped unicode, quoted name
+      null = null
+      numeric = -0.456e-5                   #testing numeric
+      empty_array = {}                      #testing empty array
+	  string_array = { X Y }                #testing 1 dim array of string
+	  string_arry2 = { { X Y } { Z A } }    #testing simple multi dim array
+      empty_empty  = {{}}                   #testing empty array for empty object
+      object_array = { {"a"=1 "b"=2}        #testing 1 dim array of objects, one char quote
+			           {"c"=3 "d"=4} }
+      object_array2 = { { {"a"=1 "b"=2}     #testing multi dim array of objects
+			              {"c"=3,"d"=4} }
+                        { {"a"=1,"b"=2}
+			              {"c"=3,"d"=4}
+			              { u v w } }
+			          }
+    }

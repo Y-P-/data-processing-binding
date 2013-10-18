@@ -1,7 +1,8 @@
-package utils.hparser
+package utils.parsers
 
 trait Handler {
   //the standard client code sits here
+  def push(ps:State,idx:Int):Unit
   def push(ps:State,name:String):Unit
   def pull(ps:State,data:String):Unit
   def pull(ps:State):Unit
