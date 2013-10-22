@@ -15,8 +15,8 @@ header = {
     list = { 1 }
     struct = { a = {} b = { c = 1 d = 2 }}
     array = {
-      { x = 4 y = 2 }
-      { x = 5  y = { 3 4 } }
+       { x = 4 y = 2 }
+       { x = 5  y = { 3 4 } }
     }
     id = { id=4 type=10 }
     id = { id=5 type=10 }

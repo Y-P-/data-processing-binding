@@ -42,9 +42,13 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
     final val Space   = 10
     final val Comment = 11  
 
-    @inline var depth:Int=0    //current depth
-    @inline var str:String=_   //current string data; updated by either readQuote or readData
-    @inline var line:Int=_     //current line
+    final def line  = line0
+    final def depth = depth0
+    final def str   = str0
+    
+    @inline protected[this] var depth0:Int=0    //current depth
+    @inline protected[this] var str0:String=_   //current string data; updated by either readQuote or readData
+    @inline protected[this] var line0:Int=_     //current line
     //return from struct => either in anonymous list (6), or in named element (0)
     //return from list   => always in named element (0)
     @inline val frame = new Array[Byte](maxDepth)   //stack of frames
@@ -62,8 +66,9 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
     marks0('"')=Quote
     marks0('#')= if (withComments) Comment else Str
     marks0('\n')=NewLine
+    onInit(this)
     
-    @inline private[this] def err(kind:Int,state:Int,msg:String) = JsonParser.this.err(this,info(kind,state),msg)
+    @inline private[this] def err(kind:Int,state:Int,msg:String) = JsonParser.this.err(info(kind,state),msg)
     @inline protected[this] final def marks(i:Int) = if ((i&0xFFFFFF80)!=0) Str else marks0(i&0x7F)
    
     protected[this] final def innerHandler:PartialFunction[Throwable,Unit] = {
@@ -96,8 +101,8 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
                                     }
                        case e    => e
                      }
-          case '"'  => str=new String(buf,0,b); return
-          case '\n' => if (nlInString) { line+=1; '\n' } else throw unclosedStringError
+          case '"'  => str0=new String(buf,0,b); return
+          case '\n' => if (nlInString) { line0+=1; '\n' } else throw unclosedStringError
           case x    => x
         }
       try { buf(b) = c } catch { case _:ArrayIndexOutOfBoundsException => internalBufferError }
@@ -109,8 +114,8 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
     //method is extremely delicate when comes inlining; and inlining really improves perfs.
     @inline @tailrec private[this] def readData(b:Int,d:CharReader,c:Char):Unit = {
        try { buf(b)=c } catch { case _:ArrayIndexOutOfBoundsException=> throw internalBufferError }
-       val c1 = try { d.nextChar } catch { case CharReader.eod => str=new String(buf,0,b+1); return }
-       if (marks(c1)!=Str) { d.reject; str=new String(buf,0,b+1); return } //the last char read doesn't belong to that current token
+       val c1 = try { d.nextChar } catch { case CharReader.eod => str0=new String(buf,0,b+1); return }
+       if (marks(c1)!=Str) { d.reject; str0=new String(buf,0,b+1); return } //the last char read doesn't belong to that current token
        readData(b+1,d,c1)
     }
     
@@ -126,11 +131,11 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
     }
    
     //returns either the kind of token (Byte) bundled with the length of a string (3 upper bytes)
-    @inline @tailrec final private[this] def read(d:CharReader,spy:Spy):Int = {
+    @inline @tailrec final private[this] def read(d:CharReader):Int = {
       try {
         var c=d.nextChar
         (marks(c): @switch) match {
-          case Str=>     readData(0,d,c); checkData(str); return Str
+          case Str=>     readData(0,d,c); checkData(str0); return Str
           case Open=>    return Open
           case Close=>   return Close
           case OpenA=>   return OpenA
@@ -139,11 +144,11 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
           case End=>     return End
           case Quote=>   readQuote(0,d); return Quote
           case Space=>   
-          case NewLine=> line+=1; spy.line = line
-          case Comment=> do { c=d.nextChar } while (c!='\n'); line+=1; spy.line = line
+          case NewLine=> line0+=1
+          case Comment=> do { c=d.nextChar } while (c!='\n'); line0+=1
         }
       } catch { case CharReader.eod => return Exit }
-      read(d,spy)
+      read(d)
     }
     
     //jumps over open/close until (nb open - nb close) = depth+1
@@ -158,10 +163,10 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
                               do {
                                 old=c
                                 c = try { d.nextChar } catch { case CharReader.eod => throw unclosedStringEODError }
-                                if (c=='\n') if (nlInString) line+=1 else throw unclosedStringError else line+=1
+                                if (c=='\n') if (nlInString) line0+=1 else throw unclosedStringError else line0+=1
                               } while (marks(c)!=Quote || old=='\\')
-        case Comment       => do { c=d.nextChar } while (c!='\n'); line+=1
-        case NewLine       => line+=1
+        case Comment       => do { c=d.nextChar } while (c!='\n'); line0+=1
+        case NewLine       => line0+=1
         case _             =>
       }
       readFast(d,n)
@@ -169,78 +174,78 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
 
     //returns the next state after this switch.
     //Two cases: switch branch is goto: state changes, no token read. switch branch is return: state may change, new token is read.
-    @inline @tailrec final private[this] def doSwitch(kind:Int,go:Int,spy:Spy):Int = {
+    @inline @tailrec final private[this] def doSwitch(kind:Int,go:Int):Int = {
       //using imbricated dense switch to benefit from the tableswitch JVM instruction (verified.)
       //trying one big switch is self defeating (worse perfs due to holes and either a lookupswitch or an intermediary state table)
       (go: @switch) match {
         case 0=> (kind: @switch) match { //object start
-          case Open   => try { depth+=1; frame(depth)=9 } catch { case _:ArrayIndexOutOfBoundsException=> throw internalFrameBufferError }; try { spy.depth=depth } catch innerHandler; return 4   //object
+          case Open   => try { depth0+=1; frame(depth0)=9 } catch { case _:ArrayIndexOutOfBoundsException=> throw internalFrameBufferError }; return 4   //object
         }
         case 1=> (kind: @switch) match { //array start
-          case OpenA  => try { depth+=1; frame(depth)=11; idx(depth)=0 } catch { case _:ArrayIndexOutOfBoundsException=> throw internalFrameBufferError }; try { spy.depth=depth } catch innerHandler; return 7   //array
+          case OpenA  => try { depth0+=1; frame(depth0)=11; idx(depth0)=0 } catch { case _:ArrayIndexOutOfBoundsException=> throw internalFrameBufferError }; return 7   //array
         }
         case 2=> (kind: @switch) match { //closing object
-          case Close  => if (depth<=0) err(kind,2,s"closing a frame at depth $depth is illegal"); depth-=1; var r=frame(depth); try { spy.depth=depth; pull(this) } catch innerHandler; return r
+          case Close  => if (depth0<=0) err(kind,2,s"closing a frame at depth $depth0 is illegal"); depth0-=1; var r=frame(depth0); return r
         }
         case 3=> (kind: @switch) match { //closing object or array
-          case CloseA => if (depth<=0) err(kind,2,s"closing a frame at depth $depth is illegal"); depth-=1; var r=frame(depth); try { spy.depth=depth; pull(this) } catch innerHandler; return r
+          case CloseA => if (depth0<=0) err(kind,2,s"closing a frame at depth $depth0 is illegal"); depth0-=1; var r=frame(depth0); return r
         }
         case 4=> (kind: @switch) match {      //after object start
-          case Close => doSwitch(kind,2,spy)  //empty
-          case Quote => doSwitch(kind,5,spy)  //name read
+          case Close => doSwitch(kind,2)  //empty
+          case Quote => doSwitch(kind,5)  //name read
         }
         case 5=> (kind: @switch) match {      //after object start
-          case Quote => try { push(this,str) } catch innerHandler; return 6  //name read
+          case Quote => try { push(str0) } catch innerHandler; return 6  //name read
         }
         case 6=> (kind: @switch) match {      // = now pass on equal
           case Eq    => return 8              //value expected
         }
         case 7=> (kind: @switch) match { //after array start
-          case CloseA => doSwitch(kind,3,spy)   //empty
-          case _      => doSwitch(kind,10,spy)  //value expected
+          case CloseA => doSwitch(kind,3)   //empty
+          case _      => doSwitch(kind,10)  //value expected
         }
         case 8=> (kind: @switch) match { //read value in object
-          case Open      => doSwitch(kind,0,spy) //sub object
-          case OpenA     => doSwitch(kind,1,spy) //sub array
-          case Str|Quote => try { pull(this,str) } catch innerHandler; 9 //value
+          case Open      => doSwitch(kind,0) //sub object
+          case OpenA     => doSwitch(kind,1) //sub array
+          case Str|Quote => try { pull(str0) } catch innerHandler; 9 //value
         }
         case 9=> (kind: @switch) match {
-          case Exit  => if (depth>0) err(kind,0,"premature end of data") else throw exit
-          case Close => doSwitch(kind,2,spy)
+          case Exit  => if (depth0>0) err(kind,0,"premature end of data") else throw exit
+          case Close => doSwitch(kind,2)
           case End   => return 5
         }
-        case 10=> try { val i=idx(depth); idx(depth)+=1; push(this,i) } catch innerHandler; (kind: @switch) match { //read value in array
-           case Open      => doSwitch(kind,0,spy) //sub object
-           case OpenA     => doSwitch(kind,1,spy) //sub array
-           case Str|Quote => try { pull(this,str) } catch innerHandler; return 11
+        case 10=> try { val i=idx(depth0); idx(depth0)+=1; push(i) } catch innerHandler; (kind: @switch) match { //read value in array
+           case Open      => doSwitch(kind,0) //sub object
+           case OpenA     => doSwitch(kind,1) //sub array
+           case Str|Quote => try { pull(str0) } catch innerHandler; return 11
         }
         case 11=> (kind: @switch) match {
-          case CloseA => doSwitch(kind,3,spy)
+          case CloseA => doSwitch(kind,3)
           case End    => return 10
         }
       }
     }
   
-    @tailrec final private[this] def doFrame(d:CharReader,spy:Spy,go:Int):Unit = {
+    @tailrec final private[this] def doFrame(d:CharReader,go:Int):Unit = {
       val r = try {
-        val k=read(d,spy)
+        val k=read(d)
         try {
-          doSwitch(k,go,spy)
+          doSwitch(k,go)
         } catch {
-          case j:Jump if depth==j.n || depth<0 => return
-          case j:Jump if depth<j.n             => readFast(d,j.n+1); depth-=j.n; 0
-          case j:Jump if depth>j.n             => err(k,go,s"illegal jump out of ${j.n} frames ($depth available)")
+          case j:Jump if depth0==j.n || depth0<0 => return
+          case j:Jump if depth0<j.n             => readFast(d,j.n+1); depth0-=j.n; 0
+          case j:Jump if depth0>j.n             => err(k,go,s"illegal jump out of ${j.n} frames ($depth0 available)")
           case _:MatchError                    => err(k,go,s"illegal transition")
         }
       } catch {
         case e:Internal => err(Str,go,e.msg)
       }
-      doFrame(d,spy,r)
+      doFrame(d,r)
     }
   
-    final def apply(d:CharReader,spy:Spy) = try { frame(0)=9; doFrame(d,spy,8) } catch { case `exit`=> }
+    final def apply(d:CharReader) = try { frame(0)=9; doFrame(d,8) } catch { case `exit`=> }
     
-    def info(kind:Int,state:Int):String = s"transition from  state $state with kind $kind at line $line and depth $depth ; last token known: '$str'"
+    def info(kind:Int,state:Int):String = s"transition from  state $state with kind $kind at line $line0 and depth $depth0 ; last token known: '$str0'"
   }
 
   /**
@@ -262,7 +267,6 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
    * 
    * This is thread safe, except possibly spy which is used for update if so requested.
    */
-  final def apply(d:CharReader,spy:Spy):Unit = (new Info)(d,spy)
-  final def apply(d:CharReader):Unit = (new Info)(d,noSpy)
+  final def apply(d:CharReader):Unit = (new Info)(d)
   final def abort(n:Int) = throw new ParserUtilities.Jump(n)
 }

@@ -16,11 +16,4 @@ final object ParserUtilities {
   protected[parsers] object exit extends Exception {
     override def fillInStackTrace = this    
   }
-    
-  protected[parsers] val noSpy = new Spy {
-    def line:Int=0
-    def depth:Int=0
-    def line_=(l:Int) = {}
-    def depth_=(l:Int) = {}
-  }
 }

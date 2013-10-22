@@ -19,14 +19,14 @@ object Test {
     val userCtx = new loader.core.UserContext[Element { type Kind<:String }] {
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5))
       override def isInclude(elt:E)(s:elt.Kind):Boolean = !elt.isInstanceOf[loader.core.CtxCore.Def#Terminal]
-      override def solveInclude(elt:E)(s:elt.Kind) = new loader.parsers.Struct(false).run(new java.io.File("verysmall1.txt").toURI, "UTF-8")
+      override def solveInclude(elt:E)(s:elt.Kind) = new loader.parsers.Struct(256,40,false).run(new java.io.File("verysmall1.txt").toURI, "UTF-8")
       override def qName(elt:E) = {
         val q=super.qName(elt)
         if (q!=null) new QName(elt.name.capitalize,q.prefix,q.isAttrib)
         else         new QName(elt.name.capitalize)
       }
     }
-    val p = new parsers.Struct(false)
+    val p = new parsers.Struct(256,40,false)
     
     if (true) {
       val out = new java.io.PrintWriter(System.out)

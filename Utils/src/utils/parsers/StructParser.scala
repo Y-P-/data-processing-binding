@@ -57,12 +57,16 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
     final val Quote   = 6
     final val NewLine = 7
     final val Space   = 8
-    final val Comment = 9  
+    final val Comment = 9
+    
+    final def line  = line0
+    final def depth = depth0
+    final def str   = str0
 
-    @inline var depth:Int=0    //current depth
-    @inline var str0:String=_  //current string data; updated by either readQuote or readData
-    @inline var str:String=_   //current string data; updated by either readQuote or readData
-    @inline var line:Int=_     //current line
+    @inline protected[this] var depth0:Int=0    //current depth
+    @inline protected[this] var str0:String=_   //current string data; updated by either readQuote or readData
+    @inline protected[this] var str1:String=_   //current string data; updated by either readQuote or readData
+    @inline protected[this] var line0:Int=_     //current line
     //return from struct => either in anonymous list (6), or in named element (0)
     //return from list   => always in named element (0)
     @inline val frame   = new Array[Byte](maxDepth)   //stack of frames
@@ -83,8 +87,9 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
     if (esc!=0) quoteClass0(esc)=1 //escaped char
     quoteClass0(quote)=2 //end of string
     quoteClass0('\n')=3  //new line
+    onInit(this)
     
-    @inline private[this] final def err(kind:Int,state:Int,msg:String) = StructParser.this.err(this,info(kind,state),msg)
+    @inline private[this] final def err(kind:Int,state:Int,msg:String) = StructParser.this.err(info(kind,state),msg)
     //execution shows this removes array limits checks (in addition to being necessary!)
     @inline private[this] final def marks(i:Int)      = if ((0xFFFFFF80&i)==0) marks0(i&0x7F) else Str
     @inline private[this] final def escape(i:Int)     = if ((0xFFFFFF80&i)==0) escape0(i)     else '-'
@@ -117,8 +122,8 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
                   }
                   else if (c1=='-') throw new Internal("illegal escape sequence")
                   else c1
-          case 2  => str=new String(buf,0,b); return
-          case 3  => if (nlInString) { line+=1; '\n' } else throw unclosedStringError
+          case 2  => str0=new String(buf,0,b); return
+          case 3  => if (nlInString) { line0+=1; '\n' } else throw unclosedStringError
           case _  => c0
         }
       try { buf(b) = c1 } catch { case _:ArrayIndexOutOfBoundsException => internalBufferError }
@@ -130,28 +135,28 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
     //method is extremely delicate when comes inlining; and inlining really improves perfs.
     @inline @tailrec private[this] def readData(b:Int,d:CharReader,c:Char):Unit = {
        try { buf(b)=c } catch { case _:ArrayIndexOutOfBoundsException=> throw internalBufferError }
-       val c1 = try { d.nextChar } catch { case CharReader.eod => str=new String(buf,0,b+1); return }
-       if (marks(c1)!=Str) { d.reject; str=new String(buf,0,b+1); return } //the last char read doesn't belong to that current token
+       val c1 = try { d.nextChar } catch { case CharReader.eod => str0=new String(buf,0,b+1); return }
+       if (marks(c1)!=Str) { d.reject; str0=new String(buf,0,b+1); return } //the last char read doesn't belong to that current token
        readData(b+1,d,c1)
     }
     
     //returns either the kind of token (Byte) bundled with the length of a string (3 upper bytes)
-    @inline @tailrec final private[this] def read(d:CharReader,spy:Spy):Int = {
+    @inline @tailrec final private[this] def read(d:CharReader):Int = {
       try {
         var c=d.nextChar
         (marks(c): @switch) match {
-          case Str=>     str0=str; readData(0,d,c); return Str
+          case Str=>     str1=str0; readData(0,d,c); return Str
           case Open=>    return Open
           case Close=>   return Close
           case Eq=>      return Eq
           case End=>     return End
-          case Quote=>   str0=str; readQuote(0,d); return Str
+          case Quote=>   str1=str0; readQuote(0,d); return Str
           case Space=>   
-          case NewLine=> line+=1; spy.line = line
-          case Comment=> do { c=d.nextChar } while (c!='\n'); line+=1; spy.line = line
+          case NewLine=> line0+=1
+          case Comment=> do { c=d.nextChar } while (c!='\n'); line0+=1
         }
       } catch { case CharReader.eod => return Exit }
-      read(d,spy)
+      read(d)
     }
     //jumps over open/close until (nb open - nb close) = depth+1
     //in effect: depth=0: jump to the end of the current layer, depth=1: jump to the end of the previous layer etc.
@@ -165,71 +170,75 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
                         do {
                           old=c
                           c = try { d.nextChar } catch { case CharReader.eod => throw unclosedStringEODError }
-                          if (c=='\n') if (nlInString) line+=1 else throw unclosedStringError else line+=1
+                          if (c=='\n') if (nlInString) line0+=1 else throw unclosedStringError else line0+=1
                         } while (marks(c)!=Quote || old=='\\')
-        case Comment => do { c=d.nextChar } while (c!='\n'); line+=1
-        case NewLine => line+=1
+        case Comment => do { c=d.nextChar } while (c!='\n'); line0+=1
+        case NewLine => line0+=1
         case _       =>
       }
       readFast(d,n)
     }
 
     //returns the next state after this switch.
-    @inline @tailrec final private[this] def doSwitch(kind:Int,go:Int,spy:Spy):Int = {
+    @inline @tailrec final private[this] def doSwitch(kind:Int,go:Int):Int = {
       //using imbricated dense switch to benefit from the tableswitch JVM instruction (verified.)
       //trying one big switch is self defeating (worse perfs due to holes and either a lookupswitch or an intermediary state table)
       (go: @switch) match {
         case 0=> (kind: @switch) match { //structure content analysis (list of sub-fields)
-          case Close => if (depth<=0) err(kind,2,s"closing a frame at depth $depth is illegal"); depth-=1; var r=frame(depth); try { spy.depth=depth; pull(this) } catch innerHandler; return r
-          case Str   => try { push(this,str) } catch innerHandler; return 1
+          case Close => if (depth0<=0) err(kind,2,s"closing a frame at depth $depth0 is illegal"); depth0-=1; var r=frame(depth); try { pull() } catch innerHandler; return r
+          case Str   => try { push(str0) } catch innerHandler; return 1
           case Exit  => throw exit
          }
         case 1=> (kind: @switch) match {       //field equal: fld = value
           case Eq => return 2
         }
         case 2=> (kind: @switch) match {       //field analysis
-          case Open => try { depth+=1; frame(depth)=0 } catch { case _:ArrayIndexOutOfBoundsException=> throw internalBufferError }; try { spy.depth=depth } catch innerHandler; return 3   //object or array. By default, we say object.
-          case Str  => try { pull(this,str) } catch innerHandler; return 0   //basic field
+          case Open => try { depth0+=1; frame(depth0)=0 } catch { case _:ArrayIndexOutOfBoundsException=> throw internalBufferError }; return 3   //object or array. By default, we say object.
+          case Str  => try { pull(str0) } catch innerHandler; return 0   //basic field
         }
-        case 3=> (kind: @switch) match {                                     //substructure analysis: first token
-          case Open  => frame(depth)=6; push(this,0); idx(depth)=0; doSwitch(kind,2,spy)   //is array of object/array
-          case Close => doSwitch(kind,0,spy)                                 //is empty (by default empty array)
+        case 3=> (kind: @switch) match {                                 //substructure analysis: first token is checked
+          //is array of object/array; note the specific Jump handler: if push wants to jump, it is from the first Open, but we already are in the second.
+          case Open  => frame(depth0)=6; try { push(0) } catch { case j:Jump => depth0+=1; throw new Jump(j.n+1); case e:Throwable => handler(e) }; idx(depth0)=0; doSwitch(kind,2)
+          case Close => doSwitch(kind,0)                                     //is empty (by default empty array)
           case Str   => return 4                                             //don't know yet : array (of strings) or object ?
         }
         case 4=> (kind: @switch) match {       //array/object disambiguation
-          case Close => try { frame(depth)=5; push(this,0); pull(this,str) } catch innerHandler; doSwitch(kind,0,spy)  //single string array
-          case Eq    => try { push(this,str) } catch innerHandler; 2                                                   //we have an object
-          case Str   => try { frame(depth)=5; push(this,0); pull(this,str0); push(this,1); pull(this,str); idx(depth)=1 } catch innerHandler; return 5 //multi elt array
+          //single string array; note the specific Jump handler: Open/Close have been read! so any attempt to jump must ignore the current layer
+          case Close => try { frame(depth0)=5; push(0); pull(str0) } catch { case j:Jump => if (j.n>0) throw new Jump(j.n-1); case e:Throwable => handler(e) }; doSwitch(kind,0)
+          //we have an object
+          case Eq    => try { push(str0) } catch innerHandler; return 2 
+          //multi elt array
+          case Str   => try { frame(depth0)=5; push(0); pull(str1); push(1); pull(str0); idx(depth0)=1 } catch innerHandler; return 5
         }
         case 5=> (kind: @switch) match {       //string array iteration (note that we wrote frame(depth)=5, but this won't ever be used for lack of children)
-          case Close => doSwitch(kind,0,spy)
-          case Str   => try { idx(depth)+=1; push(this,idx(depth)); pull(this,str) } catch innerHandler; return 5   //iterate on same state
+          case Close => doSwitch(kind,0)
+          case Str   => try { idx(depth0)+=1; push(idx(depth0)); pull(str0) } catch innerHandler; return 5   //iterate on same state
          }
         case 6=> (kind: @switch) match {       //other array iteration
-          case Open  => idx(depth)+=1; push(this,idx(depth)); doSwitch(kind,2,spy)   //new substructure
-          case Close => doSwitch(kind,0,spy)   //end of array
+          case Open  => idx(depth0)+=1; try { push(idx(depth0)) } catch innerHandler; doSwitch(kind,2)   //new substructure
+          case Close => doSwitch(kind,0)   //end of array
         }
       }
     }
   
-    @tailrec final private[this] def doFrame(d:CharReader,spy:Spy,go:Int):Unit = {
+    @tailrec final private[this] def doFrame(d:CharReader,go:Int):Unit = {
       val r = try {
-        val k=read(d,spy)
+        val k=read(d)
         try {
-          doSwitch(k,go,spy)
+          doSwitch(k,go)
         } catch {
           case j:Jump if depth==j.n || depth<0 => return
-          case j:Jump if depth<j.n             => readFast(d,j.n+1); depth-=j.n; 0
-          case j:Jump if depth>j.n             => err(k,go,s"illegal jump out of ${j.n} frames ($depth available)")
+          case j:Jump if depth>j.n             => readFast(d,j.n); depth0-=j.n; 0
+          case j:Jump if depth<j.n             => err(k,go,s"illegal jump out of ${j.n} frames ($depth available)")
           case _:MatchError                    => err(k,go,s"illegal transition from state $go with token $k")
         }
       } catch {
         case e:Internal => err(Str,go,e.msg)
       }
-      doFrame(d,spy,r)
+      doFrame(d,r)
     }
   
-    private[StructParser] final def apply(d:CharReader,spy:Spy) = try { frame(0)=0; doFrame(d,spy,0) } catch { case `exit`=> }
+    private[StructParser] final def apply(d:CharReader) = try { frame(0)=0; doFrame(d,0) } catch { case `exit`=> }
     
     def info(kind:Int,state:Int):String = s"transition from  state $state with kind $kind at line $line and depth $depth ; last token known: '$str'"
   }
@@ -253,8 +262,7 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
    * 
    * This is thread safe, except possibly spy which is used for update if so requested.
    */
-  def apply(d:CharReader,spy:Spy):Unit = (new Info)(d,spy)
-  def apply(d:CharReader):Unit = (new Info)(d,noSpy)
+  def apply(d:CharReader):Unit = (new Info)(d)
   def abort(n:Int):Nothing = throw new Jump(n)
 }
 

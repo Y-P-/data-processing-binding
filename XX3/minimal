@@ -1,0 +1,12 @@
+header = { 
+    startdate = {
+        year = 1869
+        month = january
+        day = 13
+    } 
+    enddate = { year = 1936 month = january day = 0 } 
+    tutorial = yes
+    id = { type = 4712 id = 546749 }
+    ignored = 2
+    jumped = 7
+}
