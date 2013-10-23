@@ -12,7 +12,7 @@ import utils.Reader
 import loader.reflect.Converter
 
 
-class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:Boolean=false) extends Handler {self=>
+class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:Boolean=false) extends HandlerBridge {self=>
 
   def apply(start:BaseProcessor#Top[Kind]):Parser = new Parser(start)
   

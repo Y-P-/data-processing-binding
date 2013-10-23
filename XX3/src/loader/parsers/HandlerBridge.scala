@@ -15,7 +15,7 @@ import utils.Reader
  *  - def apply(d:CharReader):Unit  (statring the underlying parser)
  *  - behaviour with abort
  */
-abstract class Handler extends ParserBuilder {self=>
+abstract class HandlerBridge extends ParserBuilder {self=>
   import ParserBuilder._
 
   type Kind = String                              //produces strings
