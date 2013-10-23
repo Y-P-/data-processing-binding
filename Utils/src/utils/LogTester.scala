@@ -13,8 +13,10 @@ import Assert._
 /** Used to pass a test.
  *  @param junit, indicates if junit is used, in which case junit methods are used.
  *         otherwise, the result is printed on the console.
+ *  @param handlers, a list of handlers to check for false positive (i.e. expected
+ *         differences)
  */
-class Tester(val junit:Boolean,val handlers:Seq[Tester.Comparator]) {
+class LogTester(val junit:Boolean,val handlers:LogTester.Comparator*) {
   val comp = handlers.reduce(_+_)
   def file(name:String) = dir.resolve(new URI(name).getPath)
   val dir = new File(".").toURI.resolve(new URI(s"test/${getClass.getSimpleName}/"))
@@ -27,7 +29,7 @@ class Tester(val junit:Boolean,val handlers:Seq[Tester.Comparator]) {
     out.write(runIt.toString)
     out.write("\n")
     out.flush
-    if (junit) Tester.checkStrings(comp)(in,out.toString) {
+    if (junit) LogTester.checkStrings(comp)(in,out.toString) {
       println(s"comparing with $fin")
       val f1 = new File(new URI(fin.toString+".out"))
       println(f1)
@@ -39,7 +41,7 @@ class Tester(val junit:Boolean,val handlers:Seq[Tester.Comparator]) {
   }
 }
 
-object Tester {
+object LogTester {
   val p1 = Pattern.compile("\\s*")
 
   /** Defines methods to check to handle expected differences.
