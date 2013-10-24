@@ -66,7 +66,7 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
     @inline protected[this] var depth0:Int=0    //current depth
     @inline protected[this] var str0:String=_   //current string data; updated by either readQuote or readData
     @inline protected[this] var str1:String=_   //current string data; updated by either readQuote or readData
-    @inline protected[this] var line0:Int=_     //current line
+    @inline protected[this] var line0:Int=1     //current line
     //return from struct => either in anonymous list (6), or in named element (0)
     //return from list   => always in named element (0)
     @inline val frame   = new Array[Byte](maxDepth)   //stack of frames

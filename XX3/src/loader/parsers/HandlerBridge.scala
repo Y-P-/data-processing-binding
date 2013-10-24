@@ -1,14 +1,10 @@
 package loader.parsers
 
-import loader.core.ParserBuilder
-import loader.core.definition.Def
-import loader.core.Locator
 import java.net.URI
-import loader.core.ParserSpawner
-import utils.parsers.StructParser
 import utils.parsers.State
-import utils.CharReader
-import utils.Reader
+import utils.{CharReader,ByteArrayReader}
+import loader.core.{ParserBuilder,ParserSpawner,Locator}
+import loader.core.definition.Def
 
 /** A standard bridge between utils.parsers.Handler and ParserBuilder.Parser.
  *  You should care about :
@@ -37,6 +33,6 @@ abstract class HandlerBridge extends ParserBuilder {self=>
     def read(in: java.io.Reader): Unit =
       this.apply(in)
     override def read(uri: URI, encoding: String): Unit = 
-      this.apply(CharReader(Reader(uri),if (encoding == null) "ISO-8859-15" else encoding))
+      this.apply(CharReader(ByteArrayReader(uri),if (encoding == null) "ISO-8859-15" else encoding))
   }
 }

@@ -12,7 +12,7 @@ public abstract class TokenReader {
   public int  line     =  0;
   
   public TokenReader(parser.Source src) {
-    this.data = utils.Reader.apply(src.uri());
+    this.data = utils.ByteArrayReader.apply(src.uri());
     this.encoding = src.encoding();
   }
 	  

@@ -48,7 +48,7 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
     
     @inline protected[this] var depth0:Int=0    //current depth
     @inline protected[this] var str0:String=_   //current string data; updated by either readQuote or readData
-    @inline protected[this] var line0:Int=_     //current line
+    @inline protected[this] var line0:Int=1     //current line
     //return from struct => either in anonymous list (6), or in named element (0)
     //return from list   => always in named element (0)
     @inline val frame = new Array[Byte](maxDepth)   //stack of frames
@@ -185,10 +185,10 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
           case OpenA  => try { depth0+=1; frame(depth0)=11; idx(depth0)=0 } catch { case _:ArrayIndexOutOfBoundsException=> throw internalFrameBufferError }; return 7   //array
         }
         case 2=> (kind: @switch) match { //closing object
-          case Close  => if (depth0<=0) err(kind,2,s"closing a frame at depth $depth0 is illegal"); depth0-=1; var r=frame(depth0); return r
+          case Close  => if (depth0<=0) err(kind,2,s"closing a frame at depth $depth0 is illegal"); depth0-=1; var r=frame(depth0); pull(); return r
         }
         case 3=> (kind: @switch) match { //closing object or array
-          case CloseA => if (depth0<=0) err(kind,2,s"closing a frame at depth $depth0 is illegal"); depth0-=1; var r=frame(depth0); return r
+          case CloseA => if (depth0<=0) err(kind,2,s"closing a frame at depth $depth0 is illegal"); depth0-=1; var r=frame(depth0); pull(); return r
         }
         case 4=> (kind: @switch) match {      //after object start
           case Close => doSwitch(kind,2)  //empty
@@ -233,9 +233,9 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
           doSwitch(k,go)
         } catch {
           case j:Jump if depth0==j.n || depth0<0 => return
-          case j:Jump if depth0<j.n             => readFast(d,j.n+1); depth0-=j.n; 0
-          case j:Jump if depth0>j.n             => err(k,go,s"illegal jump out of ${j.n} frames ($depth0 available)")
-          case _:MatchError                    => err(k,go,s"illegal transition")
+          case j:Jump if depth0<j.n              => readFast(d,j.n); depth0-=j.n; 0
+          case j:Jump if depth0>j.n              => err(k,go,s"illegal jump out of ${j.n} frames ($depth0 available)")
+          case _:MatchError                      => err(k,go,s"illegal transition")
         }
       } catch {
         case e:Internal => err(Str,go,e.msg)

@@ -1,0 +1,112 @@
+=> glossary-
+=> glossary-title-
+glossary-title-<"example glossary"> (line: 2)
+<= glossary-title-
+=> glossary-'Gloss	 Dive'-
+=> glossary-'Gloss	 Dive'-null-
+glossary-'Gloss	 Dive'-null-<null> (line: 4)
+<= glossary-'Gloss	 Dive'-null-
+=> glossary-'Gloss	 Dive'-numeric-
+glossary-'Gloss	 Dive'-numeric-<-0.456e-5> (line: 5)
+<= glossary-'Gloss	 Dive'-numeric-
+=> glossary-'Gloss	 Dive'-empty_array-
+<= glossary-'Gloss	 Dive'-empty_array-
+=> glossary-'Gloss	 Dive'-string_array-
+=> glossary-'Gloss	 Dive'-string_array-0-
+glossary-'Gloss	 Dive'-string_array-0-<X> (line: 7)
+<= glossary-'Gloss	 Dive'-string_array-0-
+=> glossary-'Gloss	 Dive'-string_array-1-
+glossary-'Gloss	 Dive'-string_array-1-<Y> (line: 7)
+<= glossary-'Gloss	 Dive'-string_array-1-
+<= glossary-'Gloss	 Dive'-string_array-
+=> glossary-'Gloss	 Dive'-string_arry2-
+=> glossary-'Gloss	 Dive'-string_arry2-0-
+=> glossary-'Gloss	 Dive'-string_arry2-0-0-
+glossary-'Gloss	 Dive'-string_arry2-0-0-<X> (line: 8)
+<= glossary-'Gloss	 Dive'-string_arry2-0-0-
+=> glossary-'Gloss	 Dive'-string_arry2-0-1-
+glossary-'Gloss	 Dive'-string_arry2-0-1-<Y> (line: 8)
+<= glossary-'Gloss	 Dive'-string_arry2-0-1-
+<= glossary-'Gloss	 Dive'-string_arry2-0-
+=> glossary-'Gloss	 Dive'-string_arry2-1-
+=> glossary-'Gloss	 Dive'-string_arry2-1-0-
+glossary-'Gloss	 Dive'-string_arry2-1-0-<Z> (line: 8)
+<= glossary-'Gloss	 Dive'-string_arry2-1-0-
+=> glossary-'Gloss	 Dive'-string_arry2-1-1-
+glossary-'Gloss	 Dive'-string_arry2-1-1-<A> (line: 8)
+<= glossary-'Gloss	 Dive'-string_arry2-1-1-
+<= glossary-'Gloss	 Dive'-string_arry2-1-
+<= glossary-'Gloss	 Dive'-string_arry2-
+=> glossary-'Gloss	 Dive'-empty_empty-
+=> glossary-'Gloss	 Dive'-empty_empty-0-
+<= glossary-'Gloss	 Dive'-empty_empty-0-
+<= glossary-'Gloss	 Dive'-empty_empty-
+=> glossary-'Gloss	 Dive'-object_array-
+=> glossary-'Gloss	 Dive'-object_array-0-
+=> glossary-'Gloss	 Dive'-object_array-0-a-
+glossary-'Gloss	 Dive'-object_array-0-a-<1> (line: 10)
+<= glossary-'Gloss	 Dive'-object_array-0-a-
+=> glossary-'Gloss	 Dive'-object_array-0-b-
+glossary-'Gloss	 Dive'-object_array-0-b-<2> (line: 10)
+<= glossary-'Gloss	 Dive'-object_array-0-b-
+<= glossary-'Gloss	 Dive'-object_array-0-
+=> glossary-'Gloss	 Dive'-object_array-1-
+=> glossary-'Gloss	 Dive'-object_array-1-c-
+glossary-'Gloss	 Dive'-object_array-1-c-<3> (line: 11)
+<= glossary-'Gloss	 Dive'-object_array-1-c-
+=> glossary-'Gloss	 Dive'-object_array-1-d-
+glossary-'Gloss	 Dive'-object_array-1-d-<4> (line: 11)
+<= glossary-'Gloss	 Dive'-object_array-1-d-
+<= glossary-'Gloss	 Dive'-object_array-1-
+<= glossary-'Gloss	 Dive'-object_array-
+=> glossary-'Gloss	 Dive'-object_array2-
+=> glossary-'Gloss	 Dive'-object_array2-0-
+=> glossary-'Gloss	 Dive'-object_array2-0-0-
+=> glossary-'Gloss	 Dive'-object_array2-0-0-a-
+glossary-'Gloss	 Dive'-object_array2-0-0-a-<1> (line: 12)
+<= glossary-'Gloss	 Dive'-object_array2-0-0-a-
+=> glossary-'Gloss	 Dive'-object_array2-0-0-b-
+glossary-'Gloss	 Dive'-object_array2-0-0-b-<2> (line: 12)
+<= glossary-'Gloss	 Dive'-object_array2-0-0-b-
+<= glossary-'Gloss	 Dive'-object_array2-0-0-
+=> glossary-'Gloss	 Dive'-object_array2-0-1-
+=> glossary-'Gloss	 Dive'-object_array2-0-1-c-
+glossary-'Gloss	 Dive'-object_array2-0-1-c-<3,> (line: 13)
+<= glossary-'Gloss	 Dive'-object_array2-0-1-c-
+=> glossary-'Gloss	 Dive'-object_array2-0-1-d-
+glossary-'Gloss	 Dive'-object_array2-0-1-d-<4> (line: 13)
+<= glossary-'Gloss	 Dive'-object_array2-0-1-d-
+<= glossary-'Gloss	 Dive'-object_array2-0-1-
+<= glossary-'Gloss	 Dive'-object_array2-0-
+=> glossary-'Gloss	 Dive'-object_array2-1-
+=> glossary-'Gloss	 Dive'-object_array2-1-0-
+=> glossary-'Gloss	 Dive'-object_array2-1-0-a-
+glossary-'Gloss	 Dive'-object_array2-1-0-a-<1,> (line: 14)
+<= glossary-'Gloss	 Dive'-object_array2-1-0-a-
+=> glossary-'Gloss	 Dive'-object_array2-1-0-b-
+glossary-'Gloss	 Dive'-object_array2-1-0-b-<2> (line: 14)
+<= glossary-'Gloss	 Dive'-object_array2-1-0-b-
+<= glossary-'Gloss	 Dive'-object_array2-1-0-
+=> glossary-'Gloss	 Dive'-object_array2-1-1-
+=> glossary-'Gloss	 Dive'-object_array2-1-1-c-
+glossary-'Gloss	 Dive'-object_array2-1-1-c-<3,> (line: 15)
+<= glossary-'Gloss	 Dive'-object_array2-1-1-c-
+=> glossary-'Gloss	 Dive'-object_array2-1-1-d-
+glossary-'Gloss	 Dive'-object_array2-1-1-d-<4> (line: 15)
+<= glossary-'Gloss	 Dive'-object_array2-1-1-d-
+<= glossary-'Gloss	 Dive'-object_array2-1-1-
+=> glossary-'Gloss	 Dive'-object_array2-1-2-
+=> glossary-'Gloss	 Dive'-object_array2-1-2-0-
+glossary-'Gloss	 Dive'-object_array2-1-2-0-<u> (line: 16)
+<= glossary-'Gloss	 Dive'-object_array2-1-2-0-
+=> glossary-'Gloss	 Dive'-object_array2-1-2-1-
+glossary-'Gloss	 Dive'-object_array2-1-2-1-<v> (line: 16)
+<= glossary-'Gloss	 Dive'-object_array2-1-2-1-
+=> glossary-'Gloss	 Dive'-object_array2-1-2-2-
+glossary-'Gloss	 Dive'-object_array2-1-2-2-<w> (line: 16)
+<= glossary-'Gloss	 Dive'-object_array2-1-2-2-
+<= glossary-'Gloss	 Dive'-object_array2-1-2-
+<= glossary-'Gloss	 Dive'-object_array2-1-
+<= glossary-'Gloss	 Dive'-object_array2-
+<= glossary-'Gloss	 Dive'-
+()

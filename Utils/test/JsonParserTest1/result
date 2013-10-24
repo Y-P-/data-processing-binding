@@ -1,0 +1,112 @@
+=> .-glossary-
+=> .-glossary-title-
+.-glossary-title-<"example glossary"> (line: 3)
+<= .-glossary-title-
+=> .-glossary-'Gloss	Dive'-
+=> .-glossary-'Gloss	Dive'-null-
+.-glossary-'Gloss	Dive'-null-<null> (line: 5)
+<= .-glossary-'Gloss	Dive'-null-
+=> .-glossary-'Gloss	Dive'-true-
+.-glossary-'Gloss	Dive'-true-<true> (line: 6)
+<= .-glossary-'Gloss	Dive'-true-
+=> .-glossary-'Gloss	Dive'-false-
+.-glossary-'Gloss	Dive'-false-<false> (line: 7)
+<= .-glossary-'Gloss	Dive'-false-
+=> .-glossary-'Gloss	Dive'-numeric-
+.-glossary-'Gloss	Dive'-numeric-<-0.456e-5> (line: 8)
+<= .-glossary-'Gloss	Dive'-numeric-
+=> .-glossary-'Gloss	Dive'-A1-
+=> .-glossary-'Gloss	Dive'-A1-0-
+.-glossary-'Gloss	Dive'-A1-0-<X> (line: 9)
+<= .-glossary-'Gloss	Dive'-A1-0-
+=> .-glossary-'Gloss	Dive'-A1-1-
+.-glossary-'Gloss	Dive'-A1-1-<Y> (line: 9)
+<= .-glossary-'Gloss	Dive'-A1-1-
+=> .-glossary-'Gloss	Dive'-A1-2-
+.-glossary-'Gloss	Dive'-A1-2-<null> (line: 9)
+<= .-glossary-'Gloss	Dive'-A1-2-
+<= .-glossary-'Gloss	Dive'-A1-
+=> .-glossary-'Gloss	Dive'-A2-
+=> .-glossary-'Gloss	Dive'-A2-0-
+=> .-glossary-'Gloss	Dive'-A2-0-0-
+.-glossary-'Gloss	Dive'-A2-0-0-<X> (line: 10)
+<= .-glossary-'Gloss	Dive'-A2-0-0-
+=> .-glossary-'Gloss	Dive'-A2-0-1-
+.-glossary-'Gloss	Dive'-A2-0-1-<Y> (line: 10)
+<= .-glossary-'Gloss	Dive'-A2-0-1-
+<= .-glossary-'Gloss	Dive'-A2-0-
+=> .-glossary-'Gloss	Dive'-A2-1-
+=> .-glossary-'Gloss	Dive'-A2-1-0-
+.-glossary-'Gloss	Dive'-A2-1-0-<Z> (line: 10)
+<= .-glossary-'Gloss	Dive'-A2-1-0-
+=> .-glossary-'Gloss	Dive'-A2-1-1-
+.-glossary-'Gloss	Dive'-A2-1-1-<A> (line: 10)
+<= .-glossary-'Gloss	Dive'-A2-1-1-
+<= .-glossary-'Gloss	Dive'-A2-1-
+<= .-glossary-'Gloss	Dive'-A2-
+=> .-glossary-'Gloss	Dive'-A3-
+<= .-glossary-'Gloss	Dive'-A3-
+=> .-glossary-'Gloss	Dive'-A4-
+=> .-glossary-'Gloss	Dive'-A4-0-
+<= .-glossary-'Gloss	Dive'-A4-0-
+<= .-glossary-'Gloss	Dive'-A4-
+=> .-glossary-'Gloss	Dive'-A5-
+=> .-glossary-'Gloss	Dive'-A5-0-
+=> .-glossary-'Gloss	Dive'-A5-0-a-
+.-glossary-'Gloss	Dive'-A5-0-a-<1> (line: 13)
+<= .-glossary-'Gloss	Dive'-A5-0-a-
+=> .-glossary-'Gloss	Dive'-A5-0-b-
+.-glossary-'Gloss	Dive'-A5-0-b-<2> (line: 13)
+<= .-glossary-'Gloss	Dive'-A5-0-b-
+<= .-glossary-'Gloss	Dive'-A5-0-
+=> .-glossary-'Gloss	Dive'-A5-1-
+=> .-glossary-'Gloss	Dive'-A5-1-c-
+.-glossary-'Gloss	Dive'-A5-1-c-<3> (line: 14)
+<= .-glossary-'Gloss	Dive'-A5-1-c-
+=> .-glossary-'Gloss	Dive'-A5-1-d-
+.-glossary-'Gloss	Dive'-A5-1-d-<4> (line: 14)
+<= .-glossary-'Gloss	Dive'-A5-1-d-
+<= .-glossary-'Gloss	Dive'-A5-1-
+<= .-glossary-'Gloss	Dive'-A5-
+=> .-glossary-'Gloss	Dive'-A6-
+=> .-glossary-'Gloss	Dive'-A6-0-
+=> .-glossary-'Gloss	Dive'-A6-0-0-
+=> .-glossary-'Gloss	Dive'-A6-0-0-a-
+.-glossary-'Gloss	Dive'-A6-0-0-a-<1> (line: 16)
+<= .-glossary-'Gloss	Dive'-A6-0-0-a-
+=> .-glossary-'Gloss	Dive'-A6-0-0-b-
+.-glossary-'Gloss	Dive'-A6-0-0-b-<2> (line: 16)
+<= .-glossary-'Gloss	Dive'-A6-0-0-b-
+<= .-glossary-'Gloss	Dive'-A6-0-0-
+=> .-glossary-'Gloss	Dive'-A6-0-1-
+=> .-glossary-'Gloss	Dive'-A6-0-1-c-
+.-glossary-'Gloss	Dive'-A6-0-1-c-<3> (line: 17)
+<= .-glossary-'Gloss	Dive'-A6-0-1-c-
+=> .-glossary-'Gloss	Dive'-A6-0-1-d-
+.-glossary-'Gloss	Dive'-A6-0-1-d-<4> (line: 17)
+<= .-glossary-'Gloss	Dive'-A6-0-1-d-
+<= .-glossary-'Gloss	Dive'-A6-0-1-
+<= .-glossary-'Gloss	Dive'-A6-0-
+=> .-glossary-'Gloss	Dive'-A6-1-
+=> .-glossary-'Gloss	Dive'-A6-1-0-
+=> .-glossary-'Gloss	Dive'-A6-1-0-a-
+.-glossary-'Gloss	Dive'-A6-1-0-a-<1> (line: 18)
+<= .-glossary-'Gloss	Dive'-A6-1-0-a-
+=> .-glossary-'Gloss	Dive'-A6-1-0-b-
+.-glossary-'Gloss	Dive'-A6-1-0-b-<2> (line: 18)
+<= .-glossary-'Gloss	Dive'-A6-1-0-b-
+<= .-glossary-'Gloss	Dive'-A6-1-0-
+=> .-glossary-'Gloss	Dive'-A6-1-1-
+=> .-glossary-'Gloss	Dive'-A6-1-1-c-
+.-glossary-'Gloss	Dive'-A6-1-1-c-<3> (line: 19)
+<= .-glossary-'Gloss	Dive'-A6-1-1-c-
+=> .-glossary-'Gloss	Dive'-A6-1-1-d-
+.-glossary-'Gloss	Dive'-A6-1-1-d-<4> (line: 19)
+<= .-glossary-'Gloss	Dive'-A6-1-1-d-
+<= .-glossary-'Gloss	Dive'-A6-1-1-
+<= .-glossary-'Gloss	Dive'-A6-1-
+<= .-glossary-'Gloss	Dive'-A6-
+<= .-glossary-'Gloss	Dive'-
+<= .-glossary-
+<= .-
+()

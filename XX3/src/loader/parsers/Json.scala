@@ -1,15 +1,8 @@
 package loader.parsers
 
-import loader.core.ParserBuilder
-import loader.core.definition.Def
-import loader.core.Locator
-import java.net.URI
 import loader.core.ParserSpawner
-import utils.parsers.JsonParser
-import utils.parsers.State
-import utils.CharReader
-import utils.Reader
 import loader.reflect.Converter
+import utils.parsers.JsonParser
 
 
 class Json(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:Boolean=false) extends HandlerBridge {self=>

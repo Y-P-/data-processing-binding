@@ -1,23 +1,22 @@
 package utils.tests.parsers
 
 import utils.parsers._
-import utils.Reader
+import utils.ByteArrayReader
+import utils.LogTester._
+import java.io.PrintWriter
+import org.junit.Test
+
+class StructParserTest(data:String) extends StandardTester {
+  def apply(file:Solver,out0:PrintWriter) = {
+    val parser = new StructParser('{','}','=',';','"','#',256,30,false,'^',Array(('t','\t'),('n','\n'),('u','+'))) with TestHandlerBridge {
+      val out = out0
+    }
+    parser(ByteArrayReader(file(data)))
+  }
+}
+
+@Test class StructParserTest1 extends StructParserTest("struct1")
 
 object StructParserTest {
-  
-  object parser extends StructParser('{','}','=',';','"','#',256,30,false,'^',Array(('t','\t'),('n','\n'),('u','+'))) {
-    var ps:State = _
-    var l = new Array[String](30)
-    def onInit(ps:State)                        = this.ps=ps
-    def push(idx:Int):Unit                      = { l(ps.depth)=idx.toString }
-    def push(name:String):Unit                  = { l(ps.depth)=name }
-    def pull(data:String):Unit                  = { for (j <- 0 to ps.depth) print(if (l(j).length>0) l(j)+"-" else "$-"); println("<"+data+">"); pull()}
-    def pull():Unit                             = { print("<= "); for (j <- 0 to ps.depth) print(if (l(j).length>0) l(j)+"-"); println}
-    def err(detail:String,cause:String):Nothing = throw new IllegalStateException(s"at <${ps.str}> at line ${ps.line} ($cause at $detail)")
-    def handler:PartialFunction[Throwable,Unit] = { case e:Throwable => println(e); throw e; }    
-  }
-
-  def main(args:Array[String]) {
-    parser(Reader(getClass.getResource("struct1").toURI))
-  }  
+  def main(args:Array[String]) = (new StructParserTest1).test
 }

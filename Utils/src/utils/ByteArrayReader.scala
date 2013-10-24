@@ -4,7 +4,7 @@ import _root_.java.nio.charset.Charset
 import _root_.java.nio.channels.FileChannel
 import _root_.java.net.{URL,URI}
 
-object Reader {
+object ByteArrayReader {
   
   /**
    * Reads a local file into a buffer.

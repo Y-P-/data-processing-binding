@@ -1,0 +1,23 @@
+{
+    "glossary": {                           #testing sub layer
+        "title": "\"example glossary\"",    #testing comments & escaped quotes
+		"\'Gloss\t\Div\u0065\'": {          #testing more escaped special, escaped normal, escaped unicode
+            "null":  null,                  #testing null
+            "true":  true,                  #testing true
+            "false": false,                 #testing false
+            "numeric": -0.456e-5,           #testing numeric
+			"A1": [ "X","Y", null ],        #testing simple array
+			"A2": [ ["X","Y"], ["Z", "A"]], #testing simple multi dim array
+			"A3": [],                       #testing empty array
+			"A4": [{}],                     #testing empty array for empty object
+			"A5": [ {"a":1,"b":2},          #testing array of objects; testing numeric value
+			        {"c":3,"d":4}
+			],
+			"A6": [ [ {"a":1,"b":2},        #testing multi dim array of objects
+			  {"c":3,"d":4}],
+              [ {"a":1,"b":2},
+			  {"c":3,"d":4}]
+			]
+        }
+    }
+}

@@ -1,18 +1,11 @@
 package loader.parsers
 
-import loader.core.ParserBuilder
-import loader.core.definition.Def
-import loader.core.Locator
-import java.net.URI
 import loader.core.ParserSpawner
-import utils.parsers.StructParser
-import utils.parsers.State
-import utils.CharReader
-import utils.Reader
 import loader.reflect.Converter
+import utils.parsers.StructParser
 
 
-class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:Boolean=false) extends HandlerBridge {self=>
+class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends HandlerBridge {self=>
 
   def apply(start:BaseProcessor#Top[Kind]):Parser = new Parser(start)
   
