@@ -2,7 +2,6 @@ package loader.features
 
 import java.net.URI
 import java.net.URLDecoder
-import loader.reflect.Converter
 
 /** Class used by default to solve includes.
  *  

@@ -44,3 +44,7 @@ class Formatter(val leftOpen       :String = "]",
     (fmt1,fmt2,fmt3,fmt4)
   }
 }
+object Formatter {
+  //the predefined format
+  implicit val defFmt = new Formatter()  
+}

@@ -5,6 +5,20 @@ import scala.reflect.ClassTag
 import loader.{Element,Assoc,InternalLoaderException,NamedField,Context,Named}
 import loader.core.exceptions.{DynamicInvocation,DynamicConstructor}
 
+object U {
+/*
+ * XXX temporary stopgap
+ */
+class StringConverter[U] {
+  def canConvert(c:Class[_]):Boolean = false
+  def get[U](c:Class[_]):Class[U] = null
+}
+object StringConverter {
+  def canConvert(c:Class[_]):Boolean = false
+  def get[U](c:Class[_]):StringConverter[U] = null
+}
+}
+
 /**
  * A class used to describe the steps necessary to go from a tag to it's final destination.
  */
@@ -14,7 +28,7 @@ protected[loader] final class Analyze protected (
        czLBd:Constructor[_<:AnyRef],               //the constructor for czL
        czColl:Class[_],                            //the collection class, if any
        czS:Class[_],                               //the temporary storage class if any
-       cvF:Converter[Any],                         //the converter to use if any
+       cvF:U.StringConverter[Any],                   //the converter to use if any
        czFNamed:Class[_]                           //the built item encapsulated in a NamedField object ; possibly null
       ) {
   def newLoadable                                 = czLBd.newInstance()
@@ -207,11 +221,11 @@ object Analyze {
     val (isMap,czF0,isNamed,builder) = infoType(gFinal,isList,isSeq)       //gets the key type (map), final expected type, collection builder (collections)
     val czF = if (czF0!=null && czF0!=classOf[AnyRef]) czF0 else throw new DynamicInvocation
     //impossible to staticaly detect the kind of built object ; rely on dynamic binding ; INFO: beware scala autoboxed primitive:we cannot detect them in generics and get Object instead!
-    val czL = (if (czLoad!=null) czLoad else if (Converter.canConvert(czF)) null else czF).asInstanceOf[Class[_<:AnyRef]] //null if we are dealing with a converter
+    val czL = (if (czLoad!=null) czLoad else if (U.StringConverter.canConvert(czF)) null else czF).asInstanceOf[Class[_<:AnyRef]] //null if we are dealing with a converter
     val cons = try { getConstructor(czL) } catch { case e:Exception=> throw new DynamicConstructor }
     val czS = if (isMap) classOf[Assoc[_,_]] else if (isNamed && !isList) classOf[NamedField[_]] else czF //map elts are internally stored as Assoc, named elt are kept as NamedField, others are kept as their final type
-    val cv = if (czL==null || classOf[Converter[_]].isAssignableFrom(czL) || czL!=czF)          //terminal fields using converters, not loaders...
-               if (czF0==null) null else Converter.get[Any](czF)
+    val cv = if (czL==null || classOf[U.StringConverter[_]].isAssignableFrom(czL) || czL!=czF)          //terminal fields using converters, not loaders...
+               if (czF0==null) null else U.StringConverter.get[Any](czF)
              else
                null
     new Analyze(czL,czF,cons,builder,czS,cv,if (isNamed) czF else null)

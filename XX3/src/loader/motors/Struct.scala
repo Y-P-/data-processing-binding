@@ -5,7 +5,6 @@ import loader._
 import utils.Indent
 import loader.core._
 import loader.core.callbacks._
-import loader.reflect.Converter
 import java.io.FileWriter
 import java.io.File
 import java.io.OutputStreamWriter
@@ -35,11 +34,6 @@ object Struct extends Processor {self=>
     
       type Result = Unit
  
-      //Note: because we work on unknown data structures (no context in ExtCore), we can only know the kind of a tag (final/container)
-      //after either its onVal or its onChild method has been called.
-      // - onVal   => we have a valued element: it begins as     name =
-      // - onChild => we have a container element: it begins as  name = {
-      // - onEnd   => we have an empty element: it begins as     name = {
       protected def getData(parent:Element,s:Status):Data = null
 
       private def newLine(e:Element):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
@@ -58,10 +52,11 @@ object Struct extends Processor {self=>
   }
   
   protected def readParams(pr: utils.ParamReader) = {
-    val append = pr("append", false)(Converter.CvBoolean.read(null, _))
-    val outFile:File = pr("out", null.asInstanceOf[File])(Converter.CvFile.read(null, _))
+    import utils.StringConverter._
+    val append = pr("append", false)(CvBoolean())
+    val outFile:File = pr("out", null.asInstanceOf[File])(CvFile("",""))
     val out = if (outFile!=null) new FileWriter(outFile,append) else new OutputStreamWriter(System.out)
-    val indent = pr("indent", 2)(Converter.CvInt.read(null, _))
+    val indent = pr("indent", 2)(CvInt("","",null))
     (out,indent)
   }
   

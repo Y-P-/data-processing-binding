@@ -1,12 +1,13 @@
 package loader.context
 
+/*
+
 import java.net.URI
 import loader._
 import loader.annotations._
 import loader.core.context._
 import scala.collection.mutable.HashMap
 import java.io.File
-
 
 class ConfigContext(tagMapBuilder: =>TagMap = new RegexTagMap) extends Context(tagMapBuilder) {
   //creates a context by reading a file from the given URI 
@@ -111,3 +112,5 @@ object ConfigContext {
     @TagSeq var struct:HashMap[String,TagStcHelper] = _
   }
 }
+
+*/

@@ -1,50 +1,72 @@
 package loader.reflect
 
-import java.lang.reflect.{Modifier,Method}
-import loader.{InternalLoaderException,Element}
+import utils.Reflect._
+import utils.ClassMap
+import loader.reflect.Converters.Converter
 import loader.annotations.TagEnd
+import loader.reflect.Converters.StringConverter
+import loader.core.context.FieldAnnot
+import loader.core.definition.Def
 
-/** A class used to invoke the method used to return the loader value upon completion.
+/** A class used to invoke the method used to return the correct value upon completion.
+ *  For example, upon reading a data object containing year/month/day, you may want to return
+ *  not that data structure, but a standard date.
+ *  This will be achieved by invoking a 'tagEnd' method, called after building the object.
+ *  That method may be:
+ *  - either a class method from that object (e.g. the object contains a builtin conversion)
+ *    it must not accept any parameter
+ *  - or a one parameter static method accepting that kind of object as parameter.
+ *  - or a two parameters static method, with the first being compatible with that object
+ *    class and the second compatible with the Element class used.
+ *  - by default, if nothing is specified, the created object is returned.
  */
-class TagEndInvoker protected (v1:(AnyRef)=>Any,v2:(AnyRef,Element)=>Any,val returnedType:Class[_]) {
-  def this(v:(AnyRef)=>Any,expectedType:Class[_])        = this(v,null,expectedType)
-  def this(v:(AnyRef,Element)=>Any,expectedType:Class[_]) = this(null,v,expectedType)
-  def apply(on:AnyRef,ld:Element):Any = if (v1!=null) v1(on) else if (v2!=null) v2(on,ld) else on
+object TagEndInvoker {
+  
+  class Solver[-E<:Def#Elt](val defaultString:ClassMap[StringConverter[_]],val named:Map[String,Converter[_,_,E]],protected[this] val registered:ClassMap[ClassMap[Converter[_,_,E]]]) {
+    /** Finds an appropriate converter from one of the sources by following these exclusive rules (in order):
+     *  - if the name is significant (not null or "")
+     *  -   o name starts with @    : take the appropriate entry (e.g. '@xyz') from the named list (no check done: it has to work)
+     *  -   o name starts with _.   : check the src then dst class
+     *  -   o name starts otherwise : check the class
+     *  -   o name ends with .*     : find any appropriate method in the right class (heuristic algorithm based on raw class for src/dst)
+     *  -   o name ends otherwise   : the name indicates the method to use for conversion
+     *  - if src can be assigned to dst, don't convert
+     *  - if src is String, check within default String converters for an appropriate converter (heuristic algorithm based on raw class for dst)
+     *  - otherwise check within registered converters for an appropriate converter (heuristic algorithm based on raw class for src and dst)
+     *  !!! This works by examining raw types. Generics must not be used!
+     */
+    def get[U<:AnyRef,V<:Any](name:String,src:Class[U],dst:Class[V],fd:FieldAnnot):Either[String,(U,E)=>V] = {
+      if (name!=null && name.length>0) {
+        if (name.charAt(0)=='@') {
+          named.get(name).map(_(dst,fd).asInstanceOf[(U,E)=>V]).toRight(s"no conversion named $name found")
+        } else try {
+          val idx    = name.lastIndexOf('.')
+          val fName  = name.substring(idx+1) match {
+            case "*" => null                 //find any available method
+            case  s  => s                    //use that specific method
+          }
+          val in = name.substring(0,idx) match {
+            case "_" => null                 //local method in class src or dst
+            case  s  => ^(Class.forName(s))  //class for conversion is given
+          }
+          val s = ^(src)
+          val d = ^(dst)
+          (if (in==null) Converters(s,s,d,fName).orElse(Converters(d,s,d,fName)) else Converters(in,s,d,fName)).map(_(dst,fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter $name available for $src => $dst")
+        } catch {  //many reasons for failure here!
+          case e:Throwable => Left(s"failed to fetch converter $name for $src => $dst: $e")
+        }
+      } else if (src<dst) {
+        //src is subclass of dst ? coerce it and return it
+        Right((u:U,e:Def#Elt)=>u.asInstanceOf[V])
+      } else if (src eq classOf[String]) {
+        //src is String ? find a default String conversion to dst
+        defaultString.get(dst).map(_(dst,fd).asInstanceOf[(U,E)=>V]).toRight(s"no default String conversion found for $dst")
+      } else {
+        //otherwise find a registered conversion from src to dst
+        registered.get(src).flatMap(_.get(dst).map(_(dst,fd).asInstanceOf[(U,Def#Elt)=>V])).toRight(s"no registered conversion found for $src => $dst")
+      }
+    }
+  }
+
 }
 
-object TagEndInvoker {
-  /** Utility to easily build the findTagEnd method in concrete classes.
-   *  @param  czL, the loading helper class
-   *  @param  isTagEnd, a method that identifies the appropriate tagEnd method
-   *  @return the unique tagEnd method to use on the loaded item to return it's value to the upper layer
-   */
-  def apply(czL:Class[_],isTagEnd:(Method)=>Boolean):TagEndInvoker = {
-    var r:TagEndInvoker = null
-    def analyze(m:Method) = {
-      if (r!=null) throw new InternalLoaderException("Only one tagEnd allowed: "+czL)
-      val returnedType = m.getReturnType
-      r = if (m.getParameterTypes.length==0)                                                    new TagEndInvoker(m.invoke(_:AnyRef),returnedType)
-          else if (m.getParameterTypes.length==1 && m.getParameterTypes()(0)==classOf[Element]) new TagEndInvoker(m.invoke(_:AnyRef,_:Element),returnedType)
-          else throw new InternalLoaderException("Badly placed TagEnd annotation (only method with no argument or Loader argument)")      
-    }
-    //protected/private local methods
-    //note that for some reason Scala adds a second method returning AnyRef ; we discard it.
-    for (m <- czL.getDeclaredMethods if (!Modifier.isPublic(m.getModifiers) && isTagEnd(m) && m.getReturnType!=classOf[AnyRef]))
-      analyze(m)
-    //public methods (incl. inherited)
-    //note that for some reason Scala adds a second method returning AnyRef ; we discard it.
-    for (m <- czL.getMethods if (isTagEnd(m) && m.getReturnType!=classOf[AnyRef]))
-      analyze(m)
-    r
-  }
-  /** The common standard way to find tag end:
-   *  - use the given name unless null or empty
-   *  - use the TagEnd annotated method
-   *  - use identity
-   */
-  def apply(czL:Class[_],name:String):TagEndInvoker = {
-    val r = if (name!=null && !name.isEmpty) TagEndInvoker(czL,_.getName==name)
-            else                             TagEndInvoker(czL,_.getAnnotation(classOf[TagEnd])!=null)
-    if (r!=null) r else new TagEndInvoker(null,null,czL)
-  }
-}

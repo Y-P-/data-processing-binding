@@ -3,7 +3,7 @@ package loader
 
 import java.net.{URI,URLEncoder,URLDecoder}
 import loader.features._
-import loader.reflect.Converter
+//import loader.reflect.Converter
 //import loader.motors.XmlMotor
 /*
 /**

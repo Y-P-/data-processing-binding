@@ -2,7 +2,6 @@ package loader.features
 
 import java.net.{URI,URLEncoder,URLDecoder}
 import scala.collection.Map
-import loader.reflect.Converter
 import loader.core.{ParserSpawner,ParserBuilder}
 
 /**
@@ -56,7 +55,7 @@ object URILoaders {
     if (param != null) for (s <- param) { val x = s.split("="); if (x(0).length > 0) vars.put(x(0), if (x.length > 1) x(1) else "") }
     //read the encoding, xpath and rebuild the URI without all that stuff we used
     val encoding = found.getOrElse("encoding", "ISO-8859-15")
-    val fast = Converter.CvBoolean.read(null, found.getOrElse("fast", "true"))
+    val fast = false //XXX loader.reflect.StringConverter.CvBoolean(null, found.getOrElse("fast", "true"))
     val uri1 = local.resolve(new URI(uri.getScheme, uri.getAuthority, uri.getPath, m1.group(3), uri.getFragment))
     //build the result
     apply(parserMap(found("mode")), uri1, encoding, found, vars, fast)

@@ -4,19 +4,19 @@ import java.lang.reflect.ParameterizedType
 import loader.{Element,Named,NamedField,Context}
 import loader.core.exceptions.DynamicInvocation
   
-final class Binder(actor:FldActor,ana:Analyze,cv:(String)=>Any,tagEnd:TagEndInvoker) {
+final class Binder(actor:FldActor,ana:Analyze,cv:(String)=>Any,tagEnd:Null) {
   @inline private def named(ld:Element,r:Any):Any = {if (r.isInstanceOf[Named]) r.asInstanceOf[Named].name_=(ld.name); r}
   @inline private def end(ld:Element,r:Any):Any   = if (ana.isNamed && !ld.parentStc.fd.isList) new NamedField(r,ld.name) else named(ld,r)
   final def namedAny(ld:Element,value:Any)        = end(ld,value)
   final def namedString(ld:Element,value:String)  = end(ld,cv(value))
-  final def namedStruct(ld:Element,value:AnyRef)  = end(ld,tagEnd(named(ld,value).asInstanceOf[AnyRef],ld))
-  final def finalValue(value:AnyRef)             = tagEnd(value,null)
-  final def set(on:AnyRef,value:Any)             = actor.set(on,value)
-  final def get(on:AnyRef)                       = actor.get(on)
-  final def seq(fd:Context#FieldMapping)         = ana.seq(fd)
-  final def newItem                              = ana.getLoadableClass.newInstance
-  final def rawClass:Class[_]                    = Analyze.getClass(actor.expected)
-  final def paramTypes:Array[Class[_]]           = actor.expected.asInstanceOf[ParameterizedType].getActualTypeArguments.map(Analyze.getClass)
+  final def namedStruct(ld:Element,value:AnyRef)  = null //end(ld,tagEnd(named(ld,value).asInstanceOf[AnyRef],ld))
+  final def finalValue(value:AnyRef)              = null //tagEnd(value,null)
+  final def set(on:AnyRef,value:Any)              = actor.set(on,value)
+  final def get(on:AnyRef)                        = actor.get(on)
+  final def seq(fd:Context#FieldMapping)          = ana.seq(fd)
+  final def newItem                               = ana.getLoadableClass.newInstance
+  final def rawClass:Class[_]                     = Analyze.getClass(actor.expected)
+  final def paramTypes:Array[Class[_]]            = actor.expected.asInstanceOf[ParameterizedType].getActualTypeArguments.map(Analyze.getClass)
 }
 object Binder {
   val debug = true
@@ -40,6 +40,6 @@ object Binder {
     null //XXX à refaire
   }
   def apply(fd:Context#FieldMapping):Binder = {
-    new Binder(null,null,null,TagEndInvoker(fd.loader.annot.clzz,""/*XXX fd.annot.tagEnd*/))
+    new Binder(null,null,null,null /*TagEndInvoker(fd.loader.annot.clzz,""/*XXX fd.annot.tagEnd*/)*/)
   }
 }

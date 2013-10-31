@@ -1,9 +1,11 @@
 package loader.context
+/*
+
 import java.lang.reflect.{Modifier,Field}
 import scala.collection.mutable.{Set,HashMap,ListBuffer}
 import loader._
 import loader.core.context._
-import loader.reflect.{Analyze,Converter}
+import loader.reflect.{Analyze,StringConverter}
 import loader.annotations.TagEnd
 import loader.core.exceptions.DynamicInvocation
 import java.io.Writer
@@ -72,11 +74,11 @@ class SerialContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       try {
         val ana = Analyze(f,null,isList,false)
         val cz=ana.getLoadableClass
-        if (cz!=null && classOf[AnyRef].isAssignableFrom(cz) && !Converter.canConvert(cz)) cz.getName else null
+        if (cz!=null && classOf[AnyRef].isAssignableFrom(cz) && !StringConverter.canConvert(cz)) cz.getName else null
       } catch {
         case d:DynamicInvocation =>
           println(s"resolving dynamic invocation on $f which is ${if(!isList)"not "}a list")
-          if (Converter.canConvert(f.getType)) null
+          if (StringConverter.canConvert(f.getType)) null
           else                                 ""
       }
     }
@@ -167,7 +169,7 @@ class SerialContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       else               apply(Class.forName(id).asSubclass(classOf[AnyRef]))
   
     final def apply(clzz:Class[_<:AnyRef]):(StructAnnot,Traversable[FieldAnnot]) = {
-      if (Converter.canConvert(clzz)) null
+      if (StringConverter.canConvert(clzz)) null
       else                            (new TagStructHelper(clzz),getFields(clzz))
     }
   }
@@ -198,3 +200,4 @@ class SerialContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
   */
 }
 
+*/

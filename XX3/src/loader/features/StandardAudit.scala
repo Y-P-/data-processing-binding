@@ -9,7 +9,7 @@ import loader.core.events.Event.{DispatchByClassArray,Processor}
 
 class StandardAuditLogger[-E<:Def#Elt](val id:IdentifierScheme[E], val max:Int) extends AuditInfo[E] {
   import Event._
-  type Logger[+Evt<:Event] = Processor[E,Evt,(Int)=>LogRecord]
+  protected[this] type Logger[+Evt<:Event] = Processor[E,Evt,(Int)=>LogRecord]
   class Dispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((E,Event))=>Int]) extends PartialFunction[(E,Event),LogRecord] {
     val d = new DispatchByClassArray[E,Evt,(Int)=>LogRecord](a)
     def isDefinedAt(x:(E,Event))     = d.isDefinedAt(x)

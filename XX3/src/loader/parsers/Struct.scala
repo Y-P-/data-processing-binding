@@ -1,7 +1,6 @@
 package loader.parsers
 
 import loader.core.ParserSpawner
-import loader.reflect.Converter
 import utils.parsers.StructParser
 
 
@@ -16,12 +15,13 @@ class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends Han
 }
 
 object Struct extends ParserSpawner {
+  import utils.StringConverter._
   type Parser = Struct
   def apply(pr: utils.ParamReader):Struct =
     new Struct(
-        pr("maxSz", 256)(Converter.CvInt.read(null, _)),
-        pr("maxDepth", 40)(Converter.CvInt.read(null, _)),
-        pr("nlInString", false)(Converter.CvBoolean.read(null, _))
+        pr("maxSz", 256)(CvInt("","","10")),
+        pr("maxDepth", 40)(CvInt("","","10")),
+        pr("nlInString", false)(CvBoolean())
         )
   def apply(maxSz:Int,maxDepth:Int,nlInString:Boolean):Struct =
     new Struct(maxSz,maxDepth,nlInString)

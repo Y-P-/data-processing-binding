@@ -137,20 +137,6 @@ object CtxCore {
           else if (s.fd.isStruct) new StructCbk(parser, s, parent, childBuilder, cb, cbks:_*)
           else                    new TerminalCbk(parser, s, parent, childBuilder, cb, cbks:_*)
       }
-      
-      //XXX for fun...
-      def copy[T<:ElementBase:scala.reflect.ClassTag](b:T,p1: String):T = {
-        import scala.reflect.runtime.{ currentMirror => cm }
-        import scala.reflect.runtime.universe._
-        val im = cm.reflect(b)
-        val ts = im.symbol.typeSignature
-        val copySym = ts.member(newTermName("copy")).asMethod
-        def element(p: Symbol): Any = (im reflectMethod ts.member(p.name).asMethod)()
-        val args = for (ps <- copySym.paramss; p <- ps) yield {
-          if (p.name.toString == "p1") p1 else element(p)
-        }
-        (im reflectMethod copySym)(args: _*).asInstanceOf[T]
-      }      
     }
   }
 }

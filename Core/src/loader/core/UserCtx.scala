@@ -1,13 +1,12 @@
 package loader.core
 
 import definition._
-import callbacks.Callback
 import events.EventHandler
 import context.Context
 import loader.core.names.QName
 
 abstract class UserContext[-Elt<:Def#Elt] {
-  type E = Elt
+  protected[this] type E = Elt
   //the handler for generated events 
   def eventHandler:EventHandler[E] = null
   //parameter that asks the parser to accelerate where it can (i.e. skip unecessary data)

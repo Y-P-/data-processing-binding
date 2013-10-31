@@ -1,7 +1,6 @@
 package loader.parsers
 
 import loader.core.ParserSpawner
-import loader.reflect.Converter
 import utils.parsers.JsonParser
 
 
@@ -16,13 +15,14 @@ class Json(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:B
 }
 
 object Json extends ParserSpawner {
+  import utils.StringConverter._
   type Parser = Json
   def apply(pr: utils.ParamReader):Json       =
     new Json(
-        pr("maxSz", 256)(Converter.CvInt.read(null, _)),
-        pr("maxDepth", 40)(Converter.CvInt.read(null, _)),
-        pr("nlInString", false)(Converter.CvBoolean.read(null, _)),
-        pr("withComments", false)(Converter.CvBoolean.read(null, _))
+        pr("maxSz", 256)(CvInt("","",null)),
+        pr("maxDepth", 40)(CvInt("","",null)),
+        pr("nlInString", false)(CvBoolean()),
+        pr("withComments", false)(CvBoolean())
         )
   def apply(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:Boolean=false):Json =
     new Json(maxSz,maxDepth,nlInString,withComments)  

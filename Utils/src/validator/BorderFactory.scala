@@ -1,13 +1,38 @@
 package validator
 
-object BorderFactory {
-  val defFmt = new Formatter()
-  def apply[T](comp:(T,T)=>Int,succ:(T,T)=>Boolean=null,format:Formatter=defFmt) = new BorderFactory[T] {
+object BorderFactory { 
+  /** the standard constructor */
+  def apply[T](comp:(T,T)=>Int,succ:(T,T)=>Boolean=null)(implicit format:Formatter):BorderFactory[T] = new BorderFactory[T] {
     def compare(t1:T,t2:T):Int = comp(t1,t2)
     def discret:Boolean = succ!=null
     def isSucc(t1:T,t2:T):Boolean = succ(t1,t2)
     val fmt:Formatter = format
   }
+  
+  //some predefined standard BorderFactories
+  implicit val forInt     = apply[Int](_-_,_-_==1)
+  implicit val forLong    = apply[Long]((x,y)=>if (x>y) 1 else if (x<y) -1 else 0,_-_==1)
+  implicit val forShort   = apply[Short](_-_,_-_==1)
+  implicit val forByte    = apply[Byte](_-_,_-_==1)
+  implicit val forFloat   = apply[Float]((x,y)=>if (x>y) 1 else if (x<y) -1 else 0,null)
+  implicit val forDouble  = apply[Double]((x,y)=>if (x>y) 1 else if (x<y) -1 else 0,null)
+  implicit val forChar    = apply[Char](_-_,_-_==1)
+  implicit val forJInt    = apply[java.lang.Integer](_-_,_-_==1)
+  implicit val forJLong   = apply[java.lang.Long]((x,y)=>if (x>y) 1 else if (x<y) -1 else 0,_-_==1)
+  implicit val forJShort  = apply[java.lang.Short](_-_,_-_==1)
+  implicit val forJByte   = apply[java.lang.Byte](_-_,_-_==1)
+  implicit val forJFloat  = apply[java.lang.Float]((x,y)=>if (x>y) 1 else if (x<y) -1 else 0,null)
+  implicit val forJDouble = apply[java.lang.Double]((x,y)=>if (x>y) 1 else if (x<y) -1 else 0,null)
+  implicit val forJChar   = apply[java.lang.Character](_-_,_-_==1)
+  implicit val forDate    = apply[java.util.Date](_.compareTo(_),null)
+  /** Builds the list of intervals appropriate to the given parameters.
+   *  @param valid, the validating string describing the valid intervals
+   *  @param parser, a parser to build T values from inside the valid string
+   *  @param bf, the appropriate BorderFactory
+   *  @param format, the format used by valid
+   *  Note that implicits lets you easily use the default value for both last parameters.
+   */
+  def check[T](valid:String,parser:(String)=>T)(implicit bf:BorderFactory[T], format:Formatter):bf.Intervals = bf.Intervals(valid,parser)
 }
 
 abstract class BorderFactory[-T] {
