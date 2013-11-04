@@ -20,114 +20,133 @@ object Converters {
    *   this would happen when a field is itself an object that was not created from a simple string
    *   generic types are not supported (because all generics of a raw class project on that class) 
    */
-  trait Converter[-U,V,-E<:Def#Elt] {
-    def coerce(dst:Class[_<:V],fd:FieldAnnot):(U,E)=>V
-    def apply(dst:Class[_],fd:FieldAnnot):(U,E)=>V = coerce(dst.asInstanceOf[Class[V]],fd)
+  trait Converter[-U<:AnyRef,+V,-E<:Def#Elt] {
+   def src:RichClass[_>:U]  //the maximal class accepted by that converter
+   def dst:RichClass[_<:V]  //the minimal class returned by the converter
+   def apply(fd:FieldAnnot):(U,E)=>V
   }
   
-  abstract class StringConverter[V:ClassTag] extends Converter[String,V,Def#Elt]
+  abstract class StringConverter[V](val dst:RichClass[_<:V]) extends Converter[String,V,Def#Elt] {
+    def this(s:utils.StringConverter[V]) = this(s.dst)
+    val src = ^(classOf[String])
+  }
+  trait StringConverterBuilder[V] {
+    def apply(c:Class[V]):StringConverter[V]
+  }
   
   protected[this] implicit def toConverter[S](f:String=>S) = (s:String,e:Def#Elt) => f(s)
   protected[this] implicit def toMapElt[U:ClassTag](sc:StringConverter[U]) = (implicitly[ClassTag[U]].runtimeClass,sc)
   
   //bridge from FieldAnnot to standard converters. 
-  object CvvString extends StringConverter[String] {
-    def coerce(dst:Class[_<:String],fd:FieldAnnot) = CvString(fd.check)
+  object CvvString extends StringConverter(CvString) {
+    def apply(fd:FieldAnnot) = CvString(fd.check)
   }
-  object CvvCharArray extends StringConverter[Array[Char]] {
-    def coerce(dst:Class[_<:Array[Char]],fd:FieldAnnot) = CvCharArray(fd.check)
+  object CvvCharArray extends StringConverter(CvCharArray) {
+    def apply(fd:FieldAnnot) = CvCharArray(fd.check)
   }
-  object CvvInt extends StringConverter[Int] {
-    def coerce(dst:Class[_<:Int],fd:FieldAnnot) = CvInt(fd.valid,fd.check,fd.param)
+  object CvvInt extends StringConverter(CvInt) {
+    def apply(fd:FieldAnnot) = CvInt(fd.valid,fd.check,fd.param)
   }
-  object CvvJInt extends StringConverter[java.lang.Integer] {
-    def coerce(dst:Class[_<:java.lang.Integer],fd:FieldAnnot) = CvJInt(fd.valid,fd.check,fd.param)
+  object CvvJInt extends StringConverter(CvJInt) {
+    def apply(fd:FieldAnnot) = CvJInt(fd.valid,fd.check,fd.param)
   }
-  object CvvLong extends StringConverter[Long] {
-    def coerce(dst:Class[_<:Long],fd:FieldAnnot) = CvLong(fd.valid,fd.check,fd.param)
+  object CvvLong extends StringConverter(CvLong) {
+    def apply(fd:FieldAnnot) = CvLong(fd.valid,fd.check,fd.param)
   }
-  object CvvJLong extends StringConverter[java.lang.Long] {
-    def coerce(dst:Class[_<:java.lang.Long],fd:FieldAnnot) = CvJLong(fd.valid,fd.check,fd.param)
+  object CvvJLong extends StringConverter(CvJLong) {
+    def apply(fd:FieldAnnot) = CvJLong(fd.valid,fd.check,fd.param)
   }
-  object CvvShort extends StringConverter[Short] {
-    def coerce(dst:Class[_<:Short],fd:FieldAnnot) = CvShort(fd.valid,fd.check,fd.param)
+  object CvvShort extends StringConverter(CvShort) {
+    def apply(fd:FieldAnnot) = CvShort(fd.valid,fd.check,fd.param)
   }
-  object CvvJShort extends StringConverter[java.lang.Short] {
-    def coerce(dst:Class[_<:java.lang.Short],fd:FieldAnnot) = CvJShort(fd.valid,fd.check,fd.param)
+  object CvvJShort extends StringConverter(CvJShort) {
+    def apply(fd:FieldAnnot) = CvJShort(fd.valid,fd.check,fd.param)
   }
-  object CvvByte extends StringConverter[Byte] {
-    def coerce(dst:Class[_<:Byte],fd:FieldAnnot) = CvByte(fd.valid,fd.check,fd.param)
+  object CvvByte extends StringConverter(CvByte) {
+    def apply(fd:FieldAnnot) = CvByte(fd.valid,fd.check,fd.param)
   }
-  object CvvJByte extends StringConverter[java.lang.Byte] {
-    def coerce(dst:Class[_<:java.lang.Byte],fd:FieldAnnot) = CvJByte(fd.valid,fd.check,fd.param)
+  object CvvJByte extends StringConverter(CvJByte) {
+    def apply(fd:FieldAnnot) = CvJByte(fd.valid,fd.check,fd.param)
   }
-  object CvvChar extends StringConverter[Char] {
-    def coerce(dst:Class[_<:Char],fd:FieldAnnot) = CvChar(fd.valid,fd.check)
+  object CvvChar extends StringConverter(CvChar) {
+    def apply(fd:FieldAnnot) = CvChar(fd.valid,fd.check)
   }
-  object CvvJChar extends StringConverter[java.lang.Character] {
-    def coerce(dst:Class[_<:java.lang.Character],fd:FieldAnnot) = CvJChar(fd.valid,fd.check)
+  object CvvJChar extends StringConverter(CvJChar) {
+    def apply(fd:FieldAnnot) = CvJChar(fd.valid,fd.check)
   }
-  object CvvFloat extends StringConverter[Float] {
-    def coerce(dst:Class[_<:Float],fd:FieldAnnot) = CvFloat(fd.valid,fd.check)
+  object CvvFloat extends StringConverter(CvFloat) {
+    def apply(fd:FieldAnnot) = CvFloat(fd.valid,fd.check)
   }
-  object CvvJFloat extends StringConverter[java.lang.Float] {
-    def coerce(dst:Class[_<:java.lang.Float],fd:FieldAnnot) = CvJFloat(fd.valid,fd.check)
+  object CvvJFloat extends StringConverter(CvJFloat) {
+    def apply(fd:FieldAnnot) = CvJFloat(fd.valid,fd.check)
   }
-  object CvvDouble extends StringConverter[Double] {
-    def coerce(dst:Class[_<:Double],fd:FieldAnnot) = CvDouble(fd.valid,fd.check)
+  object CvvDouble extends StringConverter(CvDouble) {
+    def apply(fd:FieldAnnot) = CvDouble(fd.valid,fd.check)
   }
-  object CvvJDouble extends StringConverter[java.lang.Double] {
-    def coerce(dst:Class[_<:java.lang.Double],fd:FieldAnnot) = CvJDouble(fd.valid,fd.check)
+  object CvvJDouble extends StringConverter(CvJDouble) {
+    def apply(fd:FieldAnnot) = CvJDouble(fd.valid,fd.check)
   }
-  object CvvBoolean extends StringConverter[Boolean] {
-    def coerce(dst:Class[_<:Boolean],fd:FieldAnnot) = { val s=fd.param.split("@"); CvBoolean(s(0),s(1)) }
+  object CvvBoolean extends StringConverter(CvBoolean) {
+    def apply(fd:FieldAnnot) = { val s=fd.param.split("@"); CvBoolean(s(0),s(1)) }
   }
-  object CvvJBoolean extends StringConverter[java.lang.Boolean] {
-    def coerce(dst:Class[_<:java.lang.Boolean],fd:FieldAnnot) = {
+  object CvvJBoolean extends StringConverter(CvJBoolean) {
+    def apply(fd:FieldAnnot) = {
       val x = if (fd.param==null || fd.param.length==0) "yes|oui|vrai|true|1|y|o|v|t@no|non|faux|false|0|n|f" else fd.param
       val s=x.split("@")
       CvJBoolean(s(0),s(1))
     }
   }
-  object CvvURL extends StringConverter[java.net.URL] {
-    def coerce(dst:Class[_<:java.net.URL],fd:FieldAnnot) = CvURL(fd.check,fd.valid=="C")
+  object CvvURL extends StringConverter(CvURL) {
+    def apply(fd:FieldAnnot) = CvURL(fd.check,fd.valid=="C")
   }
-  object CvvURI extends StringConverter[java.net.URI] {
-    def coerce(dst:Class[_<:java.net.URI],fd:FieldAnnot) = CvURI(fd.check)
+  object CvvURI extends StringConverter(CvURI) {
+    def apply(fd:FieldAnnot) = CvURI(fd.check)
   }
-  object CvvDate extends StringConverter[java.util.Date] {
-    def coerce(dst:Class[_<:java.util.Date],fd:FieldAnnot) = CvDate(fd.check,fd.param)
+  object CvvDate extends StringConverter(CvDate) {
+    def apply(fd:FieldAnnot) = CvDate(fd.check,fd.param)
   }
-  object CvvFile extends StringConverter[java.io.File] {
-    def coerce(dst:Class[_<:java.io.File],fd:FieldAnnot) = CvFile(fd.valid,fd.check)
+  object CvvFile extends StringConverter(CvFile) {
+    def apply(fd:FieldAnnot) = CvFile(fd.valid,fd.check)
   }
-  object CvvClass extends StringConverter[Class[_]] {
-    def coerce(dst:Class[_<:Class[_]],fd:FieldAnnot) = CvClass(fd.valid,fd.check)
+  object CvvClass extends StringConverter(CvClass) {
+    def apply(fd:FieldAnnot) = CvClass(fd.valid,fd.check)
   }
-  object CvvEnum extends StringConverter[Enumeration#Value] {
-    def coerce(dst:Class[_<:Enumeration#Value],fd:FieldAnnot) = new CvEnumeration[Enumeration#Value]()(ClassTag(dst))(fd.check)
+  
+  object CvvEnum extends utils.ClassMap.Factory[Enumeration#Value,StringConverter[_]] {
+    val max = ^(classOf[Enumeration#Value])
+    def build[X<:Enumeration#Value](cz:Class[X]) = new StringConverter[X](cz) {
+      def apply(fd:FieldAnnot) = new CvEnumeration[X]()(ClassTag(cz))(fd.check)
+    }
   }
-  object CvvJEnum extends StringConverter[Enum[_]] {
+  object CvvJEnum extends utils.ClassMap.Factory[Enum[_],StringConverter[_]] {
     //Note that Enum[_] is generic, but abstract. Concrete classes (i.e. java enums) are not generic, and these will be effectively
     //tested. So in a way the "no generics" contract is not broken here.
-    def coerce(dst:Class[_<:Enum[_]],fd:FieldAnnot) = new CvEnum[Enum[_]]()(ClassTag(dst))(fd.check)
+    val max = ^(classOf[Enum[_]])
+    def build[X<:Enum[_]](cz:Class[X]) = new StringConverter[X](cz) {
+      def apply(fd:FieldAnnot) = new CvEnum[X]()(ClassTag(cz))(fd.check)
+    }
   }
  
   //the default ClassMap for string converters.
-  val defaultMap = utils.ClassMap(CvvString,CvvCharArray,CvvInt,CvvJInt,CvvShort,CvvJShort,CvvLong,CvvJLong,
-                                  CvvByte,CvvJByte,CvvChar,CvvJChar,CvvFloat,CvvJFloat,CvvDouble,CvvJDouble,
-                                  CvvURL,CvvURI,CvvDate,CvvFile,CvvEnum,CvvJEnum,CvvBoolean,CvvJBoolean)
-  
-                                                                  
+  val defaultMap = utils.ClassMap[StringConverter[_]](
+                        CvvString,CvvCharArray,CvvInt,CvvJInt,CvvShort,CvvJShort,CvvLong,CvvJLong,
+                        CvvByte,CvvJByte,CvvChar,CvvJChar,CvvFloat,CvvJFloat,CvvDouble,CvvJDouble,
+                        CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean)(
+                        CvvEnum,CvvJEnum
+                        )
+ 
+
   //m is a method with no param, or one to three params in (Class[V],FieldAnnot,Def#Elt) (in this order)
-  final protected class MethodConverter1[U<:AnyRef,V,-E<:Def#Elt](m:Method) extends Converter[U,V,E] {
+  final protected class MethodConverter1[-U<:AnyRef,+V,-E<:Def#Elt](val dst:RichClass[_<:V], val src:RichClass[_>:U], m:Method) extends Converter[U,V,E] {
     protected[this] val permut = checkParams(p3,m.getParameterTypes,0)
-    def coerce(dst:Class[_<:V],fd:FieldAnnot):(U,E)=>V = (u,e)=>m.invoke(u,buildParams(Array(dst,fd,e),permut)).asInstanceOf[V]
+    def apply(fd:FieldAnnot):(U,E)=>V = {
+      (u,e)=>m.invoke(u,buildParams(Array(dst.c,fd,e),permut)).asInstanceOf[V]
+    }
   }
   //m is a method with one to four params in (U, Class[V],FieldAnnot,Def#Elt) (in this order, U being mandatory)
   //m can be either static, or belong to some class, of which one instance will be spawned in order to serve for the invocation
-  final protected class MethodConverter2[U<:AnyRef,V,-E<:Def#Elt](src:RichClass[U],m:Method) extends Converter[U,V,E] {
-    def coerce(dst:Class[_<:V],fd:FieldAnnot):(U,E)=>V = {
+  final protected class MethodConverter2[U<:AnyRef,+V,-E<:Def#Elt](val dst:RichClass[_<:V], val src:RichClass[_>:U], m:Method) extends Converter[U,V,E] {
+    def apply(fd:FieldAnnot):(U,E)=>V = {
       val params = p4(src)
       val helper = if (Modifier.isStatic(m.getModifiers)) {
         //static: find a matching method on the 4 params (src,Class,FieldAnnot,Def#Elt), src being first and mandatory
@@ -144,7 +163,7 @@ object Converters {
       val permut = checkParams(params,m.getParameterTypes,1)
       if (permut==null) throw new IllegalStateException(s"method $m cannot be used to convert from $src to $dst")
       if (helper._2!=null) for (x <- helper._2) if (permut.contains(x)) throw new IllegalStateException(s"method $m cannot be used to convert from $src to $dst (${params(x)} is used both in constructor and method)")
-      (u,e)=>m.invoke(helper._1,buildParams(Array(u,dst,fd,e),permut)).asInstanceOf[V]        
+      (u,e)=>m.invoke(helper._1,buildParams(Array(u,dst.c,fd,e),permut)).asInstanceOf[V]        
     }
   }
   private[this] val czFieldAnnot = ^(classOf[FieldAnnot])
@@ -160,11 +179,13 @@ object Converters {
     //Returns true for a method that satisfies the constraints for being used for conversion to V
     def check(m:Method):Boolean = {
       if (name!=null && m.getName!=name) return false
-      if (!(dst>m.getReturnType)) return false
+      if (!(dst>m.getReturnType)) return false //the return type must be must be acceptable as dst
+      val p = m.getParameterTypes
+      if (!(src<p(0))) return false            //the first param must be compatible with src
       if (Modifier.isStatic(m.getModifiers) || !(src<m.getDeclaringClass))
-        checkParams(p4(src),m.getParameterTypes,1)!=null
+        checkParams(p4(p(0)),p,1)!=null        //p(0) has been verified as accepting src ; it could be a super class.
       else
-        checkParams(p3,m.getParameterTypes,1)!=null
+        checkParams(p3,p,1)!=null
     }
     val l = in.filterMethod(check)
     var hasTagEnd = false
@@ -175,6 +196,6 @@ object Converters {
       if (te && !hasTagEnd) { hasTagEnd=true; r=m; min=m.getReturnType }  //first tagEnd seen: reinit
       else if ((min==null || min>m.getReturnType) && (te || !hasTagEnd)) { r=m; min=m.getReturnType }
     }
-    if (r==null) None else if (src<in.c) Some(new MethodConverter1(r)) else Some(new MethodConverter2(src,r))
+    if (r==null) None else if (src<in.c) Some(new MethodConverter1(dst,src,r)) else Some(new MethodConverter2(dst,src,r))
   }
 }

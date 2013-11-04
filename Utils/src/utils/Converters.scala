@@ -14,10 +14,9 @@ import utils.Reflect.RichClass
  */
 trait Converter[-U<:AnyRef,+V] {
   type Info  //a data structure used to guide the conversion
-  def src:RichClass[_>:U]
-  def dst:RichClass[_<:V]
+  def src:RichClass[_>:U]  //the maximal class accepted by that converter
+  def dst:RichClass[_<:V]  //the minimal class returned by the converter
   def apply(u:U,i:Info):V
-  def defaultName = src.c.getName+"-"+dst.c.getName
 }
 
 /** Conversions from String are especially common and important.
