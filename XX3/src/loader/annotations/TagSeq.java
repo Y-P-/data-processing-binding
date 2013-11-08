@@ -24,5 +24,5 @@ public @interface TagSeq {
   String valid()       default "";
   String audit()       default "";
   String param()       default "";
-  int rank()           default 0;
+  String convert()     default "";
 }

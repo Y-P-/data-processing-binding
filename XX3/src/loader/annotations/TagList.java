@@ -22,6 +22,6 @@ public @interface TagList {
   String check()    default "";
   String valid()    default "";
   String param()    default "";
+  String convert()  default "";
   String audit()    default "";
-  int rank()        default 0;
 }

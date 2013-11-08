@@ -29,7 +29,6 @@ abstract class FieldAnnot {
   def isSeq:Boolean        //indicates that the field can be repeated
   def isFld:Boolean        //indicates that a field is terminal
   def isStc:Boolean = !isFld && !isList
-  def rank:Int             //rank for processing if any. 0 for immediate processing.
   
   /* information pertaining to the expected syntax.
    */
@@ -40,10 +39,11 @@ abstract class FieldAnnot {
   /* next come generic info that most Context/Processor/Auditer might use.
    * filling up these is context dependant.
    */
-  def audit:String //info pertaining to the element for auditing  
-  def check:String //info for checking the validity of the parser data (Parser.Kind)
-  def valid:String //info for checking the validity of the processor data (Processor.Kind)
-  def param:String //info for transforming the data within the processor
+  def audit:String   //info pertaining to the element for auditing  
+  def check:String   //info for checking the validity of the parser data (Parser.Kind)
+  def valid:String   //info for checking the validity of the processor data (Processor.Kind)
+  def param:String   //info for transforming the data within the processor
+  def convert:String //info for selecting the appropriate conversion to use
   
   final def asXml:String = { //XXX restore
     import XmlHelper._

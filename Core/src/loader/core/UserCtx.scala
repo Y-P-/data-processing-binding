@@ -6,9 +6,6 @@ import context.Context
 import loader.core.names.QName
 import loader.core.context.FieldAnnot
 
-trait ConversionSolver[-E<:Def#Elt] {
-  def apply[U<:AnyRef,V<:Any](name:String,src:Class[U],dst:Class[V],fd:FieldAnnot):Either[String,(U,E)=>V]  
-}
 
 abstract class UserContext[-Elt<:Def#Elt] {
   protected[this] type E = Elt
@@ -24,8 +21,6 @@ abstract class UserContext[-Elt<:Def#Elt] {
   val vars:scala.collection.Map[String,String] = null
   //dynamic solver
   def solveDynamic(elt:E,fd:Context#FieldMapping):Context#FieldMapping = null
-  //used for building obects
-  def solver:ConversionSolver[E] = null
   
   /** For includes */
   //detects includes: called only in onVal calls.

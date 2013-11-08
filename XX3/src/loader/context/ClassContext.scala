@@ -6,7 +6,8 @@ import loader.core.context._
 import loader.core.exceptions.DynamicInvocation
 import loader.core.names.QName
 import loader.annotations.{TagField,TagStruct,TagSeq,TagList,TagEnd}
-import loader.reflect.Analyze
+import loader.core.context.RegexTagMap
+//XXX import loader.reflect.Analyze
 
 /** The default implementation uses RegexTagMap
  */
@@ -36,11 +37,11 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
      */
     private abstract class Info {
       def name:String
-      val ana:(Boolean,Boolean)=>Analyze
+      val ana:(Boolean,Boolean)=>Null//XXX Analyze
       //take advantage of the fact that isList/isSeq is a predefined constant in a given instance
       def loader(fd:FieldAnnot,cz:Class[_]) = if (cz!=classOf[Unknown]) cz.getName else {
         try {
-          val l = ana(fd.isList,fd.isSeq).getLoadableClass
+          val l = getClass //XXX ana(fd.isList,fd.isSeq).getLoadableClass
           if (l.isInstanceOf[AnyRef]) l.getName else null
         } catch {
           case d:DynamicInvocation => ""
@@ -59,10 +60,10 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       implicit protected final def canonicalName(f:Field) = f.getName  //XXX unused
       implicit def apply(x:Annoted) = new Info {
         val name:String = x.getName
-        val ana = x match {
-          case f:Field  => Analyze(f,null,_:Boolean,_:Boolean)
-          case m:Method => Analyze(m,null,_:Boolean,_:Boolean)
-        }
+        val ana = null //XXX x match {
+          //XXX case f:Field  => Analyze(f,null,_:Boolean,_:Boolean)
+          //XXX case m:Method => Analyze(m,null,_:Boolean,_:Boolean)
+        //XXX }
       }
     }
     
@@ -86,12 +87,12 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
       def qName              = tagManager.qName(f.outName(),f.qName());
-      def rank:Int           = f.rank()
       def min:Int            = f.min()
       def max:Int            = 1
       def check:String       = f.check()
       def valid:String       = f.valid()
       def param:String       = f.param()
+      def convert:String     = f.convert()
       def audit:String       = f.audit()
       def contiguous:Boolean = false
       def isList:Boolean     = false
@@ -104,13 +105,13 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
       def qName              = tagManager.qName(f.outName(),f.qName());
-      def rank:Int           = f.rank()
       def outName:String     = if (f.outName().isEmpty) inName else f.outName()
       def min:Int            = f.min()
       def max:Int            = f.max()
       def check:String       = f.check()
       def valid:String       = f.valid()
       def param:String       = f.param()
+      def convert:String     = f.convert()
       def audit:String       = f.audit()
       def contiguous:Boolean = f.contiguous()
       def isList:Boolean     = false
@@ -123,12 +124,12 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
       def qName              = tagManager.qName(f.outName(),f.qName());
-      def rank:Int           = f.rank()
       def min:Int            = f.min()
       def max:Int            = f.max()
       def check:String       = f.check()
       def valid:String       = f.valid()
       def param:String       = f.param()
+      def convert:String     = f.convert()
       def audit:String       = f.audit()
       def contiguous:Boolean = false
       def isList:Boolean     = true

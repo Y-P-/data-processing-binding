@@ -33,6 +33,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     def min        = 1
     def max        = 1
     def contiguous = false  
+    def convert    = ""
   }
   final def apply(id:String):FieldMapping = apply(id,"")
   final def apply(id:String,inName:String):FieldMapping = new FieldMapping(top(id,inName))
@@ -104,7 +105,6 @@ abstract class Context(tagMapBuilder: =>TagMap) {
       if (!annot.isList) throw new IllegalStateException
       new FieldMapping(new FieldAnnot {
         def inName:String  = ""
-        def rank:Int       = annot.rank
         def qName          = QName.noProc
         def min:Int        = annot.min
         def max:Int        = annot.max
@@ -114,10 +114,10 @@ abstract class Context(tagMapBuilder: =>TagMap) {
         def audit:String   = annot.audit
         def contiguous:Boolean = true
         def isList:Boolean = false
-        def isSeq:Boolean = true
-        def isFld:Boolean = false
-        def loader:String = annot.loader
-        def order:Int = 0        
+        def isSeq:Boolean  = true
+        def isFld:Boolean  = false
+        def loader:String  = annot.loader
+        def convert:String = annot.convert     
       })
     }
     override def toString = annot.toString

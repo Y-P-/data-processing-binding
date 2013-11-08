@@ -2,14 +2,15 @@ package loader.reflect
 
 import utils.Reflect._
 import utils.ClassMap
-import loader.reflect.Converters.Converter
 import loader.annotations.TagEnd
 import loader.reflect.Converters.StringConverter
-import loader.core.context.FieldAnnot
 import loader.core.definition.Def
-import loader.core.ConversionSolver
 
 
+abstract class ConversionSolver[-E<:Def#Elt] {
+  def get[U<:AnyRef,V<:Any](src:Class[U],dst:Class[V],fd:ConvertData,name:String):Either[String,(U,E)=>V]
+  def apply(src:Class[_<:AnyRef],dst:Class[_],fd:ConvertData,name:String):Either[String,(AnyRef,E)=>Any] = get[AnyRef,Any](src.asInstanceOf[Class[AnyRef]],dst.asInstanceOf[Class[Any]],fd,name)
+}
 
 /** A class used to invoke the method used to return the correct value upon completion.
  *  For example, upon reading a data object containing year/month/day, you may want to return
@@ -36,11 +37,11 @@ class StandardSolver[-E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],nam
    *  - otherwise check within registered converters for an appropriate converter (heuristic algorithm based on raw class for src and dst)
    *  !!! This works by examining raw types. Generics must not be used!
    */
-  def apply[U<:AnyRef,V<:Any](name:String,src:Class[U],dst:Class[V],fd:FieldAnnot):Either[String,(U,E)=>V] = {
+  def get[U<:AnyRef,V<:Any](src:Class[U],dst:Class[V],fd:ConvertData,name:String):Either[String,(U,E)=>V] = {
     if (name!=null && name.length>0) {
       if (name.charAt(0)=='@') {
         if (named==null)
-          Left("no named converters registered: $name cannot be solved")
+          Left(s"no named converters registered: $name cannot be solved")
         else
           named.get(name).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no conversion named $name found")
       } else try {
@@ -55,7 +56,7 @@ class StandardSolver[-E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],nam
         }
         val s = ^(src)
         val d = ^(dst)
-        (if (in==null) Converters(s,s,d,fName).orElse(Converters(d,s,d,fName)) else Converters(in,s,d,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter $name available for $src => $dst")
+        (if (in==null) Converters(s,s,d,fName).orElse(Converters(d,s,d,fName)) else Converters(in,s,d,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
       } catch {  //many reasons for failure here!
         case e:Throwable => Left(s"failed to fetch converter $name for $src => $dst: $e")
       }
@@ -70,7 +71,10 @@ class StandardSolver[-E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],nam
     } else {
       //otherwise find a registered conversion from src to dst
       var found:Converter[_,_,E] = null
-      for (c <- registered if c.src>src && c.dst<dst) if (found==null || found.dst>c.dst.c) found=c
+      for (c <- registered if c.src>src && c.dst<dst) if (found==null || found.dst>c.dst) {
+        //take c if dst is at least smaller than the current one and either is not equal or src is smaller and not equal 
+        if ((c.dst<found.dst) && (!(found.dst<c.dst) || (found.src>c.src && !(c.src<found.src)))) found=c
+      }
       if (found==null) Right(found(fd).asInstanceOf[(U,E)=>V]) else Left(s"no registered conversion found for $src => $dst")
     }
   }
@@ -79,5 +83,5 @@ class StandardSolver[-E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],nam
 object StandardSolver {
   def apply[E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]]):ConversionSolver[E] =
     new StandardSolver(defaultString,named,registered)
-  def apply = new StandardSolver(null,null,null)
+  def apply() = new StandardSolver(Converters.defaultMap,null,null)
 }

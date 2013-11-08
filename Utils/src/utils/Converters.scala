@@ -46,23 +46,22 @@ object StringConverter {
   abstract class OrderedInfo[S] extends BasicInfo[S] {
     val checker:BorderFactory[S]#Intervals
     def postvalid(s:S):S = {
-      if (!checker.check(s)) throw new IllegalArgumentException(s" acceptable values are $checker")
+      if (checker!=null && !checker.check(s)) throw new IllegalArgumentException(s" acceptable values are $checker")
       s
     }
   }
   trait RegexChecker {
-    protected implicit def toPattern(str:String) = if (str==null) null else Pattern.compile(str)
     val pattern:Pattern
     def prevalid(s:String):String = {
       if (pattern==null || pattern.matcher(s).matches) s
-      throw new ParseException(s,0)
+      else throw new ParseException(s,0)
     }
   }
   protected abstract class InfoBorderBuilder[S](implicit ct: ClassTag[S]) extends StringConverter[S] {
     protected val cvBorder:(String)=>S
-    implicit protected def toRegex(s:String):Pattern = if (s==null) null else Pattern.compile(s)
-    implicit protected def toChecker(s:String)(implicit bf:BorderFactory[S], f:Formatter):BorderFactory[S]#Intervals = BorderFactory.check(s,cvBorder)
+    implicit protected def toChecker(s:String)(implicit bf:BorderFactory[S], f:Formatter):BorderFactory[S]#Intervals = if (s==null || s.isEmpty) null else BorderFactory.check(s,cvBorder)
   }
+  implicit protected def toRegex(s:String):Pattern = if (s==null || s.isEmpty) null else Pattern.compile(s)
   
   /**********************************  STANDARD CONVERTERS ****************************************/
   //note: you never 'have to' use them. They're just convenient.
@@ -158,7 +157,7 @@ object StringConverter {
       def postvalid(s:Boolean) = s
       def prevalid(s:String)   = s
     }
-    def apply(vrai:String="yes|oui|vrai|true|1|y|o|v|t", faux:String="no|non|faux|false|0|n|f") = new Info(Pattern.compile(vrai),Pattern.compile(faux))
+    def apply(vrai:String="yes|oui|vrai|true|1|y|o|v|t", faux:String="no|non|faux|false|0|n|f") = new Info(vrai,faux)
    }
   object CvJBoolean extends StringConverter[java.lang.Boolean] {
     def apply(vrai:String,faux:String):String=>T = CvBoolean(vrai,faux)(_)
@@ -168,43 +167,42 @@ object StringConverter {
       def convert(s:String):T  = s
       def postvalid(s:T) = s
     }
-    def apply(fmtRegex:String) = new Info(Pattern.compile(fmtRegex))
+    def apply(fmtRegex:String) = new Info(fmtRegex)
   }
   object CvCharArray extends StringConverter[Array[Char]] {
     class Info(val pattern:Pattern) extends BasicInfo[T] with RegexChecker {
       def convert(s:String):T  = s.toCharArray
       def postvalid(s:T) = s
     }
-    def apply(fmtRegex:String) = new Info(Pattern.compile(fmtRegex))
+    def apply(fmtRegex:String) = new Info(fmtRegex)
   }
   object CvDate extends InfoBorderBuilder[java.util.Date] {
-    class Info(val pattern:Pattern,sdf:java.text.DateFormat) extends BasicInfo[T] with RegexChecker {
+    class Info(val checker:BorderFactory[T]#Intervals,val pattern:Pattern,sdf:java.text.DateFormat) extends OrderedInfo[T] with RegexChecker {
       def convert(s:String):T = sdf.parse(s)
-      def postvalid(s:T) = s
     }
     val cvBorder = new java.text.SimpleDateFormat().parse(_:String)
-    def apply(fmtRegex:String,convertInfo:String) = new Info(Pattern.compile(fmtRegex),new java.text.SimpleDateFormat(convertInfo))
+    def apply(validInfo:String,fmtRegex:String,convertInfo:String) = new Info(validInfo,fmtRegex,new java.text.SimpleDateFormat(convertInfo))
   }
   object CvClass extends StringConverter[Class[_]] {
     class Info(val pattern:Pattern,top:Class[_]) extends BasicInfo[T] with RegexChecker {
       def convert(s:String):T  = Class.forName(s)
       def postvalid(s:T) = if (top!=null) s.asSubclass(top) else s
     }
-    def apply(validInfo:String,fmtRegex:String) = new Info(Pattern.compile(fmtRegex),if (validInfo!=null && validInfo.length>0) Class.forName(validInfo) else null)
+    def apply(validInfo:String,fmtRegex:String) = new Info(fmtRegex,if (validInfo!=null && validInfo.length>0) Class.forName(validInfo) else null)
   }
   object CvURL extends StringConverter[java.net.URL] {
     class Info(val pattern:Pattern,checkAccessible:Boolean) extends BasicInfo[T] with RegexChecker {
       def convert(s:String):T = new java.net.URL(s)
       def postvalid(s:T) = { if (checkAccessible) s.openStream.close; s } //throws IOException if fails
     }
-    def apply(fmtRegex:String,checkAccessible:Boolean) = new Info(Pattern.compile(fmtRegex),checkAccessible)
+    def apply(fmtRegex:String,checkAccessible:Boolean) = new Info(fmtRegex,checkAccessible)
   }
   implicit object CvURI extends StringConverter[java.net.URI] {
     class Info(val pattern:Pattern) extends BasicInfo[T] with RegexChecker {
       def convert(s:String):T = new java.net.URI(s)
       def postvalid(s:T) = s
     }
-    def apply(fmtRegex:String) = new Info(Pattern.compile(fmtRegex))
+    def apply(fmtRegex:String) = new Info(fmtRegex)
   }
   implicit object CvFile extends StringConverter[java.io.File] {
     /** Files controls are sophisticated.
@@ -243,7 +241,7 @@ object StringConverter {
       }
     }
     def apply(validInfo:String,fmtRegex:String) = new Info(
-        Pattern.compile(fmtRegex),
+        fmtRegex,
         validInfo.contains('+'),
         validInfo.contains('-'),
         validInfo.contains('f'),
@@ -261,7 +259,7 @@ object StringConverter {
       def convert(s:String):T = m.invoke(null,s).asInstanceOf[T]
       def postvalid(s:T) = s
     }
-    def apply(fmtRegex:String) = new Info(Pattern.compile(fmtRegex))
+    def apply(fmtRegex:String) = new Info(fmtRegex)
   }
   class CvEnumeration[X<:Enumeration#Value:ClassTag] extends StringConverter[X] {
     // Will not work on basic Enumerations. Requires that the actual Value class is defined in the Enum object.
@@ -270,7 +268,7 @@ object StringConverter {
       def convert(s:String):T = m.invoke(null,s).asInstanceOf[T]
       def postvalid(s:T) = s
     }
-    def apply(fmtRegex:String) = new Info(Pattern.compile(fmtRegex))
+    def apply(fmtRegex:String) = new Info(fmtRegex)
   }
 
 }

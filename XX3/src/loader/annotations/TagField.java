@@ -20,7 +20,7 @@ public @interface TagField {
   int min()          default 0;
   String check()     default "";
   String valid()     default "";
+  String convert()   default "";
   String audit()     default "";
   String param()     default "";
-  int rank()         default 0;
 }
