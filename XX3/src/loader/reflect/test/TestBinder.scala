@@ -12,10 +12,10 @@ import loader.reflect.DataActor
 
 object TestBinder {
   
-  class U(val x:Int=0, val y:String=null, val z:Date=null, val a:Array[Int]=null, val u:U=null) {
+  class U(val x:Int=0, val y:String=null, val z:Date=null, val a:Array[Int]=null, val b:Array[List[Array[Int]]]=null, val u:U=null) {
     override def toString:String = s"U = ($x, $y, $z, [${if (a!=null) a.mkString(",") else ""}], $u)"
   }
-  class V(x:Int=0,y:String=null,z:Date=null,a:Array[Int]=null,u:U=null) extends U(x,y,z,a,u) {
+  class V(x:Int=0,y:String=null,z:Date=null,a:Array[Int]=null,b:Array[List[Array[Int]]]=null,u:U=null) extends U(x,y,z,a,b,u) {
     def toV(fd:FieldAnnot) = new V(x*3,y+s"-with toV and ${fd.param}",z,a,null)
     def toU = new U(x*3,y+"-with toU",z,a,null)
   }
@@ -70,12 +70,13 @@ object TestBinder {
     val y0:F = Binder(classOf[U]("y").get,StandardSolver(),fdY,false)
     val z0:F = Binder(classOf[U]("z").get,StandardSolver(),fdZ,false)
     val a0   = Binder(classOf[U]("a").get,StandardSolver(),fdY,true)
+    val b0   = Binder(classOf[U]("b").get,StandardSolver(),fdY,true)
     val u0:F = Binder(classOf[U]("u").get,StandardSolver(),fdU,false)
     
     
     val o0 = new V
     val o1 = new V
-    x0(o0,"45")
+    x0(o0,"34")
     y0(o0,"abc")
     z0(o0,"10-12-2013")
     val a = a0(o0)
@@ -83,6 +84,29 @@ object TestBinder {
     a.receive("2",null)
     a.terminate()
     println(a.read)
+    val b = b0(o0)
+    val x1 = b.subInstance
+    val xx1 = x1.subInstance
+    xx1.receive("1",null)
+    xx1.receive("2",null)
+    xx1.terminate()
+    val xx2 = x1.subInstance
+    xx2.receive("3",null)
+    xx2.receive("4",null)
+    xx2.receive(new Integer(45),null)
+    xx2.terminate()
+    x1.terminate
+    val y1 = b.subInstance
+    val yy1 = y1.subInstance
+    yy1.receive("5",null)
+    yy1.receive("6",null)
+    yy1.terminate()
+    val yy2 = y1.subInstance
+    yy2.receive("7",null)
+    yy2.receive("8",null)
+    yy2.terminate()
+    y1.terminate
+    b.terminate()
     
     println(o0)
     

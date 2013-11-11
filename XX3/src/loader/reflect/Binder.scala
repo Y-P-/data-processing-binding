@@ -42,6 +42,7 @@ abstract class Binder[-E<:Def#Elt](val what:DataActor) {
     def receive(x:AnyRef,e:E)
     def terminate():Unit
     def read():Any = what.get(on)
+    def subInstance():Instance = throw new IllegalStateException("sub instance are only allowed on collections")
   }
   def apply(on:AnyRef):Instance
   protected[this] val solver:ConversionSolver[E]
@@ -120,16 +121,22 @@ object Binder {
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
   protected trait CollectionBinder[-E<:Def#Elt] extends Binder[E] {
-    final class Instance(on:AnyRef) extends super.Instance(on) { //Binder instance for a pair (object/field or object/method)
-      val stack = new Stack(eltType(expected),expected)
-      final def receive(x:AnyRef,e:E) = stack+=(convert(x,e))
-      final def terminate():Unit = assign(on,stack.buildCollection)
+    protected[this] var eType:Type = null
+    class Instance(on:AnyRef,colClzz:Type) extends super.Instance(on) { //Binder instance for a pair (object/field or object/method)
+      eType = eltType(colClzz)
+      val stack = new Stack(eType,colClzz)
+      final def receive(x:AnyRef,e:E) = stack+=convert(x,e)
+      def terminate():Unit = assign(on,stack.buildCollection)
+      final override def subInstance = new Instance(null,eltType(colClzz)) { //Instance for deep collections (collections of collections of ...)
+        //convertSolver(src)
+        override def terminate():Unit = Instance.this.stack+=stack.buildCollection
+      }
     }
     protected[this] def convertSolver(src:Class[_]):(AnyRef,E)=>Any = {
       val fd= getFd(src)
-      solver(src,eltType(expected),fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
+      solver(src,eType,fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
     }
-    def apply(on:AnyRef) = new Instance(on)
+    def apply(on:AnyRef) = new Instance(on,expected)
   }
   /** Factory where multiple conversions from various types are expected */
   final def apply[E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:Map[Class[_],AutoConvertData],isCol:Boolean):Binder[E] = {
