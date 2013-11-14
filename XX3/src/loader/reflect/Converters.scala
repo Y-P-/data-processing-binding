@@ -7,7 +7,7 @@ import utils.Reflect._
 import java.lang.reflect.Constructor
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
-import loader.annotations.TagEnd
+import loader.annotations.Convert
 
 /**
  * Defines the generic conversion required when building object:
@@ -28,7 +28,13 @@ trait ConvertData {
   def valid:String   //info for checking the validity of the processor data (Processor.Kind)
   def param:String   //info for transforming the data within the processor  
 }
-
+object ConvertData {
+  val empty = new ConvertData {
+    val check = ""
+    val valid = ""
+    val param = ""
+  }
+}
 
 object Converters {
   
@@ -93,7 +99,11 @@ object Converters {
     def apply(fd:ConvertData) = CvJDouble(fd.valid,fd.check)
   }
   object CvvBoolean extends StringConverter(CvBoolean) {
-    def apply(fd:ConvertData) = { val s=fd.param.split("@"); CvBoolean(s(0),s(1)) }
+    def apply(fd:ConvertData) = {
+      val x = if (fd.param==null || fd.param.length==0) "yes|oui|vrai|true|1|y|o|v|t@no|non|faux|false|0|n|f" else fd.param
+      val s=x.split("@")
+      CvBoolean(s(0),s(1))
+    }
   }
   object CvvJBoolean extends StringConverter(CvJBoolean) {
     def apply(fd:ConvertData) = {
@@ -137,7 +147,7 @@ object Converters {
   val defaultMap = utils.ClassMap[StringConverter[_]](
                         CvvString,CvvCharArray,CvvInt,CvvJInt,CvvShort,CvvJShort,CvvLong,CvvJLong,
                         CvvByte,CvvJByte,CvvChar,CvvJChar,CvvFloat,CvvJFloat,CvvDouble,CvvJDouble,
-                        CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean)(
+                        CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean,CvvClass)(
                         CvvEnum,CvvJEnum
                         )
  
@@ -159,7 +169,7 @@ object Converters {
         (null,null)
       } else {
         val in = ^(m.getDeclaringClass)
-        if (in.asObject != null) (in.asObject,null)                     //return a singleton object
+        if (in.asObject != null) (in.asObject,null)                      //return a singleton object
         else in.findConstructor(Array(czClass,czConvertData),0) match {  //instance: find a matching constructor on possibly 2 params (Class,ConvertData)
           case x if x.length>1  => throw new IllegalStateException(s"too many constructor match the accepted entries for ${m.getDeclaringClass}") 
           case x if x.length==0 => throw new IllegalStateException(s"no constructor match the accepted entries for ${m.getDeclaringClass}") 
@@ -178,9 +188,9 @@ object Converters {
   private[this] val p3:Array[RichClass[_]]                 = Array(czClass,czConvertData,czDefElt)
   private[this] def p4(c:RichClass[_]):Array[RichClass[_]] = Array(c,czClass,czConvertData,czDefElt)
   
-  //finds a method in class in that is an appropriate converter from U to V. If none satisfy, null is returned.
+  //finds a method in class 'in' that is an appropriate converter from U to V. If none satisfy, null is returned.
   //bridge or synthetic methods are rejected (i.e. we accept only user defined methods)
-  //a TagEnd eligible method takes precedence over any other method
+  //a Convert eligible method takes precedence over any other method
   def apply[U<:AnyRef,V,E<:Def#Elt](in:RichClass[_], src:RichClass[U], dst:RichClass[V], name:String):Option[Converter[U,V,E]] = {
     //Returns true for a method that satisfies the constraints for being used for conversion to V
     def check(m:Method):Boolean = {
@@ -195,13 +205,13 @@ object Converters {
         checkParams(p4(p(0)),p,1)!=null        //the first param must be compatible with src
     }
     val l = in.filter(check)
-    var hasTagEnd = false
+    var hasConvert = false
     var r:Method = null
     var min:RichClass[_] = null
     for (m <- l) {
-      val te = m.getAnnotation(classOf[TagEnd])!=null
-      if (te && !hasTagEnd) { hasTagEnd=true; r=m; min=m.getReturnType }  //first tagEnd seen: reinit
-      else if ((min==null || min>m.getReturnType) && (te || !hasTagEnd)) { r=m; min=m.getReturnType }
+      val te = m.getAnnotation(classOf[Convert])!=null
+      if (te && !hasConvert) { hasConvert=true; r=m; min=m.getReturnType }  //first tagEnd seen: reinit
+      else if ((min==null || min>m.getReturnType) && (te || !hasConvert)) { r=m; min=m.getReturnType }
     }
     if (r==null) None else if (src<in.c) Some(new MethodConverter1(dst,src,r)) else Some(new MethodConverter2(dst,src,r))
   }

@@ -5,7 +5,7 @@ import scala.collection.mutable.{ListBuffer,HashMap}
 import loader.core.context._
 import loader.core.exceptions.DynamicInvocation
 import loader.core.names.QName
-import loader.annotations.{TagField,TagStruct,TagSeq,TagList,TagEnd}
+import loader.annotations.{TagField,TagStruct,TagSeq,TagList}
 import loader.core.context.RegexTagMap
 //XXX import loader.reflect.Analyze
 

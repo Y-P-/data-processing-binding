@@ -8,6 +8,7 @@ import java.text.ParseException
 import java.util.regex.Pattern
 import validator.Formatter
 import utils.Reflect.RichClass
+import java.lang.reflect.InvocationTargetException
 
 
 /** Defines a conversion from U to V using a parameter as a guide for conversion.
@@ -22,11 +23,11 @@ trait Converter[-U<:AnyRef,+V] {
 /** Conversions from String are especially common and important.
  *  This class is abstract because the inner helper class, Info, is unknown.
  */
-abstract class StringConverter[+S](implicit ct: ClassTag[S]) extends Converter[String,S] {
+abstract class StringConverter[+S:ClassTag] extends Converter[String,S] {
   final protected[this] type T = S   //for easy access inside
   type Info <: String=>S
   def src = utils.Reflect.RichClass(classOf[String])
-  val dst:RichClass[_<:S] = utils.Reflect.RichClass(ct.runtimeClass.asInstanceOf[Class[S]])
+  val dst:RichClass[_<:S] = utils.Reflect.RichClass(implicitly[ClassTag[S]].runtimeClass.asInstanceOf[Class[_<:S]])
   def apply(s:String,i:Info):S = i(s)
 }
 
@@ -158,7 +159,7 @@ object StringConverter {
       def prevalid(s:String)   = s
     }
     def apply(vrai:String="yes|oui|vrai|true|1|y|o|v|t", faux:String="no|non|faux|false|0|n|f") = new Info(vrai,faux)
-   }
+  }
   object CvJBoolean extends StringConverter[java.lang.Boolean] {
     def apply(vrai:String,faux:String):String=>T = CvBoolean(vrai,faux)(_)
   }
@@ -181,7 +182,7 @@ object StringConverter {
       def convert(s:String):T = sdf.parse(s)
     }
     val cvBorder = new java.text.SimpleDateFormat().parse(_:String)
-    def apply(validInfo:String,fmtRegex:String,convertInfo:String) = new Info(validInfo,fmtRegex,new java.text.SimpleDateFormat(convertInfo))
+    def apply(validInfo:String,fmtRegex:String,convertInfo:String) = new Info(validInfo,fmtRegex,if (convertInfo!=null && !convertInfo.isEmpty) new java.text.SimpleDateFormat(convertInfo) else new java.text.SimpleDateFormat)
   }
   object CvClass extends StringConverter[Class[_]] {
     class Info(val pattern:Pattern,top:Class[_]) extends BasicInfo[T] with RegexChecker {
@@ -255,20 +256,53 @@ object StringConverter {
   
   class CvEnum[X<:Enum[_]:ClassTag] extends StringConverter[X] {
     val m = dst.c.getMethod("valueOf", classOf[String])
+    m.setAccessible(true)
     class Info(val pattern:Pattern) extends BasicInfo[T] with RegexChecker {
-      def convert(s:String):T = m.invoke(null,s).asInstanceOf[T]
+      def convert(s:String):T = dst.c.cast(m.invoke(null,s))
       def postvalid(s:T) = s
     }
     def apply(fmtRegex:String) = new Info(fmtRegex)
   }
+  /* Note: fragile code ; subject to scala compiler implementation changes.
+   * Cannot work if the inner class Val is not overloaded, because it is protected thus cannot be directly referenced.
+   * Any declaration such as val e:X.Value (where X inherits from Enumerated) thus get translated to val e:Enumeration#Value.
+   * The actual container type (X) is lost in the process and cannot be retrieved by reflection.
+   * Furthermore, we require that the path be stable (otherwise unknown instances are required to parse the enumeration.)
+   * 
+   * A minimal working implementation is:
+   *   object X extends Enumeration {
+   *     class Val protected[X] extends super.Val
+   *     val e0=new Val
+   *     val e1=new Val
+   *   }
+   * This works because class Val is now public and knows about it's declaring class.
+   */
   class CvEnumeration[X<:Enumeration#Value:ClassTag] extends StringConverter[X] {
     // Will not work on basic Enumerations. Requires that the actual Value class is defined in the Enum object.
-    val m = dst.c.getEnclosingClass.getMethod("withName", classOf[String])
+    // Note: scala reflection is obscure, and debugging did not let me find the enclosing class.
+    // We rely on a (very) dirty hack.
+    val withName:String=>Any = {
+      val name = dst.c.getName
+      val end  = name.lastIndexOf('$')
+      val base = name.substring(end)
+      val x = if (base.indexOf('.')<0) //class name ends with XXX$YYY => the enclosing class is XXX
+                try   { Class.forName(name.substring(0, end)+"$") }
+                catch { case _ => throw new IllegalStateException(s"Enumeration ${dst.c} must be stable; reflection will fail.") }
+              else
+                throw new IllegalStateException(s"Enumeration ${dst.c} is not precise enough; reflection will fail.")
+      val m = x.getMethod("withName", classOf[String])
+      m.setAccessible(true)
+      val o = x.asObject
+      s => try {
+        m.invoke(o,s)
+      } catch {
+        case e:InvocationTargetException => throw e.getCause
+      }
+    }
     class Info(val pattern:Pattern) extends BasicInfo[T] with RegexChecker {
-      def convert(s:String):T = m.invoke(null,s).asInstanceOf[T]
+      def convert(s:String):T = dst.c.cast(withName(s))
       def postvalid(s:T) = s
     }
     def apply(fmtRegex:String) = new Info(fmtRegex)
   }
-
 }

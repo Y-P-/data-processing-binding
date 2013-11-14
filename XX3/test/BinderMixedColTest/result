@@ -1,0 +1,8 @@
+Set(1, 2, 3)
+Set(ex1, ex2, ex3)
+List(Set(1, 2, 3), Set(4, 5, 6))
+List(Set(ex1, ex2, ex3), Set(ex1, ex2, ex3), Set(ex1, ex2, ex3))
+WrappedArray(List(Set(1, 2, 3), Set(4, 5, 6)), List(Set(8, 7), Set(9), Set()), List(Set(9, 10), Set(11)))
+WrappedArray(List(Set(ex1, ex2, ex3), Set(ex1, ex2, ex3)), List(Set(ex1, ex2), Set(ex1), Set()), List(Set(ex1, ex2), Set(ex3)))
+
+()

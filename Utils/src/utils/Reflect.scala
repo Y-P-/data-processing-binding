@@ -33,8 +33,8 @@ object Reflect {
     //     do not share much in common.
     def <(c:Class[_]):Boolean = c.isAssignableFrom(this.c)
     def >(c:Class[_]):Boolean = this.c.isAssignableFrom(c)
-    def <(c:RichClass[_]):Boolean = this < c.c
-    def >(c:RichClass[_]):Boolean = this > c.c
+    final def <(c:RichClass[_]):Boolean = this < c.c
+    final def >(c:RichClass[_]):Boolean = this > c.c
     //filters out methods/fields/constructors that satisfy some test
     def filter[X<:AccessibleObject:ClassTag](check:X=>Boolean):Array[X] = onAccessible[X,Array[X]](_.filter(check))
     //filters out methods/fields/constructors that satisfy some test
@@ -198,7 +198,7 @@ object Reflect {
   def findConstructor[U](in:Array[Constructor[U]],expected:Array[RichClass[_]],mandatory:Int):Array[(Constructor[U],Array[Int])] =
     for (m <- in; p=checkParams(expected,m.getParameterTypes,mandatory) if p!=null) yield (m,p)
   
-  /** returns true if p1 and p2 represent the same primitive type, Boxed or not */
+  /** returns true if p1 and p2 represent the same primitive type, Java Boxed or not */
   final def checkPrimitive(p1:Class[_],p2:Class[_]):Boolean = {
     if (p1 eq p2)                       return true
     if (!p1.isPrimitive)                return p2.isPrimitive && checkPrimitive(p2,p1)
@@ -209,6 +209,7 @@ object Reflect {
     if (p1 eq java.lang.Double.TYPE)    return p2 eq classOf[java.lang.Double]
     if (p1 eq java.lang.Short.TYPE)     return p2 eq classOf[java.lang.Short]
     if (p1 eq java.lang.Byte.TYPE)      return p2 eq classOf[java.lang.Byte]
+    if (p1 eq java.lang.Long.TYPE)      return p2 eq classOf[java.lang.Long]
     false
   }
       

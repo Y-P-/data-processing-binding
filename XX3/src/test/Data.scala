@@ -3,9 +3,8 @@ import loader.annotations._
 import java.io.StringWriter
 import java.io.Writer
 import java.lang.Integer
-import loader.Assoc
+import loader.commons._
 import loader.Named
-import loader.NamedField
 import scala.collection.mutable.HashMap
 import scala.collection.mutable.ListBuffer
 
@@ -20,14 +19,14 @@ object Data {
   class Id {
     @TagField(inName="type") var types:Int=_
     @TagField var id:Int=_
-    @TagEnd def tagEnd(l:Element) = id+100000*types
+    @Convert def tagEnd(l:Element) = id+100000*types
   }
 
   @TagStruct
   class Encap extends Named {
     @TagField var on:Int=_
     @TagField var off:Int=_
-    @TagEnd def tagEnd(l:Element) = on+off
+    @Convert def tagEnd(l:Element) = on+off
     override def toString = "on="+on+" off="+off
     def name_=(nm:String) = println(nm)
   }
@@ -35,7 +34,7 @@ object Data {
   class Encap2 {
     @TagField var on:Int=_
     @TagField var off:Int=_
-    @TagEnd def tagEnd(l:Element) = new Assoc(on,off)
+    @Convert def tagEnd(l:Element) = on --> off
     override def toString = "on="+on+" off="+off
   }
   @TagStruct
@@ -44,14 +43,14 @@ object Data {
     final def cz = cz0
     //@TagSeq(dynamic="cz") var treaty:Array[AnyRef] = _
     @TagSeq var treaty:Array[Treaty] = _
-    @TagEnd def tagEnd(l:Element) = this
+    @Convert def tagEnd(l:Element) = this
   }
   
   @TagStruct
   class Treaty extends Named {
     @TagSeq var country:Array[String] = _
     @TagField(inName="{types?}") var types:String=_
-    @TagEnd def tagEnd(l:Element) = this
+    @Convert def tagEnd(l:Element) = this
     def name_=(nm:String) = println(nm)
     def output = {
       val b = new StringBuffer
@@ -65,7 +64,7 @@ object Data {
   class Province {
     @TagField var id:Int=_
     @TagField(check=".*") var goods:String=_            //was ....
-    @TagEnd def tagEnd(l:Element) = new Assoc(id,goods)
+    @Convert def tagEnd(l:Element) = id --> goods
   }
 
   @TagStruct
@@ -75,7 +74,7 @@ object Data {
     @TagField(inName="saved")
     def saved(v:Boolean) = if (v) println("WAS SAVED") else println("WAS NOT SAVED") 
     @TagSeq(loader=classOf[Id],contiguous=false) var id:Array[Int]=_
-    @TagEnd def tagEnd(l:Element)  = this
+    @Convert def tagEnd(l:Element)  = this
     def name_=(nm:String) = println(nm)
   }
 
@@ -95,20 +94,20 @@ object Data {
     @TagField
     var test:Int=_
     @TagField(loader=classOf[Encap], valid="3")
-    var oye:NamedField[Integer]=_
+    var oye:Integer=_
     @TagList(loader=classOf[Encap], valid="3")
-    var encap:NamedField[ListBuffer[Integer]]=_
+    var encap:ListBuffer[Integer]=_
     @TagList(loader=classOf[Encap2],max=1)
     var encap2:HashMap[Integer,Integer]=_
     @TagSeq(inName="{even.}", check=".*", contiguous=true) //was ....
-    var event:Array[NamedField[String]]=_
+    var event:Array[String]=_
     @TagList(check="...(.*)",valid="[000,800000]",min=10,max=100)  //was ....(.)?, [7000,8000]
     var history:Array[Int]=_
     @TagField
     var globaldata:GlobalData=_
     @TagSeq(inName="{provinc.}",loader=classOf[Province],min=50)
     var province:scala.collection.immutable.HashMap[Integer,String]=_
-    @TagEnd def tagEnd(l:Element):this.type = this
+    @Convert def tagEnd(l:Element):this.type = this
     def write(out:Writer):Unit = {
       def println(s:String) = { out.write(s); out.write("\n"); }
       if (header!=null) println("ai_agg   = "+header.set_ai_aggresive+" "+header.set_ai_aggresive.getClass )

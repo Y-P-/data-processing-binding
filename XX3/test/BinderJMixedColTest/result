@@ -1,0 +1,8 @@
+Set(3, 2, 1)
+Set(ex1, ex2, ex3)
+Buffer([3, 2, 1], [6, 5, 4])
+Buffer([ex1, ex2, ex3], [ex1, ex2, ex3], [ex1, ex2, ex3])
+WrappedArray([[3, 2, 1], [6, 5, 4]], [[7, 8], [9], []], [[10, 9], [11]])
+WrappedArray([[ex1, ex2, ex3], [ex1, ex2, ex3]], [[ex1, ex2], [ex1], []], [[ex1, ex2], [ex3]])
+
+()

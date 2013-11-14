@@ -16,7 +16,6 @@ object PhoneKind extends Enumeration {
 }
 
 class Person {
-  import print._
   var name:String = _
   var surname:String = _
   var birthday:java.util.Date = _

@@ -9,5 +9,5 @@ import java.lang.annotation.Inherited;
 @Inherited
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
-public @interface TagEnd {
+public @interface Convert {
 }

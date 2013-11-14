@@ -23,9 +23,7 @@ object DataActor {
    *  @return the appropriate ClassElt
    */
   def apply(cz:RichClass[_],name:String):Option[DataActor] = {
-    cz.find[Field]  (
-        _.getName==name
-        )                                               .map(new FldElt(_))    .orElse(
+    cz.find[Field]  (_.getName==name)                                               .map(new FldElt(_))    .orElse(
     cz.find[Method] (testMethod(_,name+"_$eq"))                                     .map(new ScalaElt(_))  .orElse(
     cz.find[Method] (testMethod(_,"set"+name.charAt(0).toUpper+name.substring(1)))  .map(new BeanElt(_))   .orElse(
     cz.find[Method] (testMethod(_,name))                                            .map(new MethodElt(_))))
