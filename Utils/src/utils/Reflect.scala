@@ -48,6 +48,7 @@ object Reflect {
         case Array()      => None
         case Array((c,_)) => Some(c)
     }
+    final def printMethods() = methods.filter(_=>true).foreach { println(_) }
     override def toString       = s"RichClass[${c.getCanonicalName}]"
     override def equals(o:Any)  = if (o.isInstanceOf[RichClass[_]]) o.asInstanceOf[RichClass[_]].c eq this.c else false
     override def hashCode       = c.hashCode

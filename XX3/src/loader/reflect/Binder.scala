@@ -5,6 +5,8 @@ import scala.reflect.ClassTag
 import loader.core.definition.Def
 import loader.core.context.FieldAnnot
 import loader.commons._
+import utils.Reflect._
+import scala.collection.immutable.BitSet
 
 trait AutoConvertData extends ConvertData {
   def convert:String
@@ -21,6 +23,9 @@ object AutoConvertData {
 /** A Binder ties an AccessibleObject (Field, Method with one argument) with a ConversionSolver and some conversion data.
  *  As a result, it can be used to automatically set any value into into, possibly automatically converted to the appropriate type.
  *  Binder cannot be created by the user: the Binder factory must be used for that.
+ *  The Binder exists only to store the relevant data pertaining to the underlying operations (conversion, field/method setting etc.)
+ *  An Instance must be created in order to use the binder on an actual object.
+ *  
  *  The only available method is apply, which builds an instance (the Binder bound to a given object.)
  *  Instance has only two methods:
  *  - receive(x:AnyRef,e:E), which tells that x was received for that field
@@ -38,20 +43,27 @@ object AutoConvertData {
  */
 
 abstract class Binder[-E<:Def#Elt](val what:DataActor) {
-  abstract class Instance(on:AnyRef) {                                          //Binder instance for a pair (object/field or object/method)
-    def container:Instance
+  import Binder._
+  protected[this] var eType:Type = null                   //The expected type bound; setting it may be 'complex': it mat be at the bottom of a deep collection
+  abstract class Instance(on:AnyRef) {                    //Binder instance for a pair (object/field or object/method)
+    def container:Instance = null
     def receive(x:Any,e:E)
     def terminate():Unit
     def read():Any = what.get(on)
     def subInstance():Instance = throw new IllegalStateException("sub instance are only allowed on collections")
   }
+  
   def apply(on:AnyRef):Instance
   protected[this] val solver:ConversionSolver[E]
   protected[this] def convert(u:Any,e:E):Any
+  protected[this] def getFd(src:Class[_]):AutoConvertData
+  
   protected[this] final def assign(on:AnyRef,x:Any):Unit = what.set(on, x)      //setting the field/method
   protected[this] final def expected:Type = what.expected
-  protected[this] def convertSolver(src:Class[_]):(Any,E)=>Any                  //finds the converter for source class src
-  protected[this] def getFd(src:Class[_]):AutoConvertData
+  protected[this] final def convertSolver(src:Class[_]):(Any,E)=>Any = {        //finds the converter for source class src; can only be c defined on the first invocation (when a value is actually set)
+    val fd= getFd(src)
+    solver(src,eType,fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
+  }
 }
 
 object Binder {
@@ -66,36 +78,42 @@ object Binder {
     case c:Class[_]          => c
     case g:GenericArrayType  => java.lang.reflect.Array.newInstance(g.getGenericComponentType,0).getClass
     case p:ParameterizedType => p.getRawType
-    case t:TypeVariable[_]   => throw new IllegalStateException
-    case w:WildcardType      => throw new IllegalStateException  //w.getUpperBounds().find(_ match { case c:Class[_] => !c.isInterface; case _ => false }).getOrElse(null).asInstanceOf[Class[_]]
+    case t:TypeVariable[_]   => throw new IllegalStateException(s"Real types are expected ; found $t")
+    case w:WildcardType      => throw new IllegalStateException(s"Non wilcard types are expected ; found $w")
   }).asInstanceOf[Class[_<:U]]
    
   /** Type of the underlying contained element.
    *  can only be called when t is associated with a container of some sort.
+   *  Classes wich are not generic can get away with this if they declare a Method 'dummyElt' that exactly returns the appropriate element type. The value doesn't matter.
    */
-  final protected def eltType(t:Type):Type = t match {
-    case p:ParameterizedType     => val args = p.getActualTypeArguments; args(args.length-1)
-    case g:GenericArrayType      => g.getGenericComponentType
-    case a:Class[_] if a.isArray => a.getComponentType
-    case _                       => throw new IllegalStateException
+  final protected def eltType(t:Type):Type = {
+    def error = throw new IllegalStateException(s"type $t cannot be identified as a workable collection")
+    t match {
+      case p:ParameterizedType     => val args = p.getActualTypeArguments; args(args.length-1)
+      case g:GenericArrayType      => g.getGenericComponentType
+      case a:Class[_] if a.isArray => a.getComponentType
+      case c:Class[_]              => try { c.getMethod("dummyElt").getReturnType } catch { case _:Exception => error }
+      //note: Java classes will have methods with Object as signature. Not usable.
+      case _ => error
+    }
   }
 
   abstract protected class MultiBinder[-E<:Def#Elt](protected[this] val solver:ConversionSolver[E], protected[this] val fd:Map[Class[_],AutoConvertData], what:DataActor) extends Binder[E](what) {
     protected[this] var convertMap:Map[Class[_],(Any,E)=>Any] = Map.empty  //converting to the actual value
     protected[this] final def convert(u:Any,e:E) = {
       val src = u.getClass
-      (convertMap.get(src) match {                                            //fetch the converter to use
+      (convertMap.get(src) match {                                         //fetch the converter to use
         case Some(f) => f
-        case None    => val f = convertSolver(src)                            //build it if not already registered
+        case None    => val f = convertSolver(src)                         //build it if not already registered
                         convertMap = convertMap + (src->f)
                         f
-      })(u,e)                                                                 //apply it
+      })(u,e)                                                              //apply it
     }
     protected[this] final def getFd(src:Class[_]) = fd(src)
   }
 
   abstract protected class MonoBinder[-E<:Def#Elt](protected[this] val solver:ConversionSolver[E], protected[this] val fd:AutoConvertData, what:DataActor) extends Binder[E](what) {
-    protected[this] var convertFct:(Any,E)=>Any = null                     //converting to the actual value
+    protected[this] var convertFct:(Any,E)=>Any = null                        //converting to the actual value
     protected[this] final def convert(u:Any,e:E) = {
       val src = u.getClass
       if (convertFct==null) convertFct = convertSolver(src)
@@ -105,17 +123,13 @@ object Binder {
   }
   
   /** Binder for a simple (i.e. not a collection) element.
-   *  An element could happen to be a collection, but it is treated as a whole (i.e. if conversion occurs, it occurs on the collection itself)
+   *  An element could happen to be a collection, but it is treated as a whole (i.e. if conversion occurs, it occurs on the collection itself.)
    */
   protected trait SimpleBinder[-E<:Def#Elt] extends Binder[E] {
+    eType = expected
     final class Instance(on:AnyRef) extends super.Instance(on) { //Binder instance for a pair (object/field or object/method)
-      final def container = null
       final def receive(x:Any,e:E) = assign(on,convert(x,e))
       final def terminate():Unit = ()
-    }
-    protected[this] def convertSolver(src:Class[_]):(Any,E)=>Any = {
-      val fd= getFd(src)
-      solver(src,expected,fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
     }
     def apply(on:AnyRef) = new Instance(on)
   }
@@ -123,33 +137,29 @@ object Binder {
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
   protected trait CollectionBinder[-E<:Def#Elt] extends Binder[E] {
-    protected[this] var eType:Type = null
-    class Instance(on:AnyRef,colClzz:Type) extends super.Instance(on) { //Binder instance for a pair (object/field or object/method)
-      def container:Instance = null
-      eType = eltType(colClzz)
+    implicit def toRichClass(t:Type):RichClass[_] = findClass(t)
+    val SZ = 6                                                                    //Do we expect deep collection of more thatn this depth ?
+    protected[this] var depth = -1
+    protected[this] val eTypes   = new Array[Type](SZ)                            //store calculated values to avoid recomputing them at each step
+    protected[this] val kConvert = new Array[(Any,E)=>Any](SZ)                    //store calculated key converters to avoid recomputing them at each step
+    class Instance(on:AnyRef,colClzz:Type,depth:Int) extends super.Instance(on) { //Binder instance for a pair (object/field or object/method)
+      protected[this] val eType = { if (eTypes(depth)==null) eTypes(depth)=eltType(colClzz); eTypes(depth) }
+      if (CollectionBinder.this.depth<depth) {
+        CollectionBinder.this.depth = depth
+        CollectionBinder.this.eType = eType            //each level of instance (for deep collections) sets this value (once only till bottom is reached)
+      }
       def buildStack:Stack[_] = new Stack(eType,colClzz)
-      val stack = buildStack
+      final protected[this] val stack = buildStack
       def receive(x:Any,e:E) = stack+=convert(x,e)
       def terminate():Unit = assign(on,stack.buildCollection)
-      final override def subInstance = new Instance(null,eltType(colClzz)) { //Instance for deep collections (collections of collections of ...)
+      trait SubInstance extends Instance {             //Instance for deep collections (collections of collections of ...)
         override def container = Instance.this
         override def terminate():Unit = Instance.this.stack+=stack.buildCollection
       }
+      final override def subInstance = if (isMap(eType)) new MappedInstance(null,eType,depth+1) with SubInstance else new Instance(null,eType,depth+1) with SubInstance
     }
-    protected[this] def convertSolver(src:Class[_]):(Any,E)=>Any = {
-      val fd= getFd(src)
-      solver(src,eType,fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
-    }
-    def apply(on:AnyRef) = new Instance(on,expected)
-  }
-  /** Binder for a map collection. It behaves roughly as a collection, but:
-   *  - Assoc are expected as input data.
-   *  - the key may have to be converted. In that case, only basic conversions (no ConvertData, no choice by name) are available.
-   */
-  protected trait MapBinder[-E<:Def#Elt] extends CollectionBinder[E] {
-    protected[this] var keyConvert:(Any,E)=>Any = null
-    class Instance(on:AnyRef,colClzz:Type) extends super.Instance(on,colClzz) { //Binder instance for a pair (object/field or object/method)
-      val kType = try { //type for key is first param in the list
+    class MappedInstance(on:AnyRef,colClzz:Type,depth:Int) extends Instance(on,colClzz,depth) {  //used for mapped collection
+      protected[this] val kType = try { //type for key is first param in the list
         val p=colClzz.asInstanceOf[ParameterizedType].getActualTypeArguments
         if (p.length<=1) throw new IllegalStateException(s"class $colClzz has not at least 2 parameters and cannot be used as a spawned map")
         if (p(0)==classOf[AnyRef]) throw new IllegalStateException(s"class ${p(0)} is too general for a map key")
@@ -159,25 +169,27 @@ object Binder {
       }
       override def buildStack = new Stack(classOf[Assoc[_,_]],colClzz)
       override def receive(x:Any,e:E) = x match {
-        case a:Assoc[_,_] => if (keyConvert==null) keyConvert = solver(a.key.getClass,kType,ConvertData.empty,null).fold(s=>throw new IllegalStateException(s), identity)
-                             stack += keyConvert(a.key,e) --> convert(a.value,e)
+        case a:Assoc[_,_] => if (kConvert(depth)==null) kConvert(depth) = solver(a.key.getClass,kType,ConvertData.empty,null).fold(s=>throw new IllegalStateException(s), identity)
+                             stack += kConvert(depth)(a.key,e) --> convert(a.value,e)
         case _ => throw new IllegalStateException(s"a map must receive a ${classOf[Assoc[_,_]]} as data")
-      }
+      }      
     }
-    override def apply(on:AnyRef) = new Instance(on,expected)
+    def apply(on:AnyRef) = if (isMap(expected)) new MappedInstance(on,expected,0) else new Instance(on,expected,0)
   }
+
   /** Factory where multiple conversions from various types are expected */
   final def apply[E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:Map[Class[_],AutoConvertData],isCol:Boolean):Binder[E] = {
-    if (isCol) if (what.expected.getTypeParameters.length>1) new MultiBinder(solver,fd,what) with MapBinder[E]
-               else                                          new MultiBinder(solver,fd,what) with CollectionBinder[E]
-    else                                                     new MultiBinder(solver,fd,what) with SimpleBinder[E]
+    if (isCol) new MultiBinder(solver,fd,what) with CollectionBinder[E]
+    else       new MultiBinder(solver,fd,what) with SimpleBinder[E]
   }
   /** Factory where only one conversion is expected */
   final def apply[E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
-    if (isCol) if (what.expected.getTypeParameters.length>1) new MonoBinder(solver,fd,what) with MapBinder[E]
-               else                                          new MonoBinder(solver,fd,what) with CollectionBinder[E]
-    else                                                     new MonoBinder(solver,fd,what) with SimpleBinder[E]
+    if (isCol) new MonoBinder(solver,fd,what) with CollectionBinder[E]
+    else       new MonoBinder(solver,fd,what) with SimpleBinder[E]
   }
+  
+  //checks if expected is a Map
+  protected[this] def isMap(expected:RichClass[_]):Boolean = expected<classOf[scala.collection.MapLike[_,_,_]] || expected<classOf[java.util.Map[_,_]]
   
   //TODO ?: improve perf by moving reflection out. Not worth it though (collection building doesn't happen that often).
   class Stack[+X](cx:Class[X],czColl:Class[_],sz:Int=200) extends utils.Stack(cx,sz) {
@@ -200,22 +212,22 @@ object Binder {
         val r = java.lang.reflect.Array.newInstance(czColl.asInstanceOf[Class[Array[_]]].getComponentType, length).asInstanceOf[Array[X]]
         arrayCopy(r)
         r
-      } else if (classOf[scala.collection.MapLike[_,_,_]].isAssignableFrom(czColl)) {
+      } else if (czColl<classOf[scala.collection.MapLike[_,_,_]]) {
         val builder = getBuilder
         for (x <- this) builder += { val a=x.asInstanceOf[Assoc[Any,Any]]; (a.key,a.value) }
         builder.result.asInstanceOf[AnyRef]
-      } else if (classOf[scala.collection.Iterable[_]].isAssignableFrom(czColl)) {
+      } else if (czColl<classOf[scala.collection.Iterable[_]]) {
         val builder = getBuilder
         for (x <- this) builder += x
         builder.result.asInstanceOf[AnyRef]
-      } else if (classOf[java.util.Map[_,_]].isAssignableFrom(czColl)) {
+      } else if (czColl<classOf[java.util.Map[_,_]]) {
         val r = getJInstance[java.util.Map[Any,Any]]
         for (x <- this) x match {
           case a:Assoc[_,_] => r.put(a.key,a.value)
           case _            => throw new IllegalArgumentException(s"an ${classOf[Assoc[_,_]]} is expected when filling up a map")
         }
         r
-      } else if (classOf[java.util.Collection[_]].isAssignableFrom(czColl)) {
+      } else if (czColl<classOf[java.util.Collection[_]]) {
         val r = getJInstance[java.util.Collection[X]]
         for (x <- this) r.add(x)
         r

@@ -294,7 +294,20 @@ object BinderTest {
       out0.println(w)
     }
   }
-  
+  /** Test (elementary) for binders using Maps.
+   */
+  @Test class BinderBitsetTest extends StandardTester {
+    def apply(file:Solver,out0:PrintWriter) = {
+      //val w = new { val a1:scala.collection.BitSet = scala.collection.BitSet() }
+      val w = new WB(null)
+      def f[X<:AnyRef:ClassTag](fld:String) = field(fld,w,fx)
+      val a1 = f("a1"); a1("1"); a1("2");   a1("3");  a1.up()
+      out0.println(w)
+    }
+  }
+  class WB(val a1:MyBitSet) {
+    override def toString = write(a1.self)
+  }
   //////////////////////////////////////////////////////////////////////////////////////////////////////////
   
   object Ex extends Enumeration {
@@ -366,4 +379,35 @@ object BinderTest {
   }
 
   type F = (AnyRef,Any)=>Unit  
+}
+
+/** Custom non generic Collection example:
+ *  - MUST be at TOP LEVEL (not in a class or object)
+ *  - must be a Class (possibly abstract)
+ *  - must have a companion object which defines the appropriate
+ *     * canBuildFrom method
+ *     * dummyElt method which returns the exact element type
+ */
+class MyBitSet(val self:scala.collection.immutable.BitSet) extends scala.collection.immutable.SetProxy[Int]
+
+object MyBitSet extends ObjProxy[Int,MyBitSet,scala.collection.immutable.BitSet] {
+  def dummyElt:Int = 0
+  def apply(c:scala.collection.immutable.BitSet) = new MyBitSet(c)
+  def canBuildFromP = scala.collection.immutable.BitSet.canBuildFrom()
+}
+
+trait ObjProxy[X,C,P] {
+  def newBuilder = new scala.collection.mutable.Builder[X,C] {
+      val tmp = canBuildFromP
+      def +=(elem: X) = { tmp += elem; this }
+      def clear(): Unit = ???
+      def result() = apply(tmp.result)
+    }
+  def canBuildFrom() = new scala.collection.generic.CanBuildFrom[C,X,C] {
+    def apply() = newBuilder
+    def apply(c:C) = null
+  }
+  def apply(c:P):C
+  def canBuildFromP:scala.collection.mutable.Builder[X,P]
+  def dummyElt:X
 }
