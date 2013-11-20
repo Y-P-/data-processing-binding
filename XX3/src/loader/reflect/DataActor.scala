@@ -34,7 +34,11 @@ object DataActor {
     f.setAccessible(true)
     def set(on:AnyRef,a:Any):Unit = f.set(on,a)
     def get(on:AnyRef):Any = f.get(on)
-    def expected = f.getGenericType
+    def expected = {
+      println(f)
+      println(f.getGenericType)
+      f.getGenericType
+    }
     override def toString = s"field ${f}"
   }
   final private class BeanElt(set:Method) extends DataActor {

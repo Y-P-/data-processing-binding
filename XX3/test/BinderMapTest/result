@@ -1,2 +1,6 @@
 Map(1 -> ex1, 2 -> ex2, 3 -> ex3)
+IntMap(1 -> .*, 2 -> ([a-z]+)*, 3 -> abc|abe)
+Map(ex1 -> ex3, ex2 -> ex1, ex3 -> ex2)
+LongMap(2010 -> Fri Jan 01 00:00:00 CET 2010, 2011 -> Sat Jan 01 00:00:00 CET 2011, 2012 -> Sun Jan 01 00:00:00 CET 2012)
+Map(x -> ex1, y -> ex2, z -> ex3)
 ()

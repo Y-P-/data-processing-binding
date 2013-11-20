@@ -6,7 +6,9 @@ import loader.core.definition.Def
 import loader.core.context.FieldAnnot
 import loader.commons._
 import utils.Reflect._
-import scala.collection.immutable.BitSet
+import scala.collection.mutable.Builder
+import scala.collection.mutable.ArrayBuilder
+import loader.reflect.CollectionAdapter
 
 trait AutoConvertData extends ConvertData {
   def convert:String
@@ -44,11 +46,11 @@ object AutoConvertData {
 
 abstract class Binder[-E<:Def#Elt](val what:DataActor) {
   import Binder._
-  protected[this] var eType:Type = null                   //The expected type bound; setting it may be 'complex': it mat be at the bottom of a deep collection
-  abstract class Instance(on:AnyRef) {                    //Binder instance for a pair (object/field or object/method)
+  protected[this] var eType:Type = null     //The expected type bound; setting it may be 'complex': it mat be at the bottom of a deep collection
+  abstract class Instance(on:AnyRef) {      //Binder instance for a pair (object/field or object/method)
     def container:Instance = null
     def receive(x:Any,e:E)
-    def terminate():Unit
+    def terminate(e:E):Unit
     def read():Any = what.get(on)
     def subInstance():Instance = throw new IllegalStateException("sub instance are only allowed on collections")
   }
@@ -60,6 +62,8 @@ abstract class Binder[-E<:Def#Elt](val what:DataActor) {
   
   protected[this] final def assign(on:AnyRef,x:Any):Unit = what.set(on, x)      //setting the field/method
   protected[this] final def expected:Type = what.expected
+  
+  /** This will be used to convert the data element before setting them to a field/method */
   protected[this] final def convertSolver(src:Class[_]):(Any,E)=>Any = {        //finds the converter for source class src; can only be c defined on the first invocation (when a value is actually set)
     val fd= getFd(src)
     solver(src,eType,fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
@@ -82,21 +86,6 @@ object Binder {
     case w:WildcardType      => throw new IllegalStateException(s"Non wilcard types are expected ; found $w")
   }).asInstanceOf[Class[_<:U]]
    
-  /** Type of the underlying contained element.
-   *  can only be called when t is associated with a container of some sort.
-   *  Classes wich are not generic can get away with this if they declare a Method 'dummyElt' that exactly returns the appropriate element type. The value doesn't matter.
-   */
-  final protected def eltType(t:Type):Type = {
-    def error = throw new IllegalStateException(s"type $t cannot be identified as a workable collection")
-    t match {
-      case p:ParameterizedType     => val args = p.getActualTypeArguments; args(args.length-1)
-      case g:GenericArrayType      => g.getGenericComponentType
-      case a:Class[_] if a.isArray => a.getComponentType
-      case c:Class[_]              => try { c.getMethod("dummyElt").getReturnType } catch { case _:Exception => error }
-      //note: Java classes will have methods with Object as signature. Not usable.
-      case _ => error
-    }
-  }
 
   abstract protected class MultiBinder[-E<:Def#Elt](protected[this] val solver:ConversionSolver[E], protected[this] val fd:Map[Class[_],AutoConvertData], what:DataActor) extends Binder[E](what) {
     protected[this] var convertMap:Map[Class[_],(Any,E)=>Any] = Map.empty  //converting to the actual value
@@ -129,7 +118,7 @@ object Binder {
     eType = expected
     final class Instance(on:AnyRef) extends super.Instance(on) { //Binder instance for a pair (object/field or object/method)
       final def receive(x:Any,e:E) = assign(on,convert(x,e))
-      final def terminate():Unit = ()
+      final def terminate(e:E):Unit = ()
     }
     def apply(on:AnyRef) = new Instance(on)
   }
@@ -137,44 +126,37 @@ object Binder {
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
   protected trait CollectionBinder[-E<:Def#Elt] extends Binder[E] {
-    implicit def toRichClass(t:Type):RichClass[_] = findClass(t)
     val SZ = 6                                                                    //Do we expect deep collection of more thatn this depth ?
-    protected[this] var depth = -1
+    protected[this] var depth    = -1
     protected[this] val eTypes   = new Array[Type](SZ)                            //store calculated values to avoid recomputing them at each step
     protected[this] val kConvert = new Array[(Any,E)=>Any](SZ)                    //store calculated key converters to avoid recomputing them at each step
     class Instance(on:AnyRef,colClzz:Type,depth:Int) extends super.Instance(on) { //Binder instance for a pair (object/field or object/method)
-      protected[this] val eType = { if (eTypes(depth)==null) eTypes(depth)=eltType(colClzz); eTypes(depth) }
+      val adapt = solver.collectionSolver(colClzz)(colClzz)
+      protected[this] val eType = { if (eTypes(depth)==null) eTypes(depth)=adapt.czElt; eTypes(depth) }
       if (CollectionBinder.this.depth<depth) {
         CollectionBinder.this.depth = depth
         CollectionBinder.this.eType = eType            //each level of instance (for deep collections) sets this value (once only till bottom is reached)
       }
-      def buildStack:Stack[_] = new Stack(eType,colClzz)
+      protected[this] def buildStack = ArrayBuilder.make()(ClassTag(eType)).asInstanceOf[ArrayBuilder[Any]]
       final protected[this] val stack = buildStack
       def receive(x:Any,e:E) = stack+=convert(x,e)
-      def terminate():Unit = assign(on,stack.buildCollection)
+      def terminate(e:E):Unit =  assign(on,adapt.buildCollection(stack,e))
       trait SubInstance extends Instance {             //Instance for deep collections (collections of collections of ...)
         override def container = Instance.this
-        override def terminate():Unit = Instance.this.stack+=stack.buildCollection
+        override def terminate(e:E):Unit = Instance.this.stack+=adapt.buildCollection(stack,e)
       }
-      final override def subInstance = if (isMap(eType)) new MappedInstance(null,eType,depth+1) with SubInstance else new Instance(null,eType,depth+1) with SubInstance
+      final override def subInstance = if (adapt.isMap) new MappedInstance(null,eType,depth+1) with SubInstance else new Instance(null,eType,depth+1) with SubInstance
     }
     class MappedInstance(on:AnyRef,colClzz:Type,depth:Int) extends Instance(on,colClzz,depth) {  //used for mapped collection
-      protected[this] val kType = try { //type for key is first param in the list
-        val p=colClzz.asInstanceOf[ParameterizedType].getActualTypeArguments
-        if (p.length<=1) throw new IllegalStateException(s"class $colClzz has not at least 2 parameters and cannot be used as a spawned map")
-        if (p(0)==classOf[AnyRef]) throw new IllegalStateException(s"class ${p(0)} is too general for a map key")
-        p(0)
-      } catch {
-        case e:Exception => throw new IllegalStateException(s"class $colClzz cannot be used as a spawned map: $e")
-      }
-      override def buildStack = new Stack(classOf[Assoc[_,_]],colClzz)
+      protected[this] val kType = adapt.asInstanceOf[CollectionAdapter[_,E]#MapAdapter[_,_]].czKey
+      override protected[this] def buildStack = ArrayBuilder.make[Assoc[_,_]]().asInstanceOf[ArrayBuilder[Any]] //we store Assoc for maps
       override def receive(x:Any,e:E) = x match {
         case a:Assoc[_,_] => if (kConvert(depth)==null) kConvert(depth) = solver(a.key.getClass,kType,ConvertData.empty,null).fold(s=>throw new IllegalStateException(s), identity)
                              stack += kConvert(depth)(a.key,e) --> convert(a.value,e)
         case _ => throw new IllegalStateException(s"a map must receive a ${classOf[Assoc[_,_]]} as data")
       }      
     }
-    def apply(on:AnyRef) = if (isMap(expected)) new MappedInstance(on,expected,0) else new Instance(on,expected,0)
+    def apply(on:AnyRef) = if (CollectionAdapter.isMap(expected)) new MappedInstance(on,expected,0) else new Instance(on,expected,0)
   }
 
   /** Factory where multiple conversions from various types are expected */
@@ -188,55 +170,8 @@ object Binder {
     else       new MonoBinder(solver,fd,what) with SimpleBinder[E]
   }
   
-  //checks if expected is a Map
-  protected[this] def isMap(expected:RichClass[_]):Boolean = expected<classOf[scala.collection.MapLike[_,_,_]] || expected<classOf[java.util.Map[_,_]]
   
-  //TODO ?: improve perf by moving reflection out. Not worth it though (collection building doesn't happen that often).
-  class Stack[+X](cx:Class[X],czColl:Class[_],sz:Int=200) extends utils.Stack(cx,sz) {
-    protected[this] lazy val mkBuilder = try {
-      czColl.getMethod("canBuildFrom").invoke(null).asInstanceOf[scala.collection.generic.CanBuildFrom[_,Any,_]]
-    } catch {
-      case e:NoSuchMethodException => if (czColl.isInterface) throw new IllegalStateException(s"Cannot spawn a collection defined by an interface: $czColl")
-                                      if (Modifier.isAbstract(czColl.getModifiers)) throw new IllegalStateException(s"Cannot spawn an abstract collection unless it happens to possess a static canBuildFrom() method : $czColl")
-                                      throw e
-    }
-    protected[this] def getBuilder = { val builder = mkBuilder.apply; builder.sizeHint(length); builder }
-    protected[this] def getJInstance[X]:X = try {
-      czColl.newInstance.asInstanceOf[X]
-    } catch {
-      case e:InstantiationException => if (czColl.isInterface || Modifier.isAbstract(czColl.getModifiers)) throw new IllegalStateException(s"Cannot spawn a Java collection defined by an interface or abstract class: $czColl")
-                                       throw e
-    }
-    def buildCollection:AnyRef = {
-      val r = if (czColl.isArray) {
-        val r = java.lang.reflect.Array.newInstance(czColl.asInstanceOf[Class[Array[_]]].getComponentType, length).asInstanceOf[Array[X]]
-        arrayCopy(r)
-        r
-      } else if (czColl<classOf[scala.collection.MapLike[_,_,_]]) {
-        val builder = getBuilder
-        for (x <- this) builder += { val a=x.asInstanceOf[Assoc[Any,Any]]; (a.key,a.value) }
-        builder.result.asInstanceOf[AnyRef]
-      } else if (czColl<classOf[scala.collection.Iterable[_]]) {
-        val builder = getBuilder
-        for (x <- this) builder += x
-        builder.result.asInstanceOf[AnyRef]
-      } else if (czColl<classOf[java.util.Map[_,_]]) {
-        val r = getJInstance[java.util.Map[Any,Any]]
-        for (x <- this) x match {
-          case a:Assoc[_,_] => r.put(a.key,a.value)
-          case _            => throw new IllegalArgumentException(s"an ${classOf[Assoc[_,_]]} is expected when filling up a map")
-        }
-        r
-      } else if (czColl<classOf[java.util.Collection[_]]) {
-        val r = getJInstance[java.util.Collection[X]]
-        for (x <- this) r.add(x)
-        r
-      } else
-        throw new IllegalStateException("Unsupported container class")
-      clear
-      r
-    }
-  }  
+  
+  
+  implicit protected[this] def toRichClass(t:Type):RichClass[_] = findClass(t)
 }
-
-

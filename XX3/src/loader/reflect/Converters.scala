@@ -36,6 +36,8 @@ object ConvertData {
   }
 }
 
+/** This object defines the usual default conversions.
+ */
 object Converters {
   
   abstract class StringConverter[V](val dst:RichClass[_<:V]) extends Converter[String,V,Def#Elt] {
@@ -112,6 +114,9 @@ object Converters {
       CvJBoolean(s(0),s(1))
     }
   }
+  object CvvPattern extends StringConverter[java.util.regex.Pattern](classOf[java.util.regex.Pattern]) {
+    def apply(fd:ConvertData) = (s:String,e:Def#Elt) => java.util.regex.Pattern.compile(s)
+  }  
   object CvvURL extends StringConverter(CvURL) {
     def apply(fd:ConvertData) = CvURL(fd.check,fd.valid=="C")
   }
@@ -147,7 +152,7 @@ object Converters {
   val defaultMap = utils.ClassMap[StringConverter[_]](
                         CvvString,CvvCharArray,CvvInt,CvvJInt,CvvShort,CvvJShort,CvvLong,CvvJLong,
                         CvvByte,CvvJByte,CvvChar,CvvJChar,CvvFloat,CvvJFloat,CvvDouble,CvvJDouble,
-                        CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean,CvvClass)(
+                        CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean,CvvClass,CvvPattern)(
                         CvvEnum,CvvJEnum
                         )
  
