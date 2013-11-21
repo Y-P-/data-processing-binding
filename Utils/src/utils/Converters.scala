@@ -258,7 +258,10 @@ object StringConverter {
     val m = dst.c.getMethod("valueOf", classOf[String])
     m.setAccessible(true)
     class Info(val pattern:Pattern) extends BasicInfo[T] with RegexChecker {
-      def convert(s:String):T = dst.c.cast(m.invoke(null,s))
+      def convert(s:String):T = {
+        val r = try { m.invoke(null,s) } catch { case x:InvocationTargetException => throw x.getCause }
+        dst.c.cast(r)
+      }
       def postvalid(s:T) = s
     }
     def apply(fmtRegex:String) = new Info(fmtRegex)
@@ -287,16 +290,19 @@ object StringConverter {
       val base = name.substring(end)
       val x = if (base.indexOf('.')<0) //class name ends with XXX$YYY => the enclosing class is XXX
                 try   { Class.forName(name.substring(0, end)+"$") }
-                catch { case _ => throw new IllegalStateException(s"Enumeration ${dst.c} must be stable; reflection will fail.") }
+                catch { case _ => throw new IllegalArgumentException(s"Enumeration ${dst.c} must be stable; reflection will fail.") }
               else
-                throw new IllegalStateException(s"Enumeration ${dst.c} is not precise enough; reflection will fail.")
+                throw new IllegalArgumentException(s"Enumeration ${dst.c} is not precise enough; reflection will fail.")
       val m = x.getMethod("withName", classOf[String])
       m.setAccessible(true)
       val o = x.asObject
       s => try {
         m.invoke(o,s)
       } catch {
-        case e:InvocationTargetException => throw e.getCause
+        case e:InvocationTargetException => e.getCause match {
+          case e:NoSuchElementException => throw new IllegalArgumentException(s"No element named $s exists for Enumeration $name")
+          case e => throw e
+        }
       }
     }
     class Info(val pattern:Pattern) extends BasicInfo[T] with RegexChecker {

@@ -53,7 +53,8 @@ class LogTester(name:String,handlers:LogTester.Comparator*) extends LogTester.So
     val out  = new PrintWriter(if (junit) tee(out3,out1) else tee(tee(out3,out2),out1))
     try {
       val in = new String(ByteArrayReader(fin))
-      out.println(testToDo(this,out).toString)
+      val r = testToDo(this,out)
+      if (!r.isInstanceOf[Unit]) out.println(r)
       out.flush
       if (junit) LogTester.checkStrings(comp)(in,str.toString) {
         println(s"comparing with $fin")
