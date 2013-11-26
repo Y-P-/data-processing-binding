@@ -3,6 +3,7 @@ package loader.reflect
 
 import java.lang.reflect.{Field,Method,Type}
 import utils.Reflect.RichClass
+import scala.annotation.tailrec
 
 
 abstract class DataActor {
@@ -15,20 +16,32 @@ abstract class DataActor {
 object DataActor {
   private final def testMethod(m:Method,name:String) = m.getName==name && m.getParameterTypes.length==1
   
-  implicit def apply(cz:Class[_]):String=>Option[DataActor] = (s:String)=>apply(cz,s)
+  implicit def apply(cz:Class[_]):String=>Option[DataActor] = (s:String)=>apply(cz,s,"bsfm")
+  
+  //utility for apply below: matches a character and a reflexive setter
+  protected[this] def get(cz:RichClass[_],name:String,x:Char) = x match {
+    case 'b' => cz.find[Method] (testMethod(_,"set"+name.charAt(0).toUpper+name.substring(1)))  .map(new BeanElt(_))
+    case 's' => cz.find[Method] (testMethod(_,name+"_$eq"))                                     .map(new ScalaElt(_))
+    case 'f' => cz.find[Field]  (_.getName==name)                                               .map(new FldElt(_))
+    case 'm' => cz.find[Method] (testMethod(_,name))                                            .map(new MethodElt(_))
+    case  c  => throw new IllegalArgumentException(s"the choice for reflexive affectation must be in b (bean), s (scala), f (field), m (method); any other character is an error: $c")
+  }
+  //recursive call for following the defined order
+  @tailrec protected[this] def apply(cz:RichClass[_],name:String,order:String,i:Int):Option[DataActor] = {
+    if (i>=order.length) return None
+    get(cz,name,order.charAt(i)) match {
+      case None      => apply(cz,name,order,i+1)
+      case x:Some[_] => x
+    }
+  }
   /** Finds the class element most closely matching the given canonical name in the given class.
    *  @param clzz, the class to search
    *  @param name, the name to find
-   *  @param accept, when true, return a DummyClassElement that accepts anything but does nothing!
+   *  @param order, the preferred order to match. e.g. "bf" with name 'aa' would prefer the method setAa rather than field aa, and ignore scala aa_$eq method or any aa method
    *  @return the appropriate ClassElt
    */
-  def apply(cz:RichClass[_],name:String):Option[DataActor] = {
-    cz.find[Field]  (_.getName==name)                                               .map(new FldElt(_))    .orElse(
-    cz.find[Method] (testMethod(_,name+"_$eq"))                                     .map(new ScalaElt(_))  .orElse(
-    cz.find[Method] (testMethod(_,"set"+name.charAt(0).toUpper+name.substring(1)))  .map(new BeanElt(_))   .orElse(
-    cz.find[Method] (testMethod(_,name))                                            .map(new MethodElt(_))))
-    )
-  }
+  def apply(cz:RichClass[_],name:String,order:String):Option[DataActor] = apply(cz,name,order,0)
+  
   final private class FldElt(f:Field) extends DataActor {
     val name = f.getName
     f.setAccessible(true)

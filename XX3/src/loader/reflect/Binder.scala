@@ -26,34 +26,58 @@ object AutoConvertData {
  *  The Binder exists only to store the relevant data pertaining to the underlying operations (conversion, field/method setting etc.)
  *  An Instance must be created in order to use the binder on an actual object.
  *  
- *  The only available method is apply, which builds an instance (the Binder bound to a given object.)
- *  Instance has only two methods:
- *  - receive(x:AnyRef,e:E), which tells that x was received for that field
- *  - terminate():Unit, which tells that the field is done with (and is only really usefull when building a collection.)
- *  A a consequence, the only available sequence is:
+ *  Note: now Instance is protected, so while the following is still applicable in theory, it cannot be done.
+ *    The only available method is apply, which builds an instance (the Binder bound to a given object.)
+ *    Instance has only two methods:
+ *    - receive(x:AnyRef,e:E), which tells that x was received for that field
+ *    - terminate():Unit, which tells that the field is done with (and is only really usefull when building a collection.)
+ *    A a consequence, the only available sequence is:
+ *  
+ *      val b:Binder[_,_] = Binder(fld,solver,fd)
+ *      val x:b.Instance  = b.build(anObject,e)
+ *      x.receive(a,e)
+ *      ..............
+ *      x.receive(z,e)
+ *      x.terminate
+ *    
+ *    At the end of the sequence, anObject.fld is set to the received value, appropriately converted.
+ *    
+ *  New: The correct sequence, which includes the management of simple fields as well as collection (possibly embedded) fields is:
  *  
  *    val b:Binder[_,_] = Binder(fld,solver,fd)
- *    val x:b.Instance  = b(anObject)
- *    x.receive(a,e)
- *    ..............
- *    x.receive(z,e)
- *    x.terminate
+ *    val x:b.Inner = b(o,e1) //using b on object o associated with element e1
+ *    b.down()                //entering sub-collection (obviously optional)
+ *    b(z,e2)                 //receiving value z from Element e2
+ *    b.up()                  //existing sub-collection. exiting from top layer assigns the result (applicable to simple fields)
  *    
- *  At the end of the sequence, anObject.fld is set to the received value, appropriately converted.
+ *    So there are always n calls to down and n+1 calls to up
  */
 
 abstract class Binder[-E<:Def#Elt](val what:DataActor) {
   import Binder._
-  protected[this] var eType:Type = null                         //The expected type bound; setting it may be 'complex': it mat be at the bottom of a deep collection
-  abstract class Instance(on:AnyRef,protected[this] val e:E) {  //Binder instance for a pair (object/field or object/method)
+  protected[this] var eType:Type = null                                         //The expected type bound; setting it may be 'complex': it mat be at the bottom of a deep collection
+  protected[this] abstract class Instance(on:AnyRef,protected[this] val e:E) {  //Binder instance for a pair (object/field or object/method)
     def container:Instance = null
     def receive(x:Any,e:E)
     def terminate():Unit
     def read():Any = what.get(on)
     def subInstance():Instance = throw new IllegalStateException("sub instance are only allowed on collections")
   }
+  /** This class hides layer management and simplifies the API.
+   */
+  final class Inner protected[Binder] (private[this] var cur:Instance) {
+    /** enter a sub-layer. Can be called n times (whatever n) */
+    final def down() = cur=cur.subInstance
+    /** receives a data value v from element e */
+    final def apply(v:Any,e:E) = cur.receive(v,e)
+    /** exit a sub-layer or, if at top, assign the value to the field. Must be called exactly n+1 times */
+    final def up() = { cur.terminate(); if (cur.container!=null) cur=cur.container }
+    /** reads the value. Note that it it an error to use this call if all calls to down have not been unwinded. */
+    final def get() = if (cur.container==null) cur.read() else throw new IllegalStateException("You cannot read the value from a sublayer")
+  }
+  def apply(on:AnyRef,e:E):Inner = new Inner(build(on,e))
   
-  def apply(on:AnyRef,e:E):Instance
+  protected[this] def build(on:AnyRef,e:E):Instance
   protected[this] val solver:ConversionSolver[E]
   protected[this] def convert(u:Any,e:E):Any
   protected[this] def getFd(src:Class[_]):AutoConvertData
@@ -66,6 +90,7 @@ abstract class Binder[-E<:Def#Elt](val what:DataActor) {
     val fd= getFd(src)
     solver(src,eType,fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
   }
+  
 }
 
 object Binder {
@@ -114,11 +139,11 @@ object Binder {
    */
   protected trait SimpleBinder[-E<:Def#Elt] extends Binder[E] {
     eType = expected
-    final class Instance(on:AnyRef,e:E) extends super.Instance(on,e) { //Binder instance for a pair (object/field or object/method)
+    final protected[this] class Instance(on:AnyRef,e:E) extends super.Instance(on,e) { //Binder instance for a pair (object/field or object/method)
       final def receive(x:Any,e:E) = assign(on,convert(x,e))
       final def terminate():Unit = ()
     }
-    def apply(on:AnyRef,e:E) = new Instance(on,e)
+    protected[this] def build(on:AnyRef,e:E) = new Instance(on,e)
   }
   /** Binder for a collection element. It can not be assigned until all elements have been first collected.
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
@@ -128,7 +153,7 @@ object Binder {
     protected[this] var depth    = -1
     protected[this] val eTypes   = new Array[Type](SZ)                                  //store calculated values to avoid recomputing them at each step
     protected[this] val kConvert = new Array[(Any,E)=>Any](SZ)                          //store calculated key converters to avoid recomputing them at each step
-    class Instance(on:AnyRef,val adapt:CollectionAdapter[_,E]#BaseAdapter[_],depth:Int,e:E) extends super.Instance(on,e) { //Binder instance for a pair (object/field or object/method)
+    protected[this] class Instance(on:AnyRef,val adapt:CollectionAdapter[_,E]#BaseAdapter[_],depth:Int,e:E) extends super.Instance(on,e) { //Binder instance for a pair (object/field or object/method)
       protected[this] val eType = { if (eTypes(depth)==null) eTypes(depth)=adapt.czElt; eTypes(depth) }
       if (CollectionBinder.this.depth<depth) {
         CollectionBinder.this.depth = depth
@@ -143,7 +168,7 @@ object Binder {
       }
       final override def subInstance = if (adapt.isMap) new MappedInstance(null,adapter(eType),depth+1,e) with SubInstance else new Instance(null,adapter(eType),depth+1,e) with SubInstance
     }
-    class MappedInstance(on:AnyRef,adapt:CollectionAdapter[_,E]#BaseAdapter[_],depth:Int,e:E) extends Instance(on,adapt,depth,e) {  //used for mapped collection
+    protected[this] class MappedInstance(on:AnyRef,adapt:CollectionAdapter[_,E]#BaseAdapter[_],depth:Int,e:E) extends Instance(on,adapt,depth,e) {  //used for mapped collection
       protected[this] val kType = adapt.asInstanceOf[CollectionAdapter[_,E]#MapAdapter[_,_]].czKey
       override def receive(x:Any,e:E) = x match {
         case a:Assoc[_,_] => if (kConvert(depth)==null) kConvert(depth) = solver(a.key.getClass,kType,ConvertData.empty,null).fold(s=>throw new IllegalStateException(s), identity)
@@ -152,7 +177,7 @@ object Binder {
       }      
     }
     def adapter(t:Type) = solver.collectionSolver(t)(t)
-    def apply(on:AnyRef,e:E) = {
+    protected[this] def build(on:AnyRef,e:E) = {
       val adapt = adapter(expected)
       if (adapt.isMap) new MappedInstance(on,adapt,0,e) else new Instance(on,adapt,0,e)
     }

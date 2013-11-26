@@ -85,7 +85,7 @@ object BinderTest {
     //no conversion data
     val f = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
     //basic binder: no collection, no conversion data, default String conversions
-    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).receive(_,null.asInstanceOf[E])
+    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).apply(_,null.asInstanceOf[E])
     def apply(file:Solver,out0:PrintWriter) = {
       val u = new U
       def set(fld:String,v:String) = forTest[Def#Elt,U](fld).apply(u,v)
@@ -125,7 +125,7 @@ object BinderTest {
     //no conversion data
     val f = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
     //basic binder: no collection, no conversion data, no conversion
-    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).receive(_,null.asInstanceOf[E])
+    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).apply(_,null.asInstanceOf[E])
     def apply(file:Solver,out0:PrintWriter) = {
       val u = new U
       def set(fld:String,v:Any) = forTest[Def#Elt,U](fld).apply(u,v)
@@ -610,12 +610,11 @@ object BinderTest {
   val fx = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
   class FHelper[X<:AnyRef:ClassTag](fld:String,x:X,fd:Map[Class[_],AutoConvertData]) {
     val cz  = implicitly[ClassTag[X]].runtimeClass
-    var cur = Binder(DataActor(cz)(fld).getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to $cz")),StandardSolver(),fd,true)(x,null)
-    var r:Binder[Def#Elt]#Instance = _
-    def down() = cur=cur.subInstance
-    def apply(v:Any) = cur.receive(v,null)
-    def up() = { cur.terminate(); r=cur; cur=cur.container }
-    def get() = r.read()
+    val i = Binder(DataActor(cz)(fld).getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to $cz")),StandardSolver(),fd,true)(x,null)
+    def down() = i.down
+    def apply(v:Any) = i.apply(v,null)
+    def up() = i.up
+    def get() = i.get()
   }
   def field[X<:AnyRef:ClassTag](fld:String,x:X,fd:Map[Class[_],AutoConvertData]) = new FHelper(fld,x,fd)
   def write[X](a:Traversable[X]) = if (a==null) "<null>" else scala.runtime.ScalaRunTime.stringOf(a)
