@@ -54,28 +54,27 @@ object AutoConvertData {
  */
 
 abstract class Binder[-E<:Def#Elt](val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
-  abstract class Instance(on:AnyRef,protected[this] val e:E) {  //Binder instance for a pair (object/field or object/method)
+  abstract class Analyze(on:AnyRef,protected[this] val e:E) {  //Binder instance for a pair (object/field or object/method)
     def isCol:Boolean                               //indicates whether this is a Collection
     def isMap:Boolean                               //indicates whether this is a map
     def convert(x:Any):Any                          //build the actual value for x as expected from the container
     def close():Unit                                //terminates a seq collection ; can apply to maps iff the seq elements were assocs
     protected def assign(x:Any):Unit                //an internal method to assign the result x to the container
     
-    def subInstance():Instance = throw new IllegalStateException("sub instance are only allowed on collections")   //creates a sub instance for encapsulated collections
+    def subAnalyze():Analyze = throw new IllegalStateException("sub instance are only allowed on collections")   //creates a sub instance for encapsulated collections
     def close(key:Any):Unit = throw new IllegalStateException("this method cannot be invoked from a top Instance") //terminates a sub-collection by assigning a key ; applicable if container is a map
     
     final def read():Any = what.get(on)
     final def assign(x:Any,doConvert:Boolean):Unit = assign(if (doConvert) convert(x) else x)
-    final def set(x:Any) = x match {
-      case a:Assoc[_,_] => assign(a,false)
-      case x            => assign(x,true)
-    }
+    final def set(x:Any) = assign(x,!x.isInstanceOf[Assoc[_,_]])
   }
 
-  def apply(on:AnyRef,e:E):Instance = build(on,e)
+  def apply(on:AnyRef,e:E):Analyze = build(on,e)
   
-  protected[this] def build(on:AnyRef,e:E):Instance  
+  protected[this] def build(on:AnyRef,e:E):Analyze  
   protected[this] final def adapter(t:Type) = solver.collectionSolver(Binder.findClass(t))(t)
+  protected[this] final def getSolver(cz:Class[_],t:Type) = solver(cz,Binder.findClass(t),fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
+
 }
 
 object Binder {
@@ -99,58 +98,58 @@ object Binder {
    *  An element could happen to be a collection, but it is treated as a whole (i.e. if conversion occurs, it occurs on the collection itself.)
    */
   protected class SimpleBinder[-E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
-    protected[this] class Instance(on:AnyRef,e:E) extends super.Instance(on,e) { //Binder instance for a pair (object/field or object/method)
+    protected[this] class Analyze(on:AnyRef,e:E) extends super.Analyze(on,e) { //Binder instance for a pair (object/field or object/method)
       protected[this] def eType = what.expected
       def isMap = false
       def isCol = false
       protected def assign(x:Any) = what.set(on,convert(x))
       def close():Unit = throw new IllegalStateException("cannot close a field instance")
       final def convert(src:Any):Any = {        //finds the converter for source class src; can only be c defined on the first invocation (when a value is actually set)
-        solver(src.getClass,eType,fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)(src,e)
+        getSolver(src.getClass,eType)(src,e)
       }
     }
-    protected[this] def build(on:AnyRef,e:E):super.Instance = new Instance(on,e)
+    protected[this] def build(on:AnyRef,e:E):super.Analyze = new Analyze(on,e)
   }
   /** Binder for a collection element. It can not be assigned until all elements have been first collected.
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
   protected class CollectionBinder[-E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends SimpleBinder[E](what,solver,fd) {
-    val SZ = 6                                                          //Do we expect deep collection of more than this depth ?
+    //val SZ = 6                                                          //Do we expect deep collection of more than this depth ?
     //eType = null
     //protected[this] var depth    = -1
     //protected[this] val eTypes   = new Array[Type](SZ)                  //store calculated values to avoid recomputing them at each step
     //protected[this] val kConvert = new Array[(Any,E)=>Any](SZ)          //store calculated key converters to avoid recomputing them at each step
     
-    private[this] class Instance(on:AnyRef,e:E) extends super.Instance(on,e) {
+    private[this] class Analyze(on:AnyRef,e:E) extends super.Analyze(on,e) {
       final def binder:CollectionBinder.this.type = CollectionBinder.this
-      override def subInstance = adapter(eType) match {
+      override def subAnalyze = adapter(eType) match {
         case a if a.isMap => new Map(a)
         case a            => new Col(a)
       }
-      protected[this] class Col(adapt:CollectionAdapter[_,E]#BaseAdapter[_]) extends Instance(on,e) {
-        final def parent = Instance.this
+      protected[this] class Col(adapt:CollectionAdapter[_,E]#BaseAdapter[_]) extends Analyze(on,e) {
+        final def parent = Analyze.this
         final val depth:Int = if (parent.isInstanceOf[Col]) parent.asInstanceOf[Col].depth+1 else 0
         final val stack = adapt.newBuilder(e).asInstanceOf[Builder[Any,Any]]
         protected[this] override final val eType = adapt.czElt
         final override def isCol = true
         final override def isMap = adapt.isMap
-        final override def close():Unit         = parent.assign(stack.result,false)
-        final override def close(key:Any):Unit  = if (!parent.isMap) throw new IllegalStateException("this method can only be invoked if the containing instance is a map")
-                                                  else parent.assign(key-->stack.result,false)
+        final override def close():Unit        = parent.assign(stack.result,false)
+        final override def close(key:Any):Unit = if (!parent.isMap) throw new IllegalStateException("this method can only be invoked if the containing instance is a map")
+                                                 else parent.assign(key-->stack.result,false)
         override protected def assign(x:Any):Unit = stack += x
       }
       protected[this] class Map(adapt:CollectionAdapter[_,E]#BaseAdapter[_]) extends Col(adapt) {  //used for mapped collection
         protected[this] final val kType = adapt.asInstanceOf[CollectionAdapter[_,E]#MapAdapter[_,_]].czKey
         private[this] var kConvert:(Any,E)=>Any =  null
         override protected def assign(x:Any) = x match {
-          case a:Assoc[_,_] => if (kConvert==null) kConvert = solver(a.key.getClass,kType,ConvertData.empty,null).fold(s=>throw new IllegalStateException(s), identity)
+          case a:Assoc[_,_] => if (kConvert==null) kConvert = getSolver(a.key.getClass,kType)
                                super.assign(kConvert(a.key,e) -> convert(a.value))
           case _ => throw new IllegalStateException(s"a map must receive a ${classOf[Assoc[_,_]]} as data")
         }
       }
     }
  
-    protected[this] override def build(on:AnyRef,e:E) = new Instance(on,e).subInstance
+    protected[this] override def build(on:AnyRef,e:E) = new Analyze(on,e).subAnalyze
   }
 
   def fd(check0:String,param0:String,valid0:String,convert0:String) = new AutoConvertData {

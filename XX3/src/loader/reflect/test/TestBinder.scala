@@ -606,14 +606,14 @@ object BinderTest {
   }
   //no conversion data
   val fx = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
-  implicit class XH(val cur: loader.reflect.Binder[loader.core.definition.Def#Elt]#Instance) {
-    def apply(f: (XH)=>Unit):Unit          = { val i=cur.subInstance; f(i); i.close }
-    def apply(x:Any)(f: (XH)=>Unit):Unit   = { val i=cur.subInstance; f(i); i.close(x) }
+  implicit class XH(val cur: loader.reflect.Binder[loader.core.definition.Def#Elt]#Analyze) {
+    def apply(f: (XH)=>Unit):Unit          = { val i=cur.subAnalyze; f(i); i.close }
+    def apply(x:Any)(f: (XH)=>Unit):Unit   = { val i=cur.subAnalyze; f(i); i.close(x) }
     def build(f: (XH)=>Unit):Unit          = { f(this); cur.close }
     def <<-(x:Any*):Unit                   = for (x0 <- x) cur.set(x0)
     
     def multi(x:Any*):Unit                 = for (x0 <- x) cur.set(x0)
-    def layer(f: (XH => Unit)*):Unit       = for (f0 <- f) { val i=cur.subInstance; f0(i); i.close }
+    def layer(f: (XH => Unit)*):Unit       = for (f0 <- f) { val i=cur.subAnalyze; f0(i); i.close }
     def read                               = cur.read()
   }
   def get[X<:AnyRef:ClassTag](fld:String,x:X) = Binder(DataActor(implicitly[ClassTag[X]].runtimeClass)(fld).getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to ${implicitly[ClassTag[X]].runtimeClass}")),StandardSolver(),Map.empty,true)(x,null)
