@@ -22,7 +22,7 @@ abstract class CollectionAdapter[C:ClassTag,-E<:Def#Elt] {
   val czzCol:Class[_] = implicitly[ClassTag[C]].runtimeClass
   def apply(p:Type):BaseAdapter[_]
   
-  trait BaseAdapter[-X] {
+  sealed trait BaseAdapter[-X] {
     def isMap:Boolean
     def czCol:Type                                      //the actual collection full type
     def czElt:Type                                      //the element in the collection
@@ -33,6 +33,7 @@ abstract class CollectionAdapter[C:ClassTag,-E<:Def#Elt] {
     def isMap=false
     //you have to fill this up if canBuildFrom cannot be found as a static method, or the Java Collection class is non trivial
     def newBuilder(e:E):Builder[X,C]
+    override def toString = s"SeqAdapter[$czElt]"
   }
   abstract class MapAdapter[K,X](val czKey:Class[_],val czElt:Type) extends BaseAdapter[(K,X)] {
     if (czElt==classOf[AnyRef]) throw new IllegalArgumentException(s"type $czElt is not precise enough as a map element type: this error usually occurs when using scala primitive types (e.g. List[Int])")
@@ -40,6 +41,7 @@ abstract class CollectionAdapter[C:ClassTag,-E<:Def#Elt] {
     def isMap=true
     //you have to fill this up if canBuildFrom cannot be found as a static method, or the Java Collection class is non trivial
     def newBuilder(e:E):Builder[(K,X),C]
+    override def toString = s"MapAdapter[$czKey,$czElt]"
   }
 }
 

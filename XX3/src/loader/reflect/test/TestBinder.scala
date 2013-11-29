@@ -85,7 +85,7 @@ object BinderTest {
     //no conversion data
     val f = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
     //basic binder: no collection, no conversion data, default String conversions
-    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).apply(_,null.asInstanceOf[E])
+    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).set(_)
     def apply(file:Solver,out0:PrintWriter) = {
       val u = new U
       def set(fld:String,v:String) = forTest[Def#Elt,U](fld).apply(u,v)
@@ -125,7 +125,7 @@ object BinderTest {
     //no conversion data
     val f = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
     //basic binder: no collection, no conversion data, no conversion
-    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).apply(_,null.asInstanceOf[E])
+    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).set(_)
     def apply(file:Solver,out0:PrintWriter) = {
       val u = new U
       def set(fld:String,v:Any) = forTest[Def#Elt,U](fld).apply(u,v)
@@ -162,30 +162,21 @@ object BinderTest {
    *  Checks both primitive types and object type.
    */
   @Test class BinderArrayTest extends StandardTester {
+    class W(val a1:Array[Int],val b1:Array[Ex.Val],val a2:Array[Array[Int]],val b2:Array[Array[Ex.Val]],val a3:Array[Array[Array[Int]]],val b3:Array[Array[Array[Ex.Val]]]) {
+      override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
+    }
     def apply(file:Solver,out0:PrintWriter) = {
-      val w = new W1(Array(),Array(),Array(),Array(),Array(),Array())
-      def f[X<:AnyRef:ClassTag](fld:String) = field(fld,w,fx)
-      val a1 = f("a1"); a1("1");   a1("2");   a1("3");   a1.up()
-      val b1 = f("b1"); b1("ex1"); b1("ex2"); b1("ex3"); b1.up()
-      val a2 = f("a2"); a2.down(); a2("1"); a2("2"); a2("3"); a2.up()
-                        a2.down(); a2("4"); a2("5"); a2("6"); a2.up(); a2.up()
-      val b2 = f("b2"); b2.down(); b2("ex1"); b2("ex2"); b2("ex3"); b2.up()
-                        b2.down(); b2("ex3"); b2("ex1"); b2("ex2"); b2.up()
-                        b2.down(); b2("ex2"); b2("ex3"); b2("ex1"); b2.up(); b2.up()
-      val a3 = f("a3"); a3.down(); a3.down(); a3("1"); a3("2"); a3("3"); a3.up()
-                                   a3.down(); a3("4"); a3("5"); a3("6"); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("7"); a3("8"); a3.up()
-                                   a3.down(); a3("9"); a3.up();
-                                   a3.down(); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("9"); a3("10"); a3.up()
-                                   a3.down(); a3("11"); a3.up(); a3.up(); a3.up()
-      val b3 = f("b3"); b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3("ex3"); b3.up()
-                                   b3.down(); b3("ex2"); b3("ex1"); b3("ex3"); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3.up()
-                                   b3.down(); b3("ex1"); b3.up();
-                                   b3.down(); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex2"); b3("ex1"); b3.up()
-                                   b3.down(); b3("ex3"); b3.up(); b3.up(); b3.up()
+      val w = new W(Array(),Array(),Array(),Array(),Array(),Array())
+      get("a1",w).build(_.multi("1","2","3"))
+      get("b1",w).build(_.multi("ex1","ex2","ex3"))
+      get("a2",w).build(_.layer(_.multi("1","2","3"), _.multi("4","5","6")))
+      get("b2",w).build(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex3","ex1","ex2"),_.multi("ex2","ex3","ex1")))
+      get("a3",w).build(_.layer(_.layer(_.multi("1","2","3"),_.multi("4","5","6")),
+                                _.layer(_.multi("7","8"),_.multi("9"),_.multi()),
+                                _.layer(_.multi("9","10"),_.multi("11"))))
+      get("b3",w).build(_.layer(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex2","ex1","ex3")),
+                                _.layer(_.multi("ex1","ex2"),_.multi("ex1"),_.multi()),
+                                _.layer(_.multi("ex2","ex1"),_.multi("ex3"))))
       out0.println(w)
     }
   }
@@ -193,61 +184,44 @@ object BinderTest {
    *  Checks both primitive types and object type.
    */
   @Test class BinderColTest extends StandardTester {
+    class W(val a1:List[Integer],val b1:List[Ex.Val],val a2:Array[List[Integer]],val b2:Array[List[Ex.Val]],val a3:Array[List[Array[Int]]],val b3:Array[List[Array[Ex.Val]]]) {
+      override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
+    }
     def apply(file:Solver,out0:PrintWriter) = {
-      val w = new W2(List(),List(),Array(),Array(),Array(),Array())
-      def f[X<:AnyRef:ClassTag](fld:String) = field(fld,w,fx)
-      val a1 = f("a1"); a1("1");   a1("2");   a1("3");   a1.up()
-      val b1 = f("b1"); b1("ex1"); b1("ex2"); b1("ex3"); b1.up()
-      val a2 = f("a2"); a2.down(); a2("1"); a2("2"); a2("3"); a2.up()
-                        a2.down(); a2("4"); a2("5"); a2("6"); a2.up(); a2.up()
-      val b2 = f("b2"); b2.down(); b2("ex1"); b2("ex2"); b2("ex3"); b2.up()
-                        b2.down(); b2("ex3"); b2("ex1"); b2("ex2"); b2.up()
-                        b2.down(); b2("ex2"); b2("ex3"); b2("ex1"); b2.up(); b2.up()
-      val a3 = f("a3"); a3.down(); a3.down(); a3("1"); a3("2"); a3("3"); a3.up()
-                                   a3.down(); a3("4"); a3("5"); a3("6"); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("7"); a3("8"); a3.up()
-                                   a3.down(); a3("9"); a3.up();
-                                   a3.down(); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("9"); a3("10"); a3.up()
-                                   a3.down(); a3("11"); a3.up(); a3.up(); a3.up()
-      val b3 = f("b3"); b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3("ex3"); b3.up()
-                                   b3.down(); b3("ex2"); b3("ex1"); b3("ex3"); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3.up()
-                                   b3.down(); b3("ex1"); b3.up();
-                                   b3.down(); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex2"); b3("ex1"); b3.up()
-                                   b3.down(); b3("ex3"); b3.up(); b3.up(); b3.up()
+      val w = new W(List(),List(),Array(),Array(),Array(),Array())
+      get("a1",w).build(_.multi("1","2","3"))
+      get("b1",w).build(_.multi("ex1","ex2","ex3"))
+      get("a2",w).build(_.layer(_.multi("1","2","3"), _.multi("4","5","6")))
+      get("b2",w).build(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex3","ex1","ex2"),_.multi("ex2","ex3","ex1")))
+      get("a3",w).build(_.layer(_.layer(_.multi("1","2","3"),_.multi("4","5","6")),
+                                _.layer(_.multi("7","8"),_.multi("9"),_.multi()),
+                                _.layer(_.multi("9","10"),_.multi("11"))))
+      get("b3",w).build(_.layer(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex2","ex1","ex3")),
+                                _.layer(_.multi("ex1","ex2"),_.multi("ex1"),_.multi()),
+                                _.layer(_.multi("ex2","ex1"),_.multi("ex3"))))
       out0.println(w)
     }
   }
   /** Test for binders with a more important mix of arrays and collections.
    *  Checks both primitive types and object type.
+   *  Note: we introduce repetitions for Set tests.
    */
   @Test class BinderMixedColTest extends StandardTester {
+    class W(val a1:scala.collection.immutable.HashSet[Integer],val b1:scala.collection.immutable.HashSet[Ex.Val],val a2:List[scala.collection.immutable.HashSet[Integer]],val b2:List[scala.collection.immutable.HashSet[Ex.Val]],val a3:Array[List[scala.collection.immutable.HashSet[Integer]]],val b3:Array[List[scala.collection.immutable.HashSet[Ex.Val]]]) {
+      override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
+    }
     def apply(file:Solver,out0:PrintWriter) = {
-      val w = new W3(scala.collection.immutable.HashSet(),scala.collection.immutable.HashSet(),List(),List(),Array(),Array())
-      def f[X<:AnyRef:ClassTag](fld:String) = field(fld,w,fx)
-      val a1 = f("a1"); a1("1");   a1("2");   a1("3");  a1("3");  a1.up()
-      val b1 = f("b1"); b1("ex1"); b1("ex2"); b1("ex3"); b1("ex1"); b1.up()
-      val a2 = f("a2"); a2.down(); a2("1"); a2("2"); a2("3"); a2("1"); a2.up()
-                        a2.down(); a2("4"); a2("5"); a2("6"); a2("4"); a2.up(); a2.up()
-      val b2 = f("b2"); b2.down(); b2("ex1"); b2("ex2"); b2("ex3"); b2.up()
-                        b2.down(); b2("ex3"); b2("ex1"); b2("ex2"); b2.up()
-                        b2.down(); b2("ex2"); b2("ex3"); b2("ex1"); b2.up(); b2.up()
-      val a3 = f("a3"); a3.down(); a3.down(); a3("1"); a3("2"); a3("3"); a3.up()
-                                   a3.down(); a3("4"); a3("5"); a3("6"); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("7"); a3("8"); a3.up()
-                                   a3.down(); a3("9"); a3("9"); a3.up();
-                                   a3.down(); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("9"); a3("10"); a3.up()
-                                   a3.down(); a3("11"); a3.up(); a3.up(); a3.up()
-      val b3 = f("b3"); b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3("ex3"); b3.up()
-                                   b3.down(); b3("ex2"); b3("ex1"); b3("ex3"); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3.up()
-                                   b3.down(); b3("ex1"); b3.up();
-                                   b3.down(); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex2"); b3("ex1"); b3.up()
-                                   b3.down(); b3("ex3"); b3.up(); b3.up(); b3.up()
+      val w = new W(scala.collection.immutable.HashSet(),scala.collection.immutable.HashSet(),List(),List(),Array(),Array())
+      get("a1",w).build(_.multi("1","2","3","3"))
+      get("b1",w).build(_.multi("ex1","ex2","ex3","ex1"))
+      get("a2",w).build(_.layer(_.multi("1","2","3","1"), _.multi("4","5","6","4")))
+      get("b2",w).build(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex3","ex1","ex2"),_.multi("ex2","ex3","ex1")))
+      get("a3",w).build(_.layer(_.layer(_.multi("1","2","3"),_.multi("4","5","6")),
+                                _.layer(_.multi("7","8"),_.multi("9","9"),_.multi()),
+                                _.layer(_.multi("9","10"),_.multi("11"))))
+      get("b3",w).build(_.layer(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex2","ex1","ex3")),
+                                _.layer(_.multi("ex1","ex2"),_.multi("ex1"),_.multi()),
+                                _.layer(_.multi("ex2","ex1"),_.multi("ex3"))))
       out0.println(w)
     }
   }
@@ -256,30 +230,22 @@ object BinderTest {
    *  Uses Java collections.
    */
   @Test class BinderJMixedColTest extends StandardTester {
+    class W4(val a1:java.util.HashSet[Integer],val b1:java.util.HashSet[Ex.Val],val a2:java.util.LinkedList[java.util.HashSet[Integer]],val b2:java.util.LinkedList[java.util.HashSet[Ex.Val]],val a3:Array[java.util.LinkedList[java.util.HashSet[Integer]]],val b3:Array[java.util.LinkedList[java.util.HashSet[Ex.Val]]]) {
+      import scala.collection.JavaConversions._ 
+      override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
+    }
     def apply(file:Solver,out0:PrintWriter) = {
       val w = new W4(new java.util.HashSet(),new java.util.HashSet(),new java.util.LinkedList(),new java.util.LinkedList(),Array(),Array())
-      def f[X<:AnyRef:ClassTag](fld:String) = field(fld,w,fx)
-      val a1 = f("a1"); a1("1");   a1("2");   a1("3");  a1("3");  a1.up()
-      val b1 = f("b1"); b1("ex1"); b1("ex2"); b1("ex3"); b1("ex1"); b1.up()
-      val a2 = f("a2"); a2.down(); a2("1"); a2("2"); a2("3"); a2("1"); a2.up()
-                        a2.down(); a2("4"); a2("5"); a2("6"); a2("4"); a2.up(); a2.up()
-      val b2 = f("b2"); b2.down(); b2("ex1"); b2("ex2"); b2("ex3"); b2.up()
-                        b2.down(); b2("ex3"); b2("ex1"); b2("ex2"); b2.up()
-                        b2.down(); b2("ex2"); b2("ex3"); b2("ex1"); b2.up(); b2.up()
-      val a3 = f("a3"); a3.down(); a3.down(); a3("1"); a3("2"); a3("3"); a3.up()
-                                   a3.down(); a3("4"); a3("5"); a3("6"); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("7"); a3("8"); a3.up()
-                                   a3.down(); a3("9"); a3("9"); a3.up();
-                                   a3.down(); a3.up(); a3.up()
-                        a3.down(); a3.down(); a3("9"); a3("10"); a3.up()
-                                   a3.down(); a3("11"); a3.up(); a3.up(); a3.up()
-      val b3 = f("b3"); b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3("ex3"); b3.up()
-                                   b3.down(); b3("ex2"); b3("ex1"); b3("ex3"); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex1"); b3("ex2"); b3.up()
-                                   b3.down(); b3("ex1"); b3.up();
-                                   b3.down(); b3.up(); b3.up()
-                        b3.down(); b3.down(); b3("ex2"); b3("ex1"); b3.up()
-                                   b3.down(); b3("ex3"); b3.up(); b3.up(); b3.up()
+      get("a1",w).build(_.multi("1","2","3","3"))
+      get("b1",w).build(_.multi("ex1","ex2","ex3","ex1"))
+      get("a2",w).build(_.layer(_.multi("1","2","3","1"), _.multi("4","5","6","4")))
+      get("b2",w).build(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex3","ex1","ex2"),_.multi("ex2","ex3","ex1")))
+      get("a3",w).build(_.layer(_.layer(_.multi("1","2","3"),_.multi("4","5","6")),
+                                _.layer(_.multi("7","8"),_.multi("9","9"),_.multi()),
+                                _.layer(_.multi("9","10"),_.multi("11"))))
+      get("b3",w).build(_.layer(_.layer(_.multi("ex1","ex2","ex3"),_.multi("ex2","ex1","ex3")),
+                                _.layer(_.multi("ex1","ex2"),_.multi("ex1"),_.multi()),
+                                _.layer(_.multi("ex2","ex1"),_.multi("ex3"))))
       out0.println(w)
     }
   }
@@ -289,11 +255,11 @@ object BinderTest {
     def apply(file:Solver,out0:PrintWriter) = {
       import loader.commons._
       val w = new V2()
-      def f[X<:AnyRef:ClassTag](fld:String) = field(fld,w,fx)
       //builds a 'map' ex3->ex1,ex1->ex2,ex2->ex3 => checks that the collection works and that the correct converters are called (scala collections)
-      def basicSTest(a:FHelper[_],ordered:Boolean):Unit = {
-        a("ex3" --> "ex1"); a("ex1" --> "ex2"); a("ex2" --> "ex3"); a.up()
-        val fld = a.get().asInstanceOf[scala.collection.Map[Ex.Val,Ex.Val]]
+      def basicSTest(nom:String,ordered:Boolean):Unit = {
+        val x = get(nom,w)
+        x.build(_.multi("ex3" --> "ex1","ex1" --> "ex2","ex2" --> "ex3"))
+        val fld = x.read().asInstanceOf[scala.collection.Map[Ex.Val,Ex.Val]]
         assert(fld.size==3)
         if (ordered) {
           val i=fld.keys.iterator
@@ -305,9 +271,10 @@ object BinderTest {
         assert(fld(Ex.ex2)==Ex.ex3)          
       }
       //builds a 'map' ex3->ex1,ex1->ex2,ex2->ex3 => checks that the collection works and that the correct converters are called (java collections)
-      def basicJTest(a:FHelper[_],ordered:Boolean):Unit = {
-        a("ex3" --> "ex1"); a("ex1" --> "ex2"); a("ex2" --> "ex3"); a.up()
-        val fld = a.get().asInstanceOf[java.util.Map[Ex.Val,Ex.Val]]
+      def basicJTest(nom:String,ordered:Boolean):Unit = {
+        val x = get(nom,w)
+        x.build(_.multi("ex3" --> "ex1","ex1" --> "ex2","ex2" --> "ex3"))
+        val fld = x.read().asInstanceOf[java.util.Map[Ex.Val,Ex.Val]]
         assert(fld.size==3)
         if (ordered) {
           val i=fld.values.iterator
@@ -319,27 +286,27 @@ object BinderTest {
         assert(fld.get(Ex.ex2)==Ex.ex3)          
       }
       //runs basicSTest for fields aNN where NN loops in the list (scala)
-      def suiteS(ordered:Boolean,x:Int*):Unit = for (i<-x) basicSTest(f(s"a$i"),ordered)
+      def suiteS(ordered:Boolean,x:Int*):Unit = for (i<-x) basicSTest(s"a$i",ordered)
       //runs basicSTest for fields aNN where NN loops in the list (scala)
-      def suiteJ(ordered:Boolean,x:Int*):Unit = for (i<-x) basicJTest(f(s"a$i"),ordered)
+      def suiteJ(ordered:Boolean,x:Int*):Unit = for (i<-x) basicJTest(s"a$i",ordered)
       
       suiteS(false,1,3,5,6,10,11,13)
       suiteS(true,9)
       suiteJ(false,15,16,17,20,21)
       
-      val a2 = f("a2"); a2("1" --> ".*"); a2("2" --> "([a-z]+)*");   a2("3" --> "abc|abe");  a2.up()
+      get("a2",w).build(_.multi("1" --> ".*","2" --> "([a-z]+)*","3" --> "abc|abe"))
       assert(w.a2(1).pattern==java.util.regex.Pattern.compile(".*").pattern)
       assert(w.a2(2).pattern==java.util.regex.Pattern.compile("([a-z]+)*").pattern)
       assert(w.a2(3).pattern==java.util.regex.Pattern.compile("abc|abe").pattern)
-      val a4 = f("a4"); a4("2010" --> "01/01/2010 00:00"); a4("2011" --> "01/01/2011 00:00");   a4("2012" --> "01/01/2012 00:00");  a4.up()
+      get("a4",w).build(_.multi("2010" --> "01/01/2010 00:00","2011" --> "01/01/2011 00:00","2012" --> "01/01/2012 00:00"))
       assert(w.a4(2010L)==new java.util.Date("01/01/2010 00:00"))
       assert(w.a4(2011L)==new java.util.Date("01/01/2011 00:00"))
       assert(w.a4(2012L)==new java.util.Date("01/01/2012 00:00"))
-      val a14 = f("a14"); a14("a1" --> "ex1"); a14("b1" --> "ex2"); a14("c1" --> "ex3"); a14.up()
+      get("a14",w).build(_.multi("a1" --> "ex1","b1" --> "ex2","c1" --> "ex3"))
       assert(w.a14.get(MyEnum.a1)==Ex.ex1)
       assert(w.a14.get(MyEnum.b1)==Ex.ex2)
       assert(w.a14.get(MyEnum.c1)==Ex.ex3)
-      val a18 = f("a18"); a18("p1" --> "tex1"); a18("p2" --> "tex2"); a18("p3" --> "tex3"); a18.up()
+      get("a18",w).build(_.multi("p1" --> "tex1","p2" --> "tex2","p3" --> "tex3"))
       assert(w.a18.get("p1")=="tex1")
       assert(w.a18.get("p2")=="tex2")
       assert(w.a18.get("p3")=="tex3")
@@ -352,11 +319,11 @@ object BinderTest {
   @Test class BinderSeqTest extends StandardTester {
     def apply(file:Solver,out0:PrintWriter) = {
       val w = new V1()
-      def f[X<:AnyRef:ClassTag](fld:String) = field(fld,w,fx)
       //builds a 'sequence' ex1,ex2,ex3 => checks that the collection works and that the correct converter is called (scala collections)
-      def basicSTest(a:FHelper[_],ordered:Boolean=true):Unit = {
-        a("ex1"); a("ex2"); a("ex3"); a.up()
-        val fld = a.get().asInstanceOf[Traversable[Ex.Val]]
+      def basicSTest(nom:String,ordered:Boolean=true):Unit = {
+        val x = get(nom,w)
+        x.build(_.multi("ex1","ex2","ex3"))
+        val fld = x.read().asInstanceOf[Traversable[Ex.Val]]
         assert(fld.size==3)
         if (ordered) {
           assert(fld.head==Ex.ex1)
@@ -369,9 +336,10 @@ object BinderTest {
         }
       }
       //builds a 'sequence' ex1,ex2,ex3 => checks that the collection works and that the correct converter is called (java collections)
-      def basicJTest(a:FHelper[_],ordered:Boolean=true):Unit = {
-        a("ex1"); a("ex2"); a("ex3"); a.up()
-        val fld = a.get().asInstanceOf[java.util.Collection[Ex.Val]]
+      def basicJTest(nom:String,ordered:Boolean=true):Unit = {
+        val x = get(nom,w)
+        x.build(_.multi("ex1","ex2","ex3"))
+        val fld = x.read().asInstanceOf[java.util.Collection[Ex.Val]]
         val r = fld.toArray
         assert(fld.size==3)
         if (ordered) {
@@ -385,64 +353,103 @@ object BinderTest {
         }
       }
       //runs basicSTest for fields aNN where NN loops in the list (scala)
-      def suiteS(x:Int*):Unit = for (i<-x) basicSTest(f(s"a$i"))
+      def suiteS(x:Int*):Unit = for (i<-x) basicSTest(s"a$i")
       //runs basicJTest for fields aNN where NN loops in the list (java)
-      def suiteJ(x:Int*):Unit = for (i<-x) basicJTest(f(s"a$i"))
+      def suiteJ(x:Int*):Unit = for (i<-x) basicJTest(s"a$i")
       
-      val a1 = f("a1"); a1("1"); a1("2"); a1("3"); a1.up()
+      get("a1",w).build(_.multi("1","2","3"))
       assert(w.a1.contains(1))
       assert(w.a1.contains(2))
       assert(w.a1.contains(3))
       assert(!w.a1.contains(4))
-      val a3 = f("a3"); a3("ex1"); a3("ex2"); a3.up()
+      get("a3",w).build(_.multi("ex1","ex2"))
       assert(w.a3.contains(Ex.ex1))
       assert(w.a3.contains(Ex.ex2))
       assert(!w.a3.contains(Ex.ex3))
-      val a4 = f("a4"); a4("01/01/2010 00:00"); a4("01/01/2011 00:00"); a4("01/01/2012 00:00"); a4("01/01/2012 00:00"); a4.up()
+      get("a4",w).build(_.multi("01/01/2010 00:00","01/01/2011 00:00","01/01/2012 00:00","01/01/2012 00:00"))
       assert(w.a4.contains(new java.util.Date("01/01/2010 00:00")))
       assert(w.a4.contains(new java.util.Date("01/01/2011 00:00")))
       assert(w.a4.contains(new java.util.Date("01/01/2012 00:00")))
       assert(w.a4.size==3)
-      val a5 = f("a5"); a5("ex1"); a5("ex2"); a5.up()
+      get("a5",w).build(_.multi("ex1","ex2"))
       assert(w.a5.front==Ex.ex1)
       assert(w.a5.length==2)
-      val a7 = f("a7"); a7("ex2"); a7("ex2"); a7("ex1"); a7.up()
+      get("a7",w).build(_.multi("ex2","ex2","ex1"))
       assert(w.a7.exists(_==Ex.ex1))
       assert(!w.a7.exists(_==Ex.ex3))
       assert(w.a7.last==Ex.ex1)
       assert(w.a7.size==3)
-      val a9 = f("a9"); a9("ex1"); a9("ex2"); a9("ex3"); a9("ex2"); a9.up()
+      get("a9",w).build(_.multi("ex1","ex2","ex3","ex2"))
       assert(w.a9.top==Ex.ex1)
       assert(w.a9.contains(Ex.ex3))
       assert(w.a9.size==4)
       suiteS(2,6,8,10,11,12,13,14,28,30,31,33,34,35,36,37,38,39,40,41,42,44,45,46,47,49,50,52)
-      val a17=f("a17"); a17("1"); a17("3"); a17("5"); a17.up()
+      get("a17",w).build(_.multi("1","3","5"))
       assert(w.a17.get(1))
       assert(w.a17.get(3))
       assert(w.a17.get(5))
       assert(!w.a17.get(0))
       assert(!w.a17.get(6))
-      val a19=f("a19"); a19("a1"); a19("b1"); a19("c1"); a19.up()
-      val a32 = f("a32"); a32("3"); a32("7"); a32("11"); a32.up()
+      get("a19",w).build(_.multi("a1","b1","c1"))
+      get("a32",w).build(_.multi("3","7","11"))
       assert(w.a32.contains(11))
       assert(w.a32.contains(7))
       assert(w.a32.contains(3))
       assert(!w.a32.contains(4))
-      val a51 = f("a51"); a51((Ex.ex1,null)); a51((Ex.ex3,Ex.ex1)); a51((Ex.ex2,Ex.ex1)); a51.up()
+      get("a51",w).build(_.multi((Ex.ex1,null),(Ex.ex3,Ex.ex1),(Ex.ex2,Ex.ex1)))
       assert(w.a51.iterator.corresponds(Array(Ex.ex1,Ex.ex3,Ex.ex2))(_._2==_))  //for some reason, history inverts the parameters
       val l=new java.util.LinkedList[MyEnum](); l.add(MyEnum.a1); l.add(MyEnum.b1); l.add(MyEnum.c1)
       assert(w.a19.containsAll(l))
       suiteJ(15,16,21,22,23,24,27)
-      basicJTest(f("a20"),false)
-      basicJTest(f("a26"),false)
+      basicJTest("a20",false)
+      basicJTest("a26",false)
       val h1 = new Histo("h1")
       val h2 = new Histo("h2")
       val h3 = new Histo("h2")
-      val a48 = f("a48"); a48((h1,Ex.ex1)); a48((h2,Ex.ex2)); a48((h3,Ex.ex3)); a48.up()
+      get("a48",w).build(_.multi((h1,Ex.ex1),(h2,Ex.ex2),(h3,Ex.ex3)))
       assert(w.a48.iterator.corresponds(Array(Ex.ex1,Ex.ex2,Ex.ex3))(_._1==_))  //for some reason, history inverts the parameters
       out0.println(w)
     }
   }
+  /** Test (elementary) for binders using Seq.
+   */
+  @Test class BinderMixedEncapTest extends StandardTester {
+    import loader.commons._  //make --> visible
+    def apply(file:Solver,out0:PrintWriter) = {
+      val w = new W5(null,null)
+      /*
+      //reminder: Array[Map[Integer,java.util.EnumMap[MyEnum,List[java.util.Properties]]]]
+      val a1 = field("a1",w,fx) //array layer
+      a1.down() //integer map layer
+        a1.down() //enum map layer
+          a1.down() //list layer
+            a1.down() //properties layer
+              a1("p1" --> "valeur 1")
+              a1("p2" --> "valeur 2")
+              a1.up()
+            a1.up("c1")
+          a1.up("1")
+        a1.up()
+      a1.up()
+
+      println(w.a1)
+      */
+      
+      get("a2",w).build { a2=>
+        a2("1") { i=>
+          i <<- "x"
+          i <<- "y"
+          i <<- "z"
+        }  
+        a2("2") { i=>
+          i <<- "u"
+          i <<- "v"
+          i <<- "w"
+        }  
+      }
+      out0.println(w.a2)
+    }
+  }  
   
   //XXX next test: encapsulation of maps/sequences
   //XXX next task: add converters for java.util classes
@@ -489,22 +496,13 @@ object BinderTest {
     def this() = this(0,null,0,null,0,null,0,null,false,null,0,null,0,null,0,null,null,null,null,null,null,null,null,null,null,null)
     override def toString:String = s"$pInt\n$pJInt\n$pLong\n$pJLong\n$pByte\n$pJByte\n$pShort\n$pJShort\n$pBoolean\n$pJBoolean\n$pChar\n$pJChar\n$pFloat\n$pJFloat\n$pDouble\n$pJDouble\n$pURL\n$pURI\n$pClass\n$pDate\n$pFile\n$pEnum\n$pJEnum\n$pString\n${pCharA.mkString}\n$pPat"
   }
-  //class for testing array spawning, as well as arrays of arrays etc.
-  class W1(val a1:Array[Int],val b1:Array[Ex.Val],val a2:Array[Array[Int]],val b2:Array[Array[Ex.Val]],val a3:Array[Array[Array[Int]]],val b3:Array[Array[Array[Ex.Val]]]) {
-    override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
-  }
-  //class for testing mixed array/iterable spawning, as well as arrays of arrays or lists of arrays.
-  class W2(val a1:List[Integer],val b1:List[Ex.Val],val a2:Array[List[Integer]],val b2:Array[List[Ex.Val]],val a3:Array[List[Array[Int]]],val b3:Array[List[Array[Ex.Val]]]) {
-    override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
-  }
   //another tests similar to W2; more classes involved
   class W3(val a1:scala.collection.immutable.HashSet[Integer],val b1:scala.collection.immutable.HashSet[Ex.Val],val a2:List[scala.collection.immutable.HashSet[Integer]],val b2:List[scala.collection.immutable.HashSet[Ex.Val]],val a3:Array[List[scala.collection.immutable.HashSet[Integer]]],val b3:Array[List[scala.collection.immutable.HashSet[Ex.Val]]]) {
     override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
   }
-  class W4(val a1:java.util.HashSet[Integer],val b1:java.util.HashSet[Ex.Val],val a2:java.util.LinkedList[java.util.HashSet[Integer]],val b2:java.util.LinkedList[java.util.HashSet[Ex.Val]],val a3:Array[java.util.LinkedList[java.util.HashSet[Integer]]],val b3:Array[java.util.LinkedList[java.util.HashSet[Ex.Val]]]) {
-    import scala.collection.JavaConversions._ 
-    override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
-  }
+  //nasty multi-encapsulation of several layers of maps/seqs
+  class W5(val a1:Array[Map[Integer,java.util.EnumMap[MyEnum,List[java.util.Properties]]]], val a2:Map[Integer,List[String]])
+  
   //Structure for testing which iterable we can spawn
   class V1(val a1:scala.collection.immutable.BitSet,
            val a2:scala.collection.immutable.HashSet[Ex.Val],
@@ -608,15 +606,17 @@ object BinderTest {
   }
   //no conversion data
   val fx = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
-  class FHelper[X<:AnyRef:ClassTag](fld:String,x:X,fd:Map[Class[_],AutoConvertData]) {
-    val cz  = implicitly[ClassTag[X]].runtimeClass
-    val i = Binder(DataActor(cz)(fld).getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to $cz")),StandardSolver(),fd,true)(x,null)
-    def down() = i.down
-    def apply(v:Any) = i.apply(v,null)
-    def up() = i.up
-    def get() = i.get()
+  implicit class XH(val cur: loader.reflect.Binder[loader.core.definition.Def#Elt]#Instance) {
+    def apply(f: (XH)=>Unit):Unit          = { val i=cur.subInstance; f(i); i.close }
+    def apply(x:Any)(f: (XH)=>Unit):Unit   = { val i=cur.subInstance; f(i); i.close(x) }
+    def build(f: (XH)=>Unit):Unit          = { f(this); cur.close }
+    def <<-(x:Any*):Unit                   = for (x0 <- x) cur.set(x0)
+    
+    def multi(x:Any*):Unit                 = for (x0 <- x) cur.set(x0)
+    def layer(f: (XH => Unit)*):Unit       = for (f0 <- f) { val i=cur.subInstance; f0(i); i.close }
+    def read                               = cur.read()
   }
-  def field[X<:AnyRef:ClassTag](fld:String,x:X,fd:Map[Class[_],AutoConvertData]) = new FHelper(fld,x,fd)
+  def get[X<:AnyRef:ClassTag](fld:String,x:X) = Binder(DataActor(implicitly[ClassTag[X]].runtimeClass)(fld).getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to ${implicitly[ClassTag[X]].runtimeClass}")),StandardSolver(),Map.empty,true)(x,null)
   def write[X](a:Traversable[X]) = if (a==null) "<null>" else scala.runtime.ScalaRunTime.stringOf(a)
 
   type F = (AnyRef,Any)=>Unit  
