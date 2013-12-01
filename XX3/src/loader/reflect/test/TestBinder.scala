@@ -12,6 +12,8 @@ import utils.ByteArrayReader
 import utils.LogTester._
 import java.io.PrintWriter
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.junit.runners.JUnit4
 import scala.reflect.ClassTag
 
 /*
@@ -76,6 +78,7 @@ object TestBinder {
      *   4) check that a parent class is rejected where a child class is expected
      *   5) check that the class narrowing works
      */
+//@RunWith(classOf[JUnit4])
 object BinderTest {
 
   /** Test for basic conversions for Strings.
@@ -414,40 +417,44 @@ object BinderTest {
   /** Test (elementary) for binders using Seq.
    */
   @Test class BinderMixedEncapTest extends StandardTester {
+    //nasty multi-encapsulation of several layers of maps/seqs
+    class W5(val a1:Map[Integer,List[String]], val a2:Array[Map[Integer,java.util.EnumMap[MyEnum,List[java.util.Properties]]]])
     import loader.commons._  //make --> visible
     def apply(file:Solver,out0:PrintWriter) = {
       val w = new W5(null,null)
-      /*
-      //reminder: Array[Map[Integer,java.util.EnumMap[MyEnum,List[java.util.Properties]]]]
-      val a1 = field("a1",w,fx) //array layer
-      a1.down() //integer map layer
-        a1.down() //enum map layer
-          a1.down() //list layer
-            a1.down() //properties layer
-              a1("p1" --> "valeur 1")
-              a1("p2" --> "valeur 2")
-              a1.up()
-            a1.up("c1")
-          a1.up("1")
-        a1.up()
-      a1.up()
-
-      println(w.a1)
-      */
       
-      get("a2",w).build { a2=>
-        a2("1") { i=>
-          i <<- "x"
-          i <<- "y"
-          i <<- "z"
-        }  
-        a2("2") { i=>
-          i <<- "u"
-          i <<- "v"
-          i <<- "w"
-        }  
+      get("a1",w).build { i=>
+        i.keyed("1")(_.multi("x","y","z"))
+        i.keyed("2")(_.multi("u","v","w"))
       }
-      out0.println(w.a2)
+      type F = XH=>Unit
+      get("a2",w).build {i=>
+        i.layer(Array[F](
+          _.keyed("1") { Array[F](
+            _.keyed("a1") {
+              _.layer { Array[F](_.multi("v1" --> "p1", "v2" --> "p2"),
+                                 _.multi("v3" --> "p3", "v4" --> "p4")):_* }
+            },
+            _.keyed("b1") {
+              _.layer { Array[F](_.multi("v5" --> "p5", "v6" --> "p6"),
+                                 _.multi("v7" --> "p7", "v8" --> "p8")):_* }
+            }
+          ):_*},
+          _.keyed("2") { Array[F](
+            _.keyed("c1") {
+              _.layer { Array[F](_.multi("v11" --> "p11", "v12" --> "p12"),
+                                 _.multi("v13" --> "p13", "v14" --> "p14")):_* }
+            },
+            _.keyed("a1") {
+              _.layer { Array[F](_.multi("v15" --> "p15", "v16" --> "p16"),
+                                 _.multi("v17" --> "p17", "v18" --> "p18")):_* }
+            }
+          ):_*}
+        ):_*)
+      }
+      
+      out0.println(w.a1)
+      out0.println(write(w.a2))
     }
   }  
   
@@ -500,8 +507,6 @@ object BinderTest {
   class W3(val a1:scala.collection.immutable.HashSet[Integer],val b1:scala.collection.immutable.HashSet[Ex.Val],val a2:List[scala.collection.immutable.HashSet[Integer]],val b2:List[scala.collection.immutable.HashSet[Ex.Val]],val a3:Array[List[scala.collection.immutable.HashSet[Integer]]],val b3:Array[List[scala.collection.immutable.HashSet[Ex.Val]]]) {
     override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
   }
-  //nasty multi-encapsulation of several layers of maps/seqs
-  class W5(val a1:Array[Map[Integer,java.util.EnumMap[MyEnum,List[java.util.Properties]]]], val a2:Map[Integer,List[String]])
   
   //Structure for testing which iterable we can spawn
   class V1(val a1:scala.collection.immutable.BitSet,
@@ -606,15 +611,17 @@ object BinderTest {
   }
   //no conversion data
   val fx = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
-  implicit class XH(val cur: loader.reflect.Binder[loader.core.definition.Def#Elt]#Analyze) {
-    def apply(f: (XH)=>Unit):Unit          = { val i=cur.subAnalyze; f(i); i.close }
-    def apply(x:Any)(f: (XH)=>Unit):Unit   = { val i=cur.subAnalyze; f(i); i.close(x) }
-    def build(f: (XH)=>Unit):Unit          = { f(this); cur.close }
-    def <<-(x:Any*):Unit                   = for (x0 <- x) cur.set(x0)
+  implicit class XH(x: loader.reflect.Binder[loader.core.definition.Def#Elt]#Analyze) {
+    val cur = x.subAnalyze
+    def apply(f: XH=>Unit):Unit              = new XH(cur).build(f)
+    def apply(key:Any)(f: (XH)=>Unit):Unit   = new XH(cur).build(f,key)
     
-    def multi(x:Any*):Unit                 = for (x0 <- x) cur.set(x0)
-    def layer(f: (XH => Unit)*):Unit       = for (f0 <- f) { val i=cur.subAnalyze; f0(i); i.close }
-    def read                               = cur.read()
+    def build(f: XH=>Unit):Unit               = { f(this); cur.close }
+    def build(f: XH=>Unit,key:Any):Unit       = { f(this); cur.close(key) }
+    def multi(x:Any*):Unit                    = x.foreach(cur.set)
+    def layer(f: (XH => Unit)*):Unit          = f.foreach(apply)
+    def keyed(key:Any)(f: (XH => Unit)*):Unit = this(key)(x=>f.foreach(_(x)))
+    def read                                  = cur.read()
   }
   def get[X<:AnyRef:ClassTag](fld:String,x:X) = Binder(DataActor(implicitly[ClassTag[X]].runtimeClass)(fld).getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to ${implicitly[ClassTag[X]].runtimeClass}")),StandardSolver(),Map.empty,true)(x,null)
   def write[X](a:Traversable[X]) = if (a==null) "<null>" else scala.runtime.ScalaRunTime.stringOf(a)

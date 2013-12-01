@@ -120,7 +120,7 @@ object Binder {
     //protected[this] val eTypes   = new Array[Type](SZ)                  //store calculated values to avoid recomputing them at each step
     //protected[this] val kConvert = new Array[(Any,E)=>Any](SZ)          //store calculated key converters to avoid recomputing them at each step
     
-    private[this] class Analyze(on:AnyRef,e:E) extends super.Analyze(on,e) {
+    protected[this] class Analyze(on:AnyRef,e:E) extends super.Analyze(on,e) {
       final def binder:CollectionBinder.this.type = CollectionBinder.this
       override def subAnalyze = adapter(eType) match {
         case a if a.isMap => new Map(a)
@@ -149,7 +149,7 @@ object Binder {
       }
     }
  
-    protected[this] override def build(on:AnyRef,e:E) = new Analyze(on,e).subAnalyze
+    protected[this] override def build(on:AnyRef,e:E) = new Analyze(on,e)
   }
 
   def fd(check0:String,param0:String,valid0:String,convert0:String) = new AutoConvertData {
