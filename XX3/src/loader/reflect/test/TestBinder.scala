@@ -584,8 +584,8 @@ object BinderTest {
   }
   //no conversion data
   val fx = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
-  implicit final class XH(val x: loader.reflect.Binder[loader.core.definition.Def#Elt]#Analyze) {
-    @inline private def sub(f: XH=>Unit*)             = { val c:XH=x.subAnalyze; f.foreach(_(c)); c.x }
+  implicit final class XH(val x: loader.reflect.Binder[loader.core.definition.Def#Elt]#Analyze#Instance) {
+    @inline private def sub(f: XH=>Unit*)             = { val c:XH=x.subInstance; f.foreach(_(c)); c.x }
     @inline final def u(f: XH=>Unit*):Unit            = sub(f:_*).close
     @inline final def read                            = x.read()
   }
