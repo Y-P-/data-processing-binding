@@ -1,46 +1,34 @@
 package utils
 
-import scala.collection.mutable.{HashMap,MapProxy}
 import utils.Reflect.RichClass
+import scala.collection.mutable.HashMap
 
-/**
- * A map whose keys are Classes.
- * get reads the exact match or any found super class/interface.
- * If more than one match is found, an exception is thrown.
- * !!! Doesn't support generic types (because they all erase to the same raw class)
+/** Adds a cache to a function, which prevents recomputing values that are already known.
+ *  The A parameter must respect the conditions for being a key in a Map (hashCode, equals.)
  */
-class ClassMap[R](factory:Seq[ClassMap.Factory[_,R]]) extends MapProxy[RichClass[_],R] {
-  val self = new HashMap[RichClass[_],R]
-  def get(clzz:Class[_]):Option[R] = {
-    val cz= new RichClass(clzz)
-    self.get(cz) match {
-      case None => fetch(cz)
-      case e    => e
-    }
-  }
-  protected def fetch(cz:RichClass[_]):Option[R] = {
-    var r:(RichClass[_],Option[R]) = null
-    for (f <- factory) {
-      f(cz.c) match {
-        case None =>
-        case x    => if (f.max.isFinal && f.max>cz) return x
-                     if (r==null || cz<r._1) r=(f.max,x) else if (r._2!=x) throw new IllegalStateException("more than one possible match for class $cz")
-      }
-    }
-    if (r==null) None else { self.put(cz,r._2.get); r._2 }
+trait CachedFunction[-A,+B] extends Function1[A,B] {
+  protected[this] val self:A=>B
+  private[this] val cache=new HashMap[A,B]
+  final def apply(a:A):B = cache.get(a) match {
+    case None    => val b=self(a); cache+=((a,b)); b
+    case Some(b) => b
   }
 }
 
 object ClassMap {
   /** Trait used for creating new entries from a top class. Useful for example for families of classes
-   *  that share a common super class such as ava Enum or inner classes.
+   *  that share a common super class such as Java enum or inner classes.
    */
-  trait Factory[X,R] {
+  trait Factory[X,+R] extends (Class[_]=>Option[R]) {
     def max:RichClass[X]
     def build[Y<:X](c:Class[Y]):R
     def apply(c:Class[_]):Option[R] = if (max>c) Some(build(c.asSubclass(max.c))) else None
   }
   
-  def apply[R](x:(Class[_],R)*)(f:Factory[_,R]*) = { val map = new ClassMap[R](f); map ++= x.map(x=>(new RichClass(x._1),x._2)); map }
+  private[this] class F[R](f:Factory[_,R]*) extends (Class[_]=>Option[R]) {
+    def apply(c:Class[_]):Option[R] = { for (f0<-f) { val r=f0(c); if (r!=None) return r }; None }
+  }
+  
+  def apply[R](f:Factory[_,R]*):Class[_]=>Option[R] = new CachedFunction[Class[_],Option[R]] { protected[this] val self=new F(f:_*) }
 }
 

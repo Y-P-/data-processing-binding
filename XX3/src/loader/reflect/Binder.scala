@@ -57,7 +57,7 @@ abstract class Binder[-E<:Def#Elt](val what:DataActor,protected[this] val solver
   abstract class Analyze(on:AnyRef,protected[this] val e:E) {  //Binder instance for a pair (object/field or object/method)
     def isCol:Boolean                               //indicates whether this is a Collection
     def isMap:Boolean                               //indicates whether this is a map
-    def convert(x:Any):Any                          //build the actual value for x as expected from the container
+    def convert(x:Any):Any                          //builds the actual value for x as expected from the container
     def close():Unit                                //terminates a seq collection ; can apply to maps iff the seq elements were assocs
     protected def assign(x:Any):Unit                //an internal method to assign the result x to the container
     
@@ -66,7 +66,7 @@ abstract class Binder[-E<:Def#Elt](val what:DataActor,protected[this] val solver
     
     final def read():Any = what.get(on)
     final def assign(x:Any,doConvert:Boolean):Unit = assign(if (doConvert) convert(x) else x)
-    final def set(x:Any) = assign(x,!x.isInstanceOf[Assoc[_,_]])
+    def set(x:Any) = assign(x,!x.isInstanceOf[Assoc[_,_]])
   }
 
   def apply(on:AnyRef,e:E):Analyze = build(on,e)

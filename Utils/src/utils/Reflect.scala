@@ -15,8 +15,8 @@ object Reflect {
    *  Note that this class doesn't achieve anything close to scala reflection.
    *  It doesn't use any compile time info and is not suitable for general use with generics.
    */
-  implicit final class RichClass[U](val c:Class[U]) {
-    val isFinal = Modifier.isFinal(c.getModifiers())
+  implicit final class RichClass[+U](val c:Class[_<:U]) {
+    final val isFinal = Modifier.isFinal(c.getModifiers())
     //scala singleton associated with this class if appropriate
     lazy val asObject:U = (try {
       val f = c.getDeclaredField("MODULE$")
@@ -40,11 +40,11 @@ object Reflect {
     //filters out methods/fields/constructors that satisfy some test
     def find[X<:AccessibleObject:ClassTag](check:X=>Boolean):Option[X] = onAccessible[X,Option[X]](_.find(check))
     //finds appropriate constructors matching the expected class list, whatever order, expect for the mandatory first classes that must be in the correct order. Generics are out.
-    def findConstructor(expected:Array[RichClass[_]],mandatory:Int):Array[(Constructor[U],Array[Int])] =
-      Reflect.findConstructor(c.getConstructors.asInstanceOf[Array[Constructor[U]]],expected,mandatory)
+    def findConstructor(expected:Array[RichClass[_]],mandatory:Int):Array[_<:(_<:Constructor[_<:U],Array[Int])] =
+      Reflect.findConstructor[U](c.getConstructors.asInstanceOf[Array[_<:Constructor[_<:U]]],expected,mandatory)
     //finds the constructor matching the expected class list. Generics are out.
-    def findConstructorN(expected:RichClass[_]*):Option[Constructor[U]] =
-      Reflect.findConstructor(c.getConstructors.asInstanceOf[Array[Constructor[U]]],expected.toArray,expected.length) match {
+    def findConstructorN(expected:RichClass[_]*):Option[Constructor[_<:U]] =
+      Reflect.findConstructor[U](c.getConstructors.asInstanceOf[Array[_<:Constructor[_<:U]]],expected.toArray,expected.length) match {
         case Array()      => None
         case Array((c,_)) => Some(c)
     }
@@ -196,7 +196,7 @@ object Reflect {
   def findMethod(in:Array[Method],expected:Array[RichClass[_]],mandatory:Int):Array[(Method,Array[Int])] =
     for (m <- in; p=checkParams(expected,m.getParameterTypes,mandatory) if p!=null) yield (m,p)
   /** restricts 'in' to the Constructors that do accept the right kind of parameters */
-  def findConstructor[U](in:Array[Constructor[U]],expected:Array[RichClass[_]],mandatory:Int):Array[(Constructor[U],Array[Int])] =
+  def findConstructor[U](in:Array[_<:Constructor[_<:U]],expected:Array[RichClass[_]],mandatory:Int):Array[(Constructor[_<:U],Array[Int])] =
     for (m <- in; p=checkParams(expected,m.getParameterTypes,mandatory) if p!=null) yield (m,p)
   
   /** returns true if p1 and p2 represent the same primitive type, Java Boxed or not */

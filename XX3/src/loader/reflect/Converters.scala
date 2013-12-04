@@ -40,9 +40,15 @@ object ConvertData {
  */
 object Converters {
   
-  abstract class StringConverter[V](val dst:RichClass[_<:V]) extends Converter[String,V,Def#Elt] {
+  abstract class StringConverter[+V](val dst:RichClass[_<:V]) extends Converter[String,V,Def#Elt] {
     def this(s:utils.StringConverter[V]) = this(s.dst)
     val src = ^(classOf[String])
+  }
+  object StringConverter {
+    implicit def toX[R](cz:StringConverter[R]):utils.ClassMap.Factory[_,StringConverter[_]] = new utils.ClassMap.Factory[R,StringConverter[R]] {
+      def build[Y <: R](c: Class[Y]): StringConverter[R] = cz
+      def max: RichClass[R] = cz.dst
+    }
   }
   trait StringConverterBuilder[V] {
     def apply(c:Class[V]):StringConverter[V]
@@ -147,12 +153,13 @@ object Converters {
       def apply(fd:ConvertData) = new CvEnum[X]()(ClassTag(cz))(fd.check)
     }
   }
+  
  
   //the default ClassMap for string converters.
   val defaultMap = utils.ClassMap[StringConverter[_]](
                         CvvString,CvvCharArray,CvvInt,CvvJInt,CvvShort,CvvJShort,CvvLong,CvvJLong,
                         CvvByte,CvvJByte,CvvChar,CvvJChar,CvvFloat,CvvJFloat,CvvDouble,CvvJDouble,
-                        CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean,CvvClass,CvvPattern)(
+                        CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean,CvvClass,CvvPattern,
                         CvvEnum,CvvJEnum
                         )
  

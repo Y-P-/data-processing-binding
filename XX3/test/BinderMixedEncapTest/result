@@ -1,1 +1,2 @@
 Map(1 -> List(x, y, z), 2 -> List(u, v, w))
+WrappedArray(Map(1 -> {a1=List({v2=p2, v1=p1}, {v4=p4, v3=p3}), b1=List({v6=p6, v5=p5}, {v8=p8, v7=p7})}, 2 -> {a1=List({v16=p16, v15=p15}, {v18=p18, v17=p17}), c1=List({v12=p12, v11=p11}, {v14=p14, v13=p13})}))

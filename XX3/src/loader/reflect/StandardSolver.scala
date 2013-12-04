@@ -24,7 +24,7 @@ abstract class ConversionSolver[-E<:Def#Elt] {
  *    class and the second compatible with the Element class used.
  *  - by default, if nothing is specified, the created object is returned.
  */
-class StandardSolver[-E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]],val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_,E]]) extends ConversionSolver[E] {
+class StandardSolver[-E<:Def#Elt](defaultString:(Class[_]=>Option[StringConverter[_]]),named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]],val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_,E]]) extends ConversionSolver[E] {
   /** Finds an appropriate converter from one of the sources by following these exclusive rules (in order):
    *  - if the name is significant (not null or "")
    *  -   o name starts with @    : take the appropriate entry (e.g. '@xyz') from the named list (no check done: it has to work)
@@ -67,7 +67,7 @@ class StandardSolver[-E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],nam
       Right((u:U,e:Def#Elt)=>u.asInstanceOf[V])
     } else if (src eq classOf[String]) {
       //src is String ? find a default String conversion to dst
-      defaultString.get(dst).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no default String conversion found for $dst")
+      defaultString(dst).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no default String conversion found for $dst")
     } else if (registered==null) {
       Left(s"no registered conversion found for $src => $dst")
     } else {
@@ -83,7 +83,7 @@ class StandardSolver[-E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],nam
 }
 
 object StandardSolver {
-  def apply[E<:Def#Elt](defaultString:ClassMap[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]]):ConversionSolver[E] =
+  def apply[E<:Def#Elt](defaultString:Class[_]=>Option[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]]):ConversionSolver[E] =
     new StandardSolver(defaultString,named,registered,null)
   def apply() = new StandardSolver(Converters.defaultMap,null,null,CollectionAdapter.defaultMap)
 }
