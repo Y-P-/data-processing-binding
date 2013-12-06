@@ -55,7 +55,7 @@ object TestBinder {
 
    /** Tests:
      * A) Basic Conversions
-     *   1) - check conversion to all default classes (tests basic converters)
+     *   1) - check conversion to all default classes (tests basic converters) OK
      *   2) repeat but verify that regex works
      *   3) repeat but verify that valid works (borders) for these classes where applicable
      * B) Method Conversions
