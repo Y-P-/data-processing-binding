@@ -4,7 +4,6 @@ import java.util.Date
 import loader.reflect.Binder
 import loader.reflect.StandardSolver
 import loader.core.context.FieldAnnot
-import loader.core.definition.Def
 import loader.core.names.QName
 import loader.reflect.AutoConvertData
 import loader.reflect.DataActor
@@ -80,18 +79,16 @@ object TestBinder {
      */
 //@RunWith(classOf[JUnit4])
 object BinderTest {
+  import Binder._
 
   /** Test for basic conversions for Strings.
    *  Validates that all predefined converters work on default settings.
    */
   @Test class BinderBaseStringTest extends StandardTester {
-    //no conversion data
-    val f = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
     //basic binder: no collection, no conversion data, default String conversions
-    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).set(_)
     def apply(file:Solver,out0:PrintWriter) = {
       val u = new U
-      def set(fld:String,v:String) = forTest[Def#Elt,U](fld).apply(u,v)
+      def set(fld:String,v:String) = get(fld,u).set(v,null)
       set("pInt","1")
       set("pJInt","2")
       set("pLong","3")
@@ -125,13 +122,10 @@ object BinderTest {
    *  Validates that fields can be set by using the appropriate base data class.
    */
   @Test class BinderDirectTest extends StandardTester {
-    //no conversion data
-    val f = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
     //basic binder: no collection, no conversion data, no conversion
-    implicit def forTest[E<:Def#Elt,U:ClassTag](fld:String):F = Binder(DataActor(implicitly[ClassTag[U]].runtimeClass)(fld).get,StandardSolver(),f,false)(_,null).set(_)
     def apply(file:Solver,out0:PrintWriter) = {
       val u = new U
-      def set(fld:String,v:Any) = forTest[Def#Elt,U](fld).apply(u,v)
+      def set(fld:String,v:Any) = get(fld,u).set(v,null)
       set("pInt",1)
       set("pJInt",2)
       set("pLong",3L)
@@ -169,7 +163,7 @@ object BinderTest {
       override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
     }
     def apply(file:Solver,out0:PrintWriter) = {
-      import XH._
+      import Helper._
       val w = new W(Array(),Array(),Array(),Array(),Array(),Array())
       get("a1",w).u(o("1","2","3"))
       get("b1",w).u(o("ex1","ex2","ex3"))
@@ -188,7 +182,7 @@ object BinderTest {
       override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
     }
     def apply(file:Solver,out0:PrintWriter) = {
-      import XH._
+      import Helper._
       val w = new W(List(),List(),Array(),Array(),Array(),Array())
       get("a1",w).u(o("1","2","3"))
       get("b1",w).u(o("ex1","ex2","ex3"))
@@ -208,7 +202,7 @@ object BinderTest {
       override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
     }
     def apply(file:Solver,out0:PrintWriter) = {
-      import XH._
+      import Helper._
       val w = new W(scala.collection.immutable.HashSet(),scala.collection.immutable.HashSet(),List(),List(),Array(),Array())
       get("a1",w).u(o("1","2","3","3"))
       get("b1",w).u(o("ex1","ex2","ex3","ex1"))
@@ -229,7 +223,7 @@ object BinderTest {
       override def toString = s"${write(a1)}\n${write(b1)}\n${write(a2)}\n${write(b2)}\n${write(a3)}\n${write(b3)}\n"
     }
     def apply(file:Solver,out0:PrintWriter) = {
-      import XH._
+      import Helper._
       val w = new W4(new java.util.HashSet(),new java.util.HashSet(),new java.util.LinkedList(),new java.util.LinkedList(),Array(),Array())
       get("a1",w).u(o("1","2","3","3"))
       get("b1",w).u(o("ex1","ex2","ex3","ex1"))
@@ -270,7 +264,7 @@ object BinderTest {
       //scala.collection.mutable.HashTable[Ex.Val,Ex.Val]    fails because it is not Traversable (not a real collection actually)
     }
     def apply(file:Solver,out0:PrintWriter) = {
-      import XH._
+      import Helper._
       import loader.commons._
       val w = new V2()
       //builds a 'map' ex3->ex1,ex1->ex2,ex2->ex3 => checks that the collection works and that the correct converters are called (scala collections)
@@ -395,7 +389,7 @@ object BinderTest {
       //scala.collection.mutable.PriorityQueue[Ex.Val] fails because no default is possible (requires ordering which must be provided through an adapter)
     }
     def apply(file:Solver,out0:PrintWriter) = {
-      import XH._
+      import Helper._
       val w = new V()
       //builds a 'sequence' ex1,ex2,ex3 => checks that the collection works and that the correct converter is called (scala collections)
       def basicSTest(nom:String,ordered:Boolean=true):Unit = {
@@ -496,7 +490,7 @@ object BinderTest {
     class W(val a1:Map[Integer,List[String]], val a2:Array[Map[Integer,java.util.EnumMap[MyEnum,List[java.util.Properties]]]])
     import loader.commons._  //make --> visible
     def apply(file:Solver,out0:PrintWriter) = {
-      import XH._
+      import Helper._
       val w = new W(null,null)
       
       get("a1",w).u (
@@ -584,19 +578,11 @@ object BinderTest {
   }
   //no conversion data
   val fx = Map[Class[_],AutoConvertData]().withDefault(c=>fd("","","",""))
-  implicit final class XH(val x: loader.reflect.Binder[loader.core.definition.Def#Elt]#Analyze#Instance) {
-    @inline private def sub(f: XH=>Unit*)             = { val c:XH=x.subInstance; f.foreach(_(c)); c.x }
-    @inline final def u(f: XH=>Unit*):Unit            = sub(f:_*).close
-    @inline final def read                            = x.read()
+  /** A simple utility that fetches the Binder on the DataActor fld in object x */
+  def get[X<:AnyRef:ClassTag](fld:String,x:X) = {
+    val cz = implicitly[ClassTag[X]].runtimeClass
+    Binder(DataActor(cz,fld,"f").getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to $cz")),StandardSolver(),fx(cz),true)(x)
   }
-  object XH {
-    @inline final def o(v:Any*):XH=>Unit               = xh=>v.foreach(xh.x.set)
-    @inline final def u(f:XH=>Unit*):XH=>Unit          = _.u(f:_*)
-    @inline final def u(key:Any)(f:XH=>Unit*):XH=>Unit = _.sub(f:_*).close(key)
-  }
-  def get[X<:AnyRef:ClassTag](fld:String,x:X) = Binder(DataActor(implicitly[ClassTag[X]].runtimeClass)(fld).getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to ${implicitly[ClassTag[X]].runtimeClass}")),StandardSolver(),Map.empty,true)(x,null)
   def write[X](a:Traversable[X]) = if (a==null) "<null>" else scala.runtime.ScalaRunTime.stringOf(a)
-
-  type F = (AnyRef,Any)=>Unit  
 }
 
