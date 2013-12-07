@@ -18,43 +18,54 @@ object AutoConvertData {
   }
 }
   
-/** A Binder ties an AccessibleObject (Field, Method with one argument) with a ConversionSolver and some conversion data.
+/** A Binder ties an AccessibleObject (Field, Method with one argument, which is hidden in a DataActor) with a ConversionSolver and
+ *  some conversion data.
  *  As a result, it can be used to automatically set any value into into, possibly automatically converted to the appropriate type.
  *  Binder cannot be created by the user: the Binder factory must be used for that.
  *  The Binder exists only to store the relevant data pertaining to the underlying operations (conversion, field/method setting etc.)
  *  An Instance must be created in order to use the binder on an actual object.
  *  
- *  Note: now Instance is protected, so while the following is still applicable in theory, it cannot be done.
- *    The only available method is apply, which builds an instance (the Binder bound to a given object.)
- *    Instance has only two methods:
- *    - receive(x:AnyRef,e:E), which tells that x was received for that field
- *    - terminate():Unit, which tells that the field is done with (and is only really usefull when building a collection.)
- *    A a consequence, the only available sequence is:
+ *  A Binder is kind of a lazy immutable object: once its internal state is calculated (which happens only once the first
+ *  conversion is requested), it never changes.
+ *  It is important to note that this implies that a Binder can only convert from one type of end data.
+ *  If you have once read a String to set a int field, for example, then you cannot use the same binder to use an int as input.
+ *  Another Binder, using the same DataActor would have to be used for that purpose (the internal conversion is obviously not the same!) 
  *  
- *      val b:Binder[_,_] = Binder(fld,solver,fd)
- *      val x:b.Instance  = b.build(anObject,e)
- *      x.receive(a,e)
- *      ..............
- *      x.receive(z,e)
- *      x.terminate
+ *  The Binder works on the expected type set in the DataBinder. Such a type (which is the one declared on the field, method...)
+ *  cannot include any Wildcard. Thus, Map[String,Array[Properties]] is acceptable, but not Map[String,Array[_<:Properties]]
+ *  
+ *  There are only few acceptable sequences of calls to use a Binder properly:
+ *  
+ *      val b:Binder[_,_] = Binder(fld,solver,fd,false)  //get the binder (not on a collection)
+ *      val x:b.I  = b(anObject)                         //bind it to an object
+ *      x.set(a,e)                                       //set value a to x
+ *
+ *      val b:Binder[_,_] = Binder(fld,solver,fd,true)   //get the binder (on a collection)
+ *      val x:b.I = b(anObject)                          //bind it to an object
+ *      val y:b?I = x.subInstance                        //enter the collection
+ *      y.set(a,e0)                                      //set value a to underlying collection in y
+ *      y.set(b,e1)                                      //set value b to underlying collection in y
+ *      y.set(z,en)                                      //set value z to underlying collection in y
+ *      y.close(e)                                       //terminate the collection, which assigns it to fld
  *    
+ *    In case the collection is a Map, the set must apply to Assoc objects (i.e. it is then expected that a, b,..., z have the Assoc interface.
  *    At the end of the sequence, anObject.fld is set to the received value, appropriately converted.
  *    
- *  New: The correct sequence, which includes the management of simple fields as well as collection (possibly embedded) fields is:
- *  
- *    val b:Binder[_,_] = Binder(fld,solver,fd)
- *    val x:b.Inner = b(o,e1) //using b on object o associated with element e1
- *    b.down()                //entering sub-collection (obviously optional)
- *    b(z,e2)                 //receiving value z from Element e2
- *    b.up()                  //existing sub-collection. exiting from top layer assigns the result (applicable to simple fields)
- *    
- *    So there are always n calls to down and n+1 calls to up
+ *  The top class (which cannot be instancied because the constructor is private) is used for binding to a DataActor.
+ *  Derived classes (which are also hidden) are used to bind sub-collections. 
  */
-
-abstract class Binder[-E<:Def#Elt](val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
+sealed class Binder[-E<:Def#Elt] private (val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
   protected[this] final type I = Analyze#Instance
+  private[this] var cached:Analyze = null
+  protected[this] def build(on:AnyRef):I = {
+    if (cached==null) cached = new Analyze
+    cached.newInstance(on,null)
+  }
   
-  class Analyze {                                        //Binder instance for a pair (object/field or object/method)
+  /** The Analyze class is a container that keeps track of the functions used to perform the binding.
+   *  These classes are all but invisible to the end user.
+   */
+  protected class Analyze private[Binder] {              //Binder instance for a pair (object/field or object/method)
     def isCol:Boolean = false                            //indicates whether this is a Collection
     def isMap:Boolean = false                            //indicates whether this is a map
     private[this] var eConvert:(Any, E) => Any = null
@@ -68,7 +79,9 @@ abstract class Binder[-E<:Def#Elt](val what:DataActor,protected[this] val solver
     def subAnalyze():Analyze = throw new IllegalStateException("sub instance are only allowed on collections")
     protected[reflect] def newInstance(on:AnyRef,parent:I):Instance = new Instance(on)
     
-    class Instance(on:AnyRef) {
+    /** The instance class actually binds an object with a DataActor.
+     */
+    class Instance protected[Analyze] (on:AnyRef) {
       final def read():Any             = what.get(on)
       def set(x:Any,e:E):Unit          = rcv(convert(x,e),e)
       def close(e:E):Unit              = throw new IllegalStateException("cannot close a field instance")
@@ -81,7 +94,6 @@ abstract class Binder[-E<:Def#Elt](val what:DataActor,protected[this] val solver
 
   final def apply(on:AnyRef):I = build(on)
   
-  protected[this] def build(on:AnyRef):Analyze#Instance  
   protected[this] final def adapter(t:Type) = solver.collectionSolver(Binder.findClass(t))(t)
   protected[this] final def getSolver(cz:Class[_],t:Type) = solver(cz,Binder.findClass(t),fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
 
@@ -105,20 +117,10 @@ object Binder {
   }).asInstanceOf[Class[_<:U]]
    
   
-  /** Binder for a simple (i.e. not a collection) element.
-   *  An element could happen to be a collection, but it is treated as a whole (i.e. if conversion occurs, it occurs on the collection itself.)
-   */
-  private class SimpleBinder[-E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
-    private[this] var cached:Analyze = null
-    protected[this] def build(on:AnyRef):super.Analyze#Instance = {
-      if (cached==null) cached = new Analyze
-      cached.newInstance(on,null)
-    }
-  }
   /** Binder for a collection element. It can not be assigned until all elements have been first collected.
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
-  private class CollectionBinder[-E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends SimpleBinder[E](what,solver,fd) {
+  private class CollectionBinder[-E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
     private[this] val deepCache = new Array[super.Analyze](6)   //Do we expect deep collection of more than this depth ?
     
     class Analyze(val depth:Int,val parent:super.Analyze) extends super.Analyze {
@@ -164,13 +166,13 @@ object Binder {
       }
     }
  
-    protected[this] override def build(on:AnyRef):I = new Analyze(0,null).newInstance(on,null)
+    override def build(on:AnyRef):I = new Analyze(0,null).newInstance(on,null)
   }
 
-  /** Factory */
+  /** Factory that builds a Binder with a given DataActor */
   final def apply[E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
     if (isCol) new CollectionBinder(what,solver,fd)
-    else       new SimpleBinder(what,solver,fd)
+    else       new Binder(what,solver,fd)
   }
   
   /** A class that lets use Binders easily to enter values directly.
