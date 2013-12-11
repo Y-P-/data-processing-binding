@@ -14,6 +14,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 import scala.reflect.ClassTag
+import loader.reflect.ConvertData
+import loader.reflect.Converters
 
 /*
 
@@ -81,6 +83,34 @@ object TestBinder {
 object BinderTest {
   import Binder._
 
+
+  /** Test to verify that DataActors are correctly found */
+  @Test class DataActorTest extends StandardTester {
+    class U(var a:Int, var bb:Int, var c:Int) {
+      private[this] var d:Int = 3
+      def setA(x:Int):Unit  = println("used bean set")
+      def setBb(x:Int):Unit = println("used bean set")
+      def bb(x:Int):Unit    = println("used method")
+      def m(x:Int):Unit     = println("used method")
+      def d(x:Int):Unit     = { println("used method"); d=x }
+    }
+    def apply(file:Solver,out0:PrintWriter) = {
+      import out0.println  //write to out0 (remove to write to console)
+      //checking that all kinds are found
+      println(DataActor(classOf[U], "a",  "bsfm").get.getClass)  //should get bean
+      println(DataActor(classOf[U], "bb", "bsfm").get.getClass)  //should get bean (Bean convention uses capitalization)
+      println(DataActor(classOf[U], "c",  "bsfm").get.getClass)  //should get scala
+      println(DataActor(classOf[U], "d",  "bsfm").get.getClass)  //should get field
+      println(DataActor(classOf[U], "m",  "bsfm").get.getClass)  //should get method
+      //checking that order works as expected
+      println(DataActor(classOf[U], "a",  "sfmb").get.getClass)  //should get scala
+      println(DataActor(classOf[U], "a",  "fmbs").get.getClass)  //should get field
+      println(DataActor(classOf[U], "a",  "mfbs").get.getClass)  //should get field
+      println(DataActor(classOf[U], "d",  "bsmf").get.getClass)  //should get method
+      println(DataActor(classOf[U], "d",  "bs"))                 //should get None
+    }
+  }
+  
   /** Test for basic conversions for Strings.
    *  Validates that all predefined converters work on default settings.
    */

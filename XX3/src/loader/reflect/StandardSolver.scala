@@ -4,6 +4,7 @@ import utils.Reflect._
 import utils.ClassMap
 import loader.reflect.Converters.StringConverter
 import loader.core.definition.Def
+import scala.reflect.ClassTag
 
 
 abstract class ConversionSolver[-E<:Def#Elt] {
@@ -24,7 +25,7 @@ abstract class ConversionSolver[-E<:Def#Elt] {
  *    class and the second compatible with the Element class used.
  *  - by default, if nothing is specified, the created object is returned.
  */
-class StandardSolver[-E<:Def#Elt](defaultString:(Class[_]=>Option[StringConverter[_]]),named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]],val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_,E]]) extends ConversionSolver[E] {
+class StandardSolver[-E<:Def#Elt:ClassTag](defaultString:(Class[_]=>Option[StringConverter[_]]),named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]],val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_,E]]) extends ConversionSolver[E] {
   /** Finds an appropriate converter from one of the sources by following these exclusive rules (in order):
    *  - if the name is significant (not null or "")
    *  -   o name starts with @    : take the appropriate entry (e.g. '@xyz') from the named list (no check done: it has to work)
@@ -56,7 +57,8 @@ class StandardSolver[-E<:Def#Elt](defaultString:(Class[_]=>Option[StringConverte
         }
         val s = ^(src).asInstanceOf[RichClass[_<:AnyRef]]  //ok, bad, but anyway this also works for primitive types.
         val d = ^(dst)
-        (if (in==null) Converters(s,s,d,fName).orElse(Converters(d,s,d,fName)) else Converters(in,s,d,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
+        val cz = implicitly[ClassTag[E]].runtimeClass.asSubclass(classOf[Def#Elt])
+        (if (in==null) Converters(cz,s,s,d,fName).orElse(Converters(cz,d,s,d,fName)) else Converters(cz,in,s,d,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
       } catch {  //many reasons for failure here!
         case e:Throwable => Left(s"failed to fetch converter $name for $src => $dst: $e")
       }
@@ -83,7 +85,7 @@ class StandardSolver[-E<:Def#Elt](defaultString:(Class[_]=>Option[StringConverte
 }
 
 object StandardSolver {
-  def apply[E<:Def#Elt](defaultString:Class[_]=>Option[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]]):ConversionSolver[E] =
+  def apply[E<:Def#Elt:ClassTag](defaultString:Class[_]=>Option[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]]):ConversionSolver[E] =
     new StandardSolver(defaultString,named,registered,null)
   def apply() = new StandardSolver(Converters.defaultMap,null,null,CollectionAdapter.defaultMap)
 }

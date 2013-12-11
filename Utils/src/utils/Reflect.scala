@@ -37,6 +37,19 @@ object Reflect {
     final def >(c:RichClass[_]):Boolean = this > c.c
     //filters out methods/fields/constructors that satisfy some test
     def filter[X<:AccessibleObject:ClassTag](check:X=>Boolean):Array[X] = onAccessible[X,Array[X]](_.filter(check))
+    def filterMap[X<:AccessibleObject:ClassTag,U:ClassTag](f:X=>Option[U]):Array[U] = onAccessible[X,Array[U]] { x =>
+      val r = new Array[U](x.maxSize)
+      var i:Int=0
+      x.foreach { m=>
+        f(m) match {
+          case None =>
+          case Some(v) => r(i)=v; i+=1
+        }
+      }
+      val r0 = new Array[U](i)
+      System.arraycopy(r, 0, r0, 0, i)
+      r0
+    }
     //filters out methods/fields/constructors that satisfy some test
     def find[X<:AccessibleObject:ClassTag](check:X=>Boolean):Option[X] = onAccessible[X,Option[X]](_.find(check))
     //finds appropriate constructors matching the expected class list, whatever order, expect for the mandatory first classes that must be in the correct order. Generics are out.
@@ -70,6 +83,7 @@ object Reflect {
       def isBridge(x:X):Boolean
       def getName(x:X):String
       private[this] def keep(x:X) = !(isSynthetic(x) || isBridge(x))
+      def maxSize = getDeclared.length+get.length
       def debug(x:X) = {
         val m = getModifiers(x)
         print(getName(x))
@@ -79,16 +93,27 @@ object Reflect {
         if (isSynthetic(x)) print(" synthetic")
         if (isBridge(x)) print(" bridge") 
       }
-      def filter(check:X=>Boolean):Array[X] = {
-        val r = new Array[AnyRef](getDeclared.length+get.length)
+      def map[U:ClassTag](f:X=>U):Array[U] = {
+        val r = new Array[U](maxSize)
         var i=0
-        //protected/private local methods
-        for (m <- get) if (!Modifier.isPublic(getModifiers(m)) && keep(m) && check(m)) { r(i)=m; i+=1 }
-        //public methods (incl. inherited)
-        for (m <- getDeclared) if (keep(m) && check(m)) { r(i)=m; i+=1 }
+        foreach { m => r(i)=f(m); i+=1 }
+        val r0 = new Array[U](i)
+        System.arraycopy(r, 0, r0, 0, i)
+        r0
+      }
+      def filter(check:X=>Boolean):Array[X] = {
+        val r = new Array[AnyRef](maxSize)
+        var i=0
+        foreach { m => r(i)=m; i+=1 }
         val r0 = new Array[X](i)
         System.arraycopy(r, 0, r0, 0, i)
         r0
+      }
+      def foreach[U](f:X=>U):Unit = {
+        //protected/private local methods
+        for (m <- get) if (!Modifier.isPublic(getModifiers(m)) && keep(m)) f(m)
+        //public methods (incl. inherited)
+        for (m <- getDeclared) if (keep(m)) f(m)
       }
       //find out the first method/field/constructor that satisfy some test
       def find(check:X=>Boolean):Option[X] = {
