@@ -200,24 +200,25 @@ object Converters {
   protected object MethodConverter2 {
     def apply[U<:AnyRef,V,E<:Def#Elt](p:Array[Int], m:Method, src:RichClass[_>:U], dst:RichClass[_<:V]) = if (p==null) null else new MethodConverter2[U,V,E](p,m,src,dst)
   }
-  private[this] val czConvertData = ^(classOf[ConvertData])
+  private[this] val czConvertData:RichClass[_] = classOf[ConvertData]
   
   //finds a method in class 'in' that is an appropriate converter from U to V. If none satisfy, null is returned.
   //bridge or synthetic methods are rejected (i.e. we accept only user defined methods)
   //a Convert eligible method takes precedence over any other method
   //if a name is specified, only methods with that name are examined, otherwise (null or "") all method are examined and the "best" match kept.
-  def apply[U<:AnyRef,V,E<:Def#Elt](czE:Class[E], in:RichClass[_], src:RichClass[U], dst:RichClass[V], name:String):Option[Converter[U,V,E]] = {
+  def apply[U<:AnyRef,V,E<:Def#Elt:ClassTag](in:RichClass[_], src:RichClass[U], dst:RichClass[V], name:String):Option[Converter[U,V,E]] = {
+    val czE:RichClass[_] = implicitly[ClassTag[E]].runtimeClass
     //Returns a converter for a method that satisfies the constraints for being used for conversion to V, None otherwise
     def check(m:Method):Option[Converter[U,V,E] with MethodConverter] = {
       if (name!=null && name.length>0 && m.getName!=name) return None
       if (!(dst>m.getReturnType)) return None //the return type must be must be acceptable as dst
       val p = m.getParameterTypes
       if (Modifier.isStatic(m.getModifiers) || !(src<m.getDeclaringClass))
-        Option(MethodConverter2[U,V,E](checkParams(Array(p(0),czConvertData,czE),p,1),m,src,dst))
+        Option(MethodConverter2[U,V,E](checkParams(p,Array(^(p(0)),czConvertData,czE),1),m,src,dst))
       else if (src<m.getDeclaringClass)        //src class method
-        Option(MethodConverter1[U,V,E](checkParams(Array(czConvertData,czE),p,0),m,src,dst))
+        Option(MethodConverter1[U,V,E](checkParams(p,Array(czConvertData,czE),0),m,src,dst))
       else
-        Option(MethodConverter2[U,V,E](checkParams(Array(p(0),czConvertData,czE),p,1),m,src,dst))    //the first param must be compatible with src
+        Option(MethodConverter2[U,V,E](checkParams(p,Array(^(p(0)),czConvertData,czE),1),m,src,dst))    //the first param must be compatible with src
     }
     val l = in.filterMap(check)
     var hasConvert = false

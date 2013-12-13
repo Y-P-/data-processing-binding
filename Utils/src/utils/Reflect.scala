@@ -22,6 +22,7 @@ object Reflect {
       val f = c.getDeclaredField("MODULE$")
       val m = f.getModifiers
       if (Modifier.isFinal(m) && Modifier.isStatic(m)) f.get(null) else null
+      // c.getDeclaredField("MODULE$").get(if (c.getEnclosingClass!=null) c.getEnclosingClass.asObject else null) //tackling possible recurivity ?
     } catch {
       case _:Throwable => null
     }).asInstanceOf[U]
@@ -61,6 +62,7 @@ object Reflect {
         case Array()      => None
         case Array((c,_)) => Some(c)
     }
+    
     final def printMethods() = methods.filter(_=>true).foreach { println(_) }
     override def toString       = s"RichClass[${c.getCanonicalName}]"
     override def equals(o:Any)  = if (o.isInstanceOf[RichClass[_]]) o.asInstanceOf[RichClass[_]].c eq this.c else false
@@ -192,17 +194,18 @@ object Reflect {
     
   /** Matches an incoming list of classes against an expected list of classes. Classes must be unrelated or the match will be unpredictable.
    *  @param expected, the list of possible classes
-   *  @param incoming, the list of found classes
+   *  @param incoming, the list of found classes ; they must all be assignable to at most one of the expected classes.
+   *                   it is possible to only partially match the incoming list, but the expected list must be fully met.
    *  @param mandatory, the number of elements in expected that must be found in the right order in found
-   *  @return an array indicating how indexes in incoming match indexes in expected. null if fails (i.e some elts in incoming don't match expected)
+   *  @return an array indicating how indexes in incoming match indexes in expected. null if fails (i.e some incoming elts don't match any expected one)
    */
-  def checkParams(expected:Array[RichClass[_]],incoming:Array[Class[_]],mandatory:Int):Array[Int] = {
-    if (incoming.length>expected.length) return null
-    val a = new Array[Int](incoming.length)
-    for (i <- 0 until mandatory) if (!(expected(i)>incoming(i))) return null else a(i)=i
-    for (i <- mandatory until incoming.length) {
+  def checkParams(expected:Array[Class[_]],incoming:Array[RichClass[_]],mandatory:Int):Array[Int] = {
+    if (incoming.length<expected.length) return null
+    val a = new Array[Int](expected.length)
+    for (i <- 0 until mandatory) if (!(incoming(i)<expected(i))) return null else a(i)=i
+    for (i <- mandatory until expected.length) {
       var k = -1
-      for (j <- mandatory until expected.length if k<0 && expected(j)>incoming(i)) k=j
+      for (j <- mandatory until incoming.length if k<0 && incoming(j)<expected(i)) k=j
       if (k<0) return null
       a(i)=k
     }
@@ -218,12 +221,12 @@ object Reflect {
   }
   
   /** restricts 'in' to the Methods that do accept the right kind of parameters */
-  def findMethod(in:Array[Method],expected:Array[RichClass[_]],mandatory:Int):Array[(Method,Array[Int])] =
-    for (m <- in; p=checkParams(expected,m.getParameterTypes,mandatory) if p!=null) yield (m,p)
+  def findMethod(in:Array[Method],incoming:Array[RichClass[_]],mandatory:Int):Array[(Method,Array[Int])] =
+    for (m <- in; p=checkParams(m.getParameterTypes,incoming,mandatory) if p!=null) yield (m,p)
   /** restricts 'in' to the Constructors that do accept the right kind of parameters */
-  def findConstructor[U](in:Array[_<:Constructor[_<:U]],expected:Array[RichClass[_]],mandatory:Int):Array[(Constructor[_<:U],Array[Int])] =
-    for (m <- in; p=checkParams(expected,m.getParameterTypes,mandatory) if p!=null) yield (m,p)
-  
+  def findConstructor[U](in:Array[_<:Constructor[_<:U]],incoming:Array[RichClass[_]],mandatory:Int):Array[(Constructor[_<:U],Array[Int])] =
+    for (m <- in; p=checkParams(m.getParameterTypes,incoming,mandatory) if p!=null) yield (m,p)
+    
   /** returns true if p1 and p2 represent the same primitive type, Java Boxed or not */
   final def checkPrimitive(p1:Class[_],p2:Class[_]):Boolean = {
     if (p1 eq p2)                       return true

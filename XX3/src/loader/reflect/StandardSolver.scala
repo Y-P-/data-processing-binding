@@ -57,8 +57,7 @@ class StandardSolver[-E<:Def#Elt:ClassTag](defaultString:(Class[_]=>Option[Strin
         }
         val s = ^(src).asInstanceOf[RichClass[_<:AnyRef]]  //ok, bad, but anyway this also works for primitive types.
         val d = ^(dst)
-        val cz = implicitly[ClassTag[E]].runtimeClass.asSubclass(classOf[Def#Elt])
-        (if (in==null) Converters(cz,s,s,d,fName).orElse(Converters(cz,d,s,d,fName)) else Converters(cz,in,s,d,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
+        (if (in==null) Converters(s,s,d,fName).orElse(Converters(d,s,d,fName)) else Converters(in,s,d,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
       } catch {  //many reasons for failure here!
         case e:Throwable => Left(s"failed to fetch converter $name for $src => $dst: $e")
       }
