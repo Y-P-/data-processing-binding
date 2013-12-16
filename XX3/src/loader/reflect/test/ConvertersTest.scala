@@ -27,8 +27,18 @@ import loader.reflect.Converters
  *       or that we can somehow provide an instance of W to work on.
  */
 object ConvertersTest {
-  
   import loader.core.definition.Def
+
+  class V(out:PrintWriter)
+
+  object V {
+    def invoke(out:PrintWriter, n:Int) = { out.println(s"invoked V.toV$n"); new V(out) }
+    def toV1(u:U,fd:ConvertData,e:Def#Elt):V = invoke(u.out,1)
+    def toV2(u:U,fd:ConvertData):V = invoke(u.out,2)
+    def toV3(u:U,e:Def#Elt):V = invoke(u.out,3)
+    def toV4(u:U):V = invoke(u.out,4)    
+  }
+  
   class U(val out:PrintWriter) {
     def invoke(n:Int) = { out.println(s"invoked U.toV$n"); new V(out) }
     def toV1(fd:ConvertData,e:Def#Elt):V = invoke(1)
@@ -53,7 +63,7 @@ object ConvertersTest {
       //checking that all converters are found in the source
       for (i <- 1 to 6) check(cU,i)
       //checking that all converters are found in the destination
-      for (i <- 1 to 4) check(cV,1)
+      for (i <- 1 to 4) check(V.getClass,i)
       
       //checking sub-classes for Def#Elt
       println(Converters(cU, cU,  cV, "toV5"))  //None: CtxCore.Def#Elt cannot accept definition.Def#Elt
@@ -61,16 +71,4 @@ object ConvertersTest {
       println(Converters(cU, cU,  cV, "toV1")(ClassTag(classOf[loader.core.CtxCore.Def#Elt])))
     }
   }
-}
-
-class V(out:PrintWriter) {
-}
-object V {
-  import ConvertersTest.U
-  import loader.core.definition.Def
-  def invoke(out:PrintWriter, n:Int) = { out.println(s"invoked V.toV$n"); new V(out) }
-  def toV1(u:U,fd:ConvertData,e:Def#Elt):V = invoke(u.out,1)
-  def toV2(u:U,fd:ConvertData):V = invoke(u.out,2)
-  def toV3(u:U,e:Def#Elt):V = invoke(u.out,3)
-  def toV4(u:U):V = invoke(u.out,4)    
 }

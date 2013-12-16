@@ -19,10 +19,11 @@ object Reflect {
     final val isFinal = Modifier.isFinal(c.getModifiers())
     //scala singleton associated with this class if appropriate
     lazy val asObject:U = (try {
+      val x = if (c.getEnclosingClass!=null) Class.forName(c.getEnclosingClass.getName+"$"+c.getSimpleName)
+              else c
       val f = c.getDeclaredField("MODULE$")
       val m = f.getModifiers
       if (Modifier.isFinal(m) && Modifier.isStatic(m)) f.get(null) else null
-      // c.getDeclaredField("MODULE$").get(if (c.getEnclosingClass!=null) c.getEnclosingClass.asObject else null) //tackling possible recurivity ?
     } catch {
       case _:Throwable => null
     }).asInstanceOf[U]
