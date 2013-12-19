@@ -84,9 +84,8 @@ object definition {
      *  Holds the data necessary to process these events.
      *  You probably don't want to ever override any of these methods.
      */
-    abstract class Elt extends Traversable[Element] with BaseElt { self:Element=>
+    trait Elt extends Traversable[Element] with BaseElt { self:Element=>
       def myself:Element = this
-      import scala.reflect._
       /** Context for use */
       def userCtx:UserCtx
       /** Fields */
@@ -343,7 +342,7 @@ object definition {
          *   val fm = im.reflectField(termSymb)
          *   fm.set(parser)
          */
-        protected var parser0:Parser
+        protected[this] var parser0:Parser
         def parser = parser0
         protected def parser_=(parser:Parser):Unit = parser0=parser
       }  

@@ -296,6 +296,8 @@ object StringConverter {
       val m = x.getMethod("withName", classOf[String])
       m.setAccessible(true)
       val o = x.asObject
+      if (!Modifier.isStatic(m.getModifiers) && o==null)
+        throw new IllegalArgumentException(s"it is not possible to find an instance to invoke $m")
       s => try {
         m.invoke(o,s)
       } catch {

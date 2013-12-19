@@ -1,7 +1,5 @@
 package loader.core
 
-import callbacks._
-
 /** A more complex implementation for core, where Element is extended through composition with
  *  an arbitrary Data object which can be built from the parent and Status object.
  */
