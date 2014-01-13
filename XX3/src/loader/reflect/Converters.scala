@@ -167,6 +167,7 @@ object Converters {
     def m:Method
   }
   //m is a method with no param, or one or two params in (ConvertData,Def#Elt) (in this order)
+  //it belongs to class U
   final protected class MethodConverter1[-U<:AnyRef,+V,-E<:Def#Elt] private (p:Array[Int], val m:Method, val src:RichClass[_>:U], val dst:RichClass[_<:V]) extends Converter[U,V,E] with MethodConverter {
     def apply(fd:ConvertData):(U,E)=>V = {
       (u,e)=>m.invoke(u,buildParams(Array(fd,e),p):_*).asInstanceOf[V]
@@ -176,12 +177,12 @@ object Converters {
   protected object MethodConverter1 {
     def apply[U<:AnyRef,V,E<:Def#Elt](p:Array[Int], m:Method, src:RichClass[_>:U], dst:RichClass[_<:V]) = if (p==null) null else new MethodConverter1[U,V,E](p,m,src,dst)
   }
-  //m is a method with one to four params in (U, ConvertData, Def#Elt) (in this order, U being mandatory)
-  //m can be either static, or belong to some class, of which one instance will be spawned in order to serve for the invocation
+  //m is a method with one to three params in (U, ConvertData, Def#Elt) (in this order, U being mandatory)
+  //m can be either static, or belong to some class which is not U, of which one instance will be spawned in order to serve for the invocation
   final protected class MethodConverter2[U<:AnyRef,+V,-E<:Def#Elt](p:Array[Int], val m:Method, val src:RichClass[_>:U], val dst:RichClass[_<:V]) extends Converter[U,V,E] with MethodConverter {
     def apply(fd:ConvertData):(U,E)=>V = {
       val helper = if (Modifier.isStatic(m.getModifiers)) {
-        //static: find a matching method on the 4 params (src,ConvertData,Def#Elt), src being first and mandatory
+        //static: find a matching method on the 3 params (src,ConvertData,Def#Elt), src being first and mandatory
         (null,null)
       } else {
         val in = ^(m.getDeclaringClass)
@@ -189,10 +190,11 @@ object Converters {
         else in.findConstructor(Array(czConvertData),0) match {  //instance: find a matching constructor on possibly 1 param (ConvertData)
           case x if x.length>1  => throw new IllegalStateException(s"too many constructor match the accepted entries for ${m.getDeclaringClass}") 
           case x if x.length==0 => throw new IllegalStateException(s"no constructor match the accepted entries for ${m.getDeclaringClass}") 
-          case x                => (x(0)._1.newInstance(buildParams(Array(fd),x(0)._2)),x(0)._2) //create an appropriate helper class with the right params
+          case x                => (x(0)._1.newInstance(buildParams(Array(fd),x(0)._2):_*),x(0)._2) //create an appropriate helper class with the right params
         }
       }
-      if (helper._2!=null) for (x <- helper._2) if (p.contains(x)) throw new IllegalStateException(s"method $m cannot be used to convert (is used both in constructor and method)")
+      //wrong, was suppoed to detect and forbid invocations which contained fd if fd is used in the constructor ; seems unecessarily restricive. And code is wrong (compares indexes!)
+      //if (helper._2!=null) for (x <- helper._2) if (p.contains(x)) throw new IllegalStateException(s"method $m cannot be used to convert (is used both in constructor and method)")
       (u,e)=>m.invoke(helper._1,buildParams(Array(u,fd,e),p):_*).asInstanceOf[V]        
     }
     override def toString:String = s"MethodConverter2 with $m"
@@ -208,27 +210,25 @@ object Converters {
   //if a name is specified, only methods with that name are examined, otherwise (null or "") all method are examined and the "best" match kept.
   def apply[U<:AnyRef,V,E<:Def#Elt:ClassTag](in:RichClass[_], src:RichClass[U], dst:RichClass[V], name:String):Option[Converter[U,V,E]] = {
     val czE:RichClass[_] = implicitly[ClassTag[E]].runtimeClass
+    val isSrc = src<in
     //Returns a converter for a method that satisfies the constraints for being used for conversion to V, None otherwise
-    def check(m:Method):Option[Converter[U,V,E] with MethodConverter] = {
+    def check(m:Method):Option[(Array[Int],Method)] = {
       if (name!=null && name.length>0 && m.getName!=name) return None
       if (!(dst>m.getReturnType)) return None //the return type must be must be acceptable as dst
-      val p = m.getParameterTypes
-      if (Modifier.isStatic(m.getModifiers) || !(src<m.getDeclaringClass))
-        Option(MethodConverter2[U,V,E](checkParams(p,Array(^(p(0)),czConvertData,czE),1),m,src,dst))
-      else if (src<m.getDeclaringClass)        //src class method
-        Option(MethodConverter1[U,V,E](checkParams(p,Array(czConvertData,czE),0),m,src,dst))
-      else
-        Option(MethodConverter2[U,V,E](checkParams(p,Array(^(p(0)),czConvertData,czE),1),m,src,dst))    //the first param must be compatible with src
+      val a:Array[RichClass[_]] = if (isSrc) Array(czConvertData,czE) else Array(src,czConvertData,czE)
+      val cp = checkParams(m.getParameterTypes,a,if (isSrc) 0 else 1)
+      if (cp==null) None else Option((cp,m))
     }
-    val l = in.filterMap(check)
-    var hasConvert = false
-    var r:Converter[U,V,E] = null
-    var min:RichClass[_] = null
-    for (cv <- l) {
-      val te = cv.m.getAnnotation(classOf[Convert])!=null
-      if (te && !hasConvert) { hasConvert=true; r=cv; min=cv.m.getReturnType }  //first tagEnd seen: reinit
-      else if ((min==null || min>cv.m.getReturnType) && (te || !hasConvert)) { r=cv; min=cv.m.getReturnType }
+    val l = utils.Reflect.AccessibleElements(in.methods).flatMap(m=>check(m))
+    if (l.isEmpty) return None
+    var min:(Array[Int],Method) = null
+    for (x <- l) {
+      if (min==null) min=x                                    //first item
+      else if (utils.Reflect.<(x._2,min._2)) {                //or smaller item
+        if (utils.Reflect.<(min._2,x._2)) return None         //only differs by return type: ambiguous
+        else min=x
+      } else if (! utils.Reflect.<(min._2,x._2)) return None  //item is not comparable: failure
     }
-    if (r==null) None else Some(r)
+    Some(if (isSrc) MethodConverter1[U,V,E](min._1,min._2,src,dst) else MethodConverter2[U,V,E](min._1,min._2,src,dst))
   }
 }

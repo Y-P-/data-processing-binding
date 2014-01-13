@@ -19,12 +19,16 @@ object DataActor {
   implicit def apply(cz:Class[_]):String=>Option[DataActor] = (s:String)=>apply(cz,s,"bsfm")
   
   //utility for apply below: matches a character and a reflexive setter
-  protected[this] def get(cz:RichClass[_],name:String,x:Char) = x match {
-    case 'b' => cz.find[Method] (testMethod(_,"set"+name.charAt(0).toUpper+name.substring(1)))  .map(new BeanElt(_))
-    case 's' => cz.find[Method] (testMethod(_,name+"_$eq"))                                     .map(new ScalaElt(_))
-    case 'f' => cz.find[Field]  (_.getName==name)                                               .map(new FldElt(_))
-    case 'm' => cz.find[Method] (testMethod(_,name))                                            .map(new MethodElt(_))
-    case  c  => throw new IllegalArgumentException(s"the choice for reflexive affectation must be in b (bean), s (scala), f (field), m (method); any other character is an error: $c")
+  protected[this] def get(cz:RichClass[_],name:String,x:Char) = {
+    lazy val m = utils.Reflect.AccessibleElements(cz.methods)
+    lazy val f = utils.Reflect.AccessibleElements(cz.fields)
+    x match {
+      case 'b' => m.find (testMethod(_,"set"+name.charAt(0).toUpper+name.substring(1)))  .map(new BeanElt(_))
+      case 's' => m.find (testMethod(_,name+"_$eq"))                                     .map(new ScalaElt(_))
+      case 'f' => f.find (_.getName==name)                                               .map(new FldElt(_))
+      case 'm' => m.find (testMethod(_,name))                                            .map(new MethodElt(_))
+      case  c  => throw new IllegalArgumentException(s"the choice for reflexive affectation must be in b (bean), s (scala), f (field), m (method); any other character is an error: $c")
+    }
   }
   //recursive call for following the defined order
   @tailrec protected[this] def apply(cz:RichClass[_],name:String,order:String,i:Int):Option[DataActor] = {

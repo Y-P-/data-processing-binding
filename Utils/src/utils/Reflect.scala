@@ -10,7 +10,81 @@ import java.lang.reflect.Field
 object Reflect {
   class NoSuchMethodException(msg:String=null) extends Exception(msg)
   class TooManyMethodException(msg:String=null) extends Exception(msg)
+  object cannotCompare extends Exception { override def fillInStackTrace = this }
+
+  abstract class AccessibleElements[X<:AccessibleObject:ClassTag](l:Array[X]) {
+    implicit val wrapped:scala.collection.mutable.ArrayOps[X] = l
+    def getModifiers(x:X):Int
+    def isSynthetic(x:X):Boolean
+    def isBridge(x:X):Boolean
+    def getName(x:X):String
+    def <(x1:X,x2:X):Boolean
+    def debug(x:X) = {
+      val m = getModifiers(x)
+      print(getName(x))
+      if (Modifier.isPublic(m)) print(" public")
+      if (Modifier.isPrivate(m)) print(" private")
+      if (Modifier.isProtected(m)) print(" protected")
+      if (isSynthetic(x)) print(" synthetic")
+      if (isBridge(x)) print(" bridge") 
+    }
+    final def min:X = {
+      var min:X = null.asInstanceOf[X]
+      for (x <- wrapped) {
+        if (min==null || <(x,min)) min=x                  //first item, or smaller item
+        else if (! <(min,x)) return null.asInstanceOf[X]  //item is not comparable: failure
+      }
+      min
+    }
+  }
+  object AccessibleElements {
+    //Factory for the limited number of AccessibleObject classes
+    def apply[X<:AccessibleObject:ClassTag](l:Array[X]):AccessibleElements[X] = {
+      val x = implicitly[ClassTag[X]].runtimeClass
+      (if      (x==classOf[Method])          new Methods(l.asInstanceOf[Array[Method]])
+       else if (x==classOf[Field])           new Fields(l.asInstanceOf[Array[Field]])
+       else if (x==classOf[Constructor[_]])  new Constructors(l.asInstanceOf[Array[Constructor[_]]])
+       else                                  null).asInstanceOf[AccessibleElements[X]]
+    }
+    implicit def toArray[X<:AccessibleObject](a:AccessibleElements[X]) = a.wrapped
+  }
   
+  def <(m1:Method,m2:Method):Boolean = {
+    val p1 = m1.getParameterTypes
+    val p2 = m1.getParameterTypes
+    if (p1.length!=p2.length) return false
+    for (i <- 0 until p1.length) if (!p2(i).isAssignableFrom(p1(i))) return false
+    return true
+  }
+  def <(m1:Constructor[_],m2:Constructor[_]):Boolean = {
+    val p1 = m1.getParameterTypes
+    val p2 = m1.getParameterTypes
+    if (p1.length!=p2.length) return false
+    for (i <- 0 until p1.length) if (!p2(i).isAssignableFrom(p1(i))) return false
+    return true
+  }
+  class Methods(l:Array[Method]) extends AccessibleElements[Method](l) {
+    final def getModifiers(x:Method)         = x.getModifiers
+    final def isSynthetic(x:Method)          = x.isSynthetic
+    final def isBridge(x:Method)             = x.isBridge
+    final def getName(x:Method)              = x.getName
+    final def <(m1:Method,m2:Method):Boolean = Reflect.<(m1,m2)
+  }
+  class Fields(l:Array[Field]) extends AccessibleElements[Field](l) {
+    final def getModifiers(x:Field)        = x.getModifiers
+    final def isSynthetic(x:Field)         = x.isSynthetic
+    final def isBridge(x:Field)            = false
+    final def getName(x:Field)             = x.getName
+    final def <(m1:Field,m2:Field):Boolean = false
+  }
+  class Constructors(l:Array[Constructor[_]]) extends AccessibleElements[Constructor[_]](l) {
+    final def getModifiers(x:Constructor[_]) = x.getModifiers
+    final def isSynthetic(x:Constructor[_])  = x.isSynthetic
+    final def isBridge(x:Constructor[_])     = false
+    final def getName(x:Constructor[_])      = x.getName
+    final def <(c1:Constructor[_],c2:Constructor[_]):Boolean = Reflect.<(c1,c2)
+  }
+    
   /** Provides some Java reflection utilities.
    *  Note that this class doesn't achieve anything close to scala reflection.
    *  It doesn't use any compile time info and is not suitable for general use with generics.
@@ -37,23 +111,6 @@ object Reflect {
     def >(c:Class[_]):Boolean = this.c.isAssignableFrom(c)
     final def <(c:RichClass[_]):Boolean = this < c.c
     final def >(c:RichClass[_]):Boolean = this > c.c
-    //filters out methods/fields/constructors that satisfy some test
-    def filter[X<:AccessibleObject:ClassTag](check:X=>Boolean):Array[X] = onAccessible[X,Array[X]](_.filter(check))
-    def filterMap[X<:AccessibleObject:ClassTag,U:ClassTag](f:X=>Option[U]):Array[U] = onAccessible[X,Array[U]] { x =>
-      val r = new Array[U](x.maxSize)
-      var i:Int=0
-      x.foreach { m=>
-        f(m) match {
-          case None =>
-          case Some(v) => r(i)=v; i+=1
-        }
-      }
-      val r0 = new Array[U](i)
-      System.arraycopy(r, 0, r0, 0, i)
-      r0
-    }
-    //filters out methods/fields/constructors that satisfy some test
-    def find[X<:AccessibleObject:ClassTag](check:X=>Boolean):Option[X] = onAccessible[X,Option[X]](_.find(check))
     //finds appropriate constructors matching the expected class list, whatever order, expect for the mandatory first classes that must be in the correct order. Generics are out.
     def findConstructor(expected:Array[RichClass[_]],mandatory:Int):Array[_<:(_<:Constructor[_<:U],Array[Int])] =
       Reflect.findConstructor[U](c.getConstructors.asInstanceOf[Array[_<:Constructor[_<:U]]],expected,mandatory)
@@ -64,90 +121,18 @@ object Reflect {
         case Array((c,_)) => Some(c)
     }
     
-    final def printMethods() = methods.filter(_=>true).foreach(println)
+    final def printMethods() = methods.foreach(println)
     override def toString       = s"RichClass[${c.getCanonicalName}]"
     override def equals(o:Any)  = if (o.isInstanceOf[RichClass[_]]) o.asInstanceOf[RichClass[_]].c eq this.c else false
     override def hashCode       = c.hashCode
     
-    def onAccessible[X<:AccessibleObject:ClassTag,U](f: AccessibleElements[X]=>U):U = {
-      val x = implicitly[ClassTag[X]].runtimeClass
-      val o = if      (x==classOf[Method])          methods
-              else if (x==classOf[Field])           fields
-              else if (x==classOf[Constructor[_]])  constructors
-              else                                  null
-      f(o.asInstanceOf[AccessibleElements[X]])
-    }
-
-    abstract class AccessibleElements[X<:AccessibleObject:ClassTag] {
-      def get:Array[X]
-      def getDeclared:Array[X]
-      def getModifiers(x:X):Int
-      def isSynthetic(x:X):Boolean
-      def isBridge(x:X):Boolean
-      def getName(x:X):String
-      private[this] def keep(x:X) = !(isSynthetic(x) || isBridge(x))
-      def maxSize = getDeclared.length+get.length
-      def debug(x:X) = {
-        val m = getModifiers(x)
-        print(getName(x))
-        if (Modifier.isPublic(m)) print(" public")
-        if (Modifier.isPrivate(m)) print(" private")
-        if (Modifier.isProtected(m)) print(" protected")
-        if (isSynthetic(x)) print(" synthetic")
-        if (isBridge(x)) print(" bridge") 
-      }
-      def map[U:ClassTag](f:X=>U):Array[U] = {
-        val r = new Array[U](maxSize)
-        var i=0
-        foreach { m => r(i)=f(m); i+=1 }
-        val r0 = new Array[U](i)
-        System.arraycopy(r, 0, r0, 0, i)
-        r0
-      }
-      def filter(check:X=>Boolean):Array[X] = {
-        val r = new Array[AnyRef](maxSize)
-        var i=0
-        foreach { m => r(i)=m; i+=1 }
-        val r0 = new Array[X](i)
-        System.arraycopy(r, 0, r0, 0, i)
-        r0
-      }
-      def foreach[U](f:X=>U):Unit = {
-        //protected/private local methods
-        for (m <- get) if (!Modifier.isPublic(getModifiers(m)) && keep(m)) f(m)
-        //public methods (incl. inherited)
-        for (m <- getDeclared) if (keep(m)) f(m)
-      }
-      //find out the first method/field/constructor that satisfy some test
-      def find(check:X=>Boolean):Option[X] = {
-        def f(a:Array[X]):Option[X] = { for (x <- a) if (keep(x) && check(x)) return Some(x); None }
-        f(get).orElse(f(getDeclared))
-      }
-    }
-    object methods extends AccessibleElements[Method] {
-      def get                    = c.getMethods
-      def getDeclared            = c.getDeclaredMethods
-      def getModifiers(x:Method) = x.getModifiers
-      def isSynthetic(x:Method)  = x.isSynthetic
-      def isBridge(x:Method)     = x.isBridge
-      def getName(x:Method)      = x.getName
-    }
-    object fields extends AccessibleElements[Field] {
-      def get                    = c.getFields
-      def getDeclared            = c.getDeclaredFields
-      def getModifiers(x:Field)  = x.getModifiers
-      def isSynthetic(x:Field)   = x.isSynthetic
-      def isBridge(x:Field)      = false
-      def getName(x:Field)       = x.getName
-    }
-    object constructors extends AccessibleElements[Constructor[_]] {
-      def get                            = c.getConstructors
-      def getDeclared                    = c.getDeclaredConstructors
-      def getModifiers(x:Constructor[_]) = x.getModifiers
-      def isSynthetic(x:Constructor[_])  = x.isSynthetic
-      def isBridge(x:Constructor[_])     = false
-      def getName(x:Constructor[_])      = x.getName
-    }
+    //standard way to retrieve useful methods,fields and construtors
+    //this will retrieve all public methods from the class and superclasses, and all methods from the class itself (protected or private)
+    //a method is present only once
+    //synthetic methods are excluded
+    def methods      = (c.getDeclaredMethods.filter(m => !Modifier.isPublic(m.getModifiers))++c.getMethods).filter(!_.isSynthetic)
+    def fields       = (c.getDeclaredFields.filter(m => !Modifier.isPublic(m.getModifiers))++c.getFields).filter(!_.isSynthetic)
+    def constructors = (c.getDeclaredConstructors.filter(m => !Modifier.isPublic(m.getModifiers))++c.getConstructors).filter(!_.isSynthetic)
   }
   
   //easy factory
@@ -179,7 +164,7 @@ object Reflect {
     l
   }
   
-  /** Finds a method (static or not) in src that return dst (or a subclass of).
+  /** Finds the methods (static or not) in src that return dst (or a subclass of).
    *  @param  src, the source class in which we are looking for an appropriate method (possibly static)
    *  @param  dst, the class to return
    *  @param  check, a method that adds additional criterion on a method (such as name...)
@@ -187,7 +172,7 @@ object Reflect {
    *  @throws NoSuchMethodException if no method or more than one method is found matching
    */
   def find[U<:AnyRef,V](src:RichClass[U],dst:RichClass[V],check:(Method)=>Boolean):Array[Method] =
-    reduce(src.filter(m => check(m) && dst>m.getReturnType),src,dst)
+    reduce(src.methods.filter(m => check(m) && dst>m.getReturnType),src,dst)
     
   ////////////////////////////////////////////////////////////////////////////////////////////////  
   // The following methods are useful to deal with reflexion around variable list of parameters //
@@ -203,12 +188,13 @@ object Reflect {
   def checkParams(expected:Array[Class[_]],incoming:Array[RichClass[_]],mandatory:Int):Array[Int] = {
     if (incoming.length<expected.length) return null
     val a = new Array[Int](expected.length)
+    //mandatory arguments must be matched at their exact position
     for (i <- 0 until mandatory) if (!(incoming(i)<expected(i))) return null else a(i)=i
-    for (i <- mandatory until expected.length) {
-      var k = -1
-      for (j <- mandatory until incoming.length if k<0 && incoming(j)<expected(i)) k=j
-      if (k<0) return null
-      a(i)=k
+    val r = mandatory until incoming.length
+    //loop on other expected arguments
+    for (i <- mandatory until expected.length) {               
+      if (r.find(incoming(_)<expected(i)).map(a(i)=_)==None)   //check if an incoming argument matches and if found, record its index
+        return null                                            //if none found, arguments match fails
     }
     a
   }

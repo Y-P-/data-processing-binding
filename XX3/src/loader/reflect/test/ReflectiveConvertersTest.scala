@@ -68,12 +68,14 @@ object ReflectiveConvertersTest {
   //derived object to convert from
   class T(out:PrintWriter) extends S(out)
   
-  class X1(fd:ConvertData) {
+  class X0(fd:ConvertData) {
     def invoke(out:PrintWriter, n:Int):W = { out.println(s"invoked V.toV$n"); new W(out) }
-    def toV1(u:S,e:Def#Elt):V = invoke(u.out,1)
-    def toV2(u:T,e:Def#Elt):V = invoke(u.out,2)
-    def toV3(u:S,e:Def#Elt):W = invoke(u.out,3)
-    def toV4(u:T,e:Def#Elt):W = invoke(u.out,4)
+    def toV3(u:S,e:CtxDef#Elt):W = invoke(u.out,3)
+    def toV4(u:T,e:Def#Elt):W    = invoke(u.out,4)
+  }
+  class X1(fd:ConvertData) extends X0(fd) {
+    def toV1(u:S,e:Def#Elt):V    = invoke(u.out,1)
+    def toV2(u:T,e:CtxDef#Elt):V = invoke(u.out,2)
   }
 
   /** Test to verify that DataActors are correctly found */
@@ -95,7 +97,7 @@ object ReflectiveConvertersTest {
       def check(in:Class[_],n:Int) = check0[Def#Elt](in,cS,cV,n)
       
       //checking that all converters are found in the source
-      for (i <- 1 to 6) check(cS,i)
+      for (i <- 1 to 6) check(cS,i)  //5 must fail: CtxCore.Def#Elt cannot accept definition.Def#Elt
       //checking that all converters are found in the destination
       for (i <- 1 to 4) check(V.getClass,i)
       
@@ -112,7 +114,7 @@ object ReflectiveConvertersTest {
       out0.println ("---- S to W ----")
       for (i <- 1 to 8) check0[Def#Elt](W.getClass,classOf[S],classOf[W],i)  //4
       out0.println ("---- T to V ----")
-      for (i <- 1 to 8) check0[Def#Elt](W.getClass,classOf[T],classOf[V],i)  //1,2,4,5,6,8
+      for (i <- 1 to 8) check0[Def#Elt](W.getClass,classOf[T],classOf[V],i)     //1,2,4,5,6,8
       out0.println ("---- S to V using CtxDef#Elt ----")
       for (i <- 1 to 8) check0[CtxDef#Elt](W.getClass,classOf[S],classOf[V],i)  //1,2,3,4
       out0.println ("---- T to W using CtxDef#Elt ----")
@@ -123,11 +125,27 @@ object ReflectiveConvertersTest {
       for (i <- 1 to 8) check0[CtxDef#Elt](W.getClass,classOf[T],classOf[V],i)  //1,2,3,4,5,6,7,8
       
       //checking that we can find an appropriate converter when not giving a name
-      out0.println ("---- S to V using CtxDef#Elt in X1 instancied from ConvertData ----")
-      checkBase[CtxDef#Elt](classOf[X1], cS, cW, null) //OK, can find
-      checkBase[CtxDef#Elt](classOf[X1], cS, cV, null) //no, more than one
-      checkBase[CtxDef#Elt](classOf[X1], cT, cV, null) //no, more than one
-      checkBase[CtxDef#Elt](classOf[X1], cT, cW, null) //no, more than one
+      //also used to check how the Reflect framework behaves given inheritance
+      out0.println ("---- S to V using CtxDef#Elt in X1 instancied with fd0 ----")
+      checkBase[CtxDef#Elt](classOf[X1], cS, cW, null) //OK, can find only V3
+      checkBase[CtxDef#Elt](classOf[X1], cS, cV, null) //no, more than one: V1,V3
+      checkBase[CtxDef#Elt](classOf[X1], cT, cV, null) //no, more than one: V1,V2,V3,V4
+      checkBase[CtxDef#Elt](classOf[X1], cT, cW, null) //no, more than one: V3,V4
+      out0.println ("---- S to V using CtxDef#Elt in X0 instancied with fd0 ----")
+      checkBase[CtxDef#Elt](classOf[X0], cS, cW, null) //OK, can find only V3
+      checkBase[CtxDef#Elt](classOf[X0], cS, cV, null) //OK, can find only V3
+      checkBase[CtxDef#Elt](classOf[X0], cT, cV, null) //no, more than one: V3,V4
+      checkBase[CtxDef#Elt](classOf[X0], cT, cW, null) //no, more than one: V3,V4
+      out0.println ("---- S to V using Def#Elt in X1 instancied with fd0 ----")
+      checkBase[Def#Elt](classOf[X1], cS, cW, null) //no
+      checkBase[Def#Elt](classOf[X1], cS, cV, null) //OK, can find only V1
+      checkBase[Def#Elt](classOf[X1], cT, cV, null) //no, more than one: V1,V4
+      checkBase[Def#Elt](classOf[X1], cT, cW, null) //OK, can find only V4
+      out0.println ("---- S to V using Def#Elt in X0 instancied with fd0 ----")
+      checkBase[Def#Elt](classOf[X0], cS, cW, null) //no
+      checkBase[Def#Elt](classOf[X0], cS, cV, null) //no
+      checkBase[Def#Elt](classOf[X0], cT, cV, null) //OK, can find only V4
+      checkBase[Def#Elt](classOf[X0], cT, cW, null) //OK, can find only V4
     }
   }
 }
