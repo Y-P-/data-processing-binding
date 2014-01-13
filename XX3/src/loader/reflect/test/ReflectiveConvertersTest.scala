@@ -146,6 +146,14 @@ object ReflectiveConvertersTest {
       checkBase[Def#Elt](classOf[X0], cS, cV, null) //no
       checkBase[Def#Elt](classOf[X0], cT, cV, null) //OK, can find only V4
       checkBase[Def#Elt](classOf[X0], cT, cW, null) //OK, can find only V4
+      
+      out0.println ("---- Check behaviour with standard classes ; also checks compatibility with static methods ----")
+      val c0 = Converters(classOf[Integer], classOf[Integer], classOf[String], null)
+      out0.println(c0)         //finds toString
+      out0.println(c0.get(fd0)(654,null))
+      val c2 = Converters(classOf[Integer], classOf[String], classOf[Int], "parseInt")
+      out0.println(c2)         //finds parseInt, a static method returning a scalar
+      out0.println(c2.get(fd0)("12345",null))
     }
   }
 }

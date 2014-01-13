@@ -149,5 +149,10 @@ Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W
 invoked V.toV4
 Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$X0.toV4(loader.reflect.test.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
 invoked V.toV4
+---- Check behaviour with standard classes ; also checks compatibility with static methods ----
+Some(MethodConverter1 with public java.lang.String java.lang.Integer.toString())
+654
+Some(MethodConverter2 with public static int java.lang.Integer.parseInt(java.lang.String) throws java.lang.NumberFormatException)
+12345
 
 
