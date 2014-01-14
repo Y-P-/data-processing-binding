@@ -93,8 +93,6 @@ object Reflect {
     final val isFinal = Modifier.isFinal(c.getModifiers())
     //scala singleton associated with this class if appropriate
     lazy val asObject:U = (try {
-      val x = if (c.getEnclosingClass!=null) Class.forName(c.getEnclosingClass.getName+"$"+c.getSimpleName)
-              else c
       val f = c.getDeclaredField("MODULE$")
       val m = f.getModifiers
       if (Modifier.isFinal(m) && Modifier.isStatic(m)) f.get(null) else null
@@ -188,6 +186,7 @@ object Reflect {
   def checkParams(expected:Array[Class[_]],incoming:Array[RichClass[_]],mandatory:Int):Array[Int] = {
     if (incoming.length<expected.length) return null
     val a = new Array[Int](expected.length)
+    if (a.length==0) return if (mandatory==0) a else null
     //mandatory arguments must be matched at their exact position
     for (i <- 0 until mandatory) if (!(incoming(i)<expected(i))) return null else a(i)=i
     val r = mandatory until incoming.length

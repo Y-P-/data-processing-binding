@@ -30,6 +30,19 @@ object ReflectiveConvertersTest {
   import loader.core.definition.Def
   import loader.core.CtxCore.{ Def => CtxDef }
 
+  object A {
+    object AA {
+      class X {
+        def cv(x:Integer):String = x.toString
+      }
+      object Y {
+        def cv(x:Integer):String = x.toString
+      }
+      class Z(fd:ConvertData) {
+        def cv(x:Integer):String = x.toString
+      }
+    }
+  }
   //basic object being converted to
   class V(out:PrintWriter)
   object V {
@@ -147,13 +160,22 @@ object ReflectiveConvertersTest {
       checkBase[Def#Elt](classOf[X0], cT, cV, null) //OK, can find only V4
       checkBase[Def#Elt](classOf[X0], cT, cW, null) //OK, can find only V4
       
-      out0.println ("---- Check behaviour with standard classes ; also checks compatibility with static methods ----")
+      out0.println ("---- Standard Java classes, compatibility with static methods, classes without ConvertData, deep nested classes ----")
       val c0 = Converters(classOf[Integer], classOf[Integer], classOf[String], null)
       out0.println(c0)         //finds toString
       out0.println(c0.get(fd0)(654,null))
       val c2 = Converters(classOf[Integer], classOf[String], classOf[Int], "parseInt")
       out0.println(c2)         //finds parseInt, a static method returning a scalar
       out0.println(c2.get(fd0)("12345",null))
+      val c1 = Converters(classOf[A.AA.X], classOf[Integer], classOf[String], null)
+      out0.println(c1)         //finds cv
+      out0.println(c1.get(fd0)(7896,null))
+      val c3 = Converters(A.AA.Y.getClass, classOf[Integer], classOf[String], null)
+      out0.println(c3)         //finds cv
+      out0.println(c3.get(fd0)(5648,null))
+      val c4 = Converters(classOf[A.AA.Z], classOf[Integer], classOf[String], null)
+      out0.println(c4)         //finds cv
+      out0.println(c4.get(fd0)(8931,null))
     }
   }
 }
