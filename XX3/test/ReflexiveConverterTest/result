@@ -160,3 +160,11 @@ Some(MethodConverter2 with public java.lang.String loader.reflect.test.Reflectiv
 5648
 Some(MethodConverter2 with public java.lang.String loader.reflect.test.ReflectiveConvertersTest$A$AA$Z.cv(java.lang.Integer))
 8931
+Some(MethodConverter2 with public java.lang.String loader.reflect.test.ReflectiveConvertersTest$A1$AA$X.cv(java.lang.Integer))
+78960
+Some(MethodConverter2 with public java.lang.String loader.reflect.test.ReflectiveConvertersTest$A1$AA$Y$.cv(java.lang.Integer))
+56480
+Some(MethodConverter2 with public java.lang.String loader.reflect.test.ReflectiveConvertersTest$A1$AA$Z.cv(java.lang.Integer))
+89310
+Some(MethodConverter2 with public java.lang.String loader.reflect.test.ReflectiveConvertersTest$A1$AA$Y$.cv(java.lang.Integer))
+564801

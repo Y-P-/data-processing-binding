@@ -179,13 +179,12 @@ object Converters {
   }
   //m is a method with one to three params in (U, ConvertData, Def#Elt) (in this order, U being mandatory)
   //m can be either static, or belong to some class which is not U, of which one instance will be spawned in order to serve for the invocation
-  final protected class MethodConverter2[U<:AnyRef,+V,-E<:Def#Elt](p:Array[Int], val m:Method, val src:RichClass[_>:U], val dst:RichClass[_<:V]) extends Converter[U,V,E] with MethodConverter {
+  final protected class MethodConverter2[U<:AnyRef,+V,-E<:Def#Elt](in:RichClass[_],p:Array[Int], val m:Method, val src:RichClass[_>:U], val dst:RichClass[_<:V]) extends Converter[U,V,E] with MethodConverter {
     def apply(fd:ConvertData):(U,E)=>V = {
       val helper = if (Modifier.isStatic(m.getModifiers)) {
         //static: find a matching method on the 3 params (src,ConvertData,Def#Elt), src being first and mandatory
         (null,null)
       } else {
-        val in = ^(m.getDeclaringClass)
         if (in.asObject != null) (in.asObject,null)              //return a singleton object
         else in.findConstructor(Array(czConvertData),0) match {  //instance: find a matching constructor on possibly 1 param (ConvertData)
           case x if x.length>1  => throw new IllegalStateException(s"too many constructor match the accepted entries for ${m.getDeclaringClass}") 
@@ -200,7 +199,7 @@ object Converters {
     override def toString:String = s"MethodConverter2 with $m"
   }
   protected object MethodConverter2 {
-    def apply[U<:AnyRef,V,E<:Def#Elt](p:Array[Int], m:Method, src:RichClass[_>:U], dst:RichClass[_<:V]) = if (p==null) null else new MethodConverter2[U,V,E](p,m,src,dst)
+    def apply[U<:AnyRef,V,E<:Def#Elt](in:RichClass[_], p:Array[Int], m:Method, src:RichClass[_>:U], dst:RichClass[_<:V]) = if (p==null) null else new MethodConverter2[U,V,E](in,p,m,src,dst)
   }
   private[this] val czConvertData:RichClass[_] = classOf[ConvertData]
   
@@ -229,6 +228,6 @@ object Converters {
         else min=x
       } else if (! utils.Reflect.<(min._2,x._2)) return None  //item is not comparable: failure
     }
-    Some(if (isSrc) MethodConverter1[U,V,E](min._1,min._2,src,dst) else MethodConverter2[U,V,E](min._1,min._2,src,dst))
+    Some(if (isSrc) MethodConverter1[U,V,E](min._1,min._2,src,dst) else MethodConverter2[U,V,E](in,min._1,min._2,src,dst))
   }
 }

@@ -185,8 +185,8 @@ object Reflect {
    */
   def checkParams(expected:Array[Class[_]],incoming:Array[RichClass[_]],mandatory:Int):Array[Int] = {
     if (incoming.length<expected.length) return null
+    if (expected.length==0) return if (mandatory==0) new Array[Int](0) else null
     val a = new Array[Int](expected.length)
-    if (a.length==0) return if (mandatory==0) a else null
     //mandatory arguments must be matched at their exact position
     for (i <- 0 until mandatory) if (!(incoming(i)<expected(i))) return null else a(i)=i
     val r = mandatory until incoming.length

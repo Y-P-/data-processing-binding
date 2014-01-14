@@ -30,12 +30,31 @@ object ReflectiveConvertersTest {
   import loader.core.definition.Def
   import loader.core.CtxCore.{ Def => CtxDef }
 
+  abstract class WithCheck {
+    def n:Int
+    WithCheck(n,this)
+    def doNothing() = ()
+  }
+  object WithCheck {
+    var count=0
+    def apply(n:Int,o:Object) = {
+      count+=1
+      if (count!=n) throw new IllegalStateException(s"an object has more than one representation ($count): $o")
+    }
+  }
+  //used to test various nesting cases ; stable path using val are NOT supported (no way to get back to the val through Java reflection)
+  //Note that we check that the object is spawned once only
   object A {
+    WithCheck(3,this)
     object AA {
+      WithCheck(2,this)
+      val parent = A  //force reference to ensure init (count check)
       class X {
         def cv(x:Integer):String = x.toString
       }
       object Y {
+        WithCheck(1,this)
+        val parent = AA  //force reference to ensure init (count check)
         def cv(x:Integer):String = x.toString
       }
       class Z(fd:ConvertData) {
@@ -43,6 +62,31 @@ object ReflectiveConvertersTest {
       }
     }
   }
+  val a=A.AA.Y.cv(4) //forces object init ; done to ensure count is right
+  //same, but with a full fledged class/object pair, with an object part that inherits from another class
+  class A1 {
+    def doNothing() = ()
+  }
+  object A1 extends WithCheck {
+    def n=6
+    object AA extends WithCheck {
+      def n=5
+      val parent = A1
+      class X {
+        def cv(x:Integer):String = x.toString
+      }
+      object Y extends WithCheck {
+        def n=4
+        val parent = AA
+        def cv(x:Integer):String = x.toString
+      }
+      class Z(fd:ConvertData) {
+        def cv(x:Integer):String = x.toString
+      }
+    }
+  }
+  val a1=A1.AA.Y.cv(4)
+  if (a1!=a) throw new IllegalStateException("ensure the code is executed by the JVM!")
   //basic object being converted to
   class V(out:PrintWriter)
   object V {
@@ -176,6 +220,18 @@ object ReflectiveConvertersTest {
       val c4 = Converters(classOf[A.AA.Z], classOf[Integer], classOf[String], null)
       out0.println(c4)         //finds cv
       out0.println(c4.get(fd0)(8931,null))
+      val c5 = Converters(classOf[A1.AA.X], classOf[Integer], classOf[String], null)
+      out0.println(c5)         //finds cv
+      out0.println(c5.get(fd0)(78960,null))
+      val c6 = Converters(A1.AA.Y.getClass, classOf[Integer], classOf[String], null)
+      out0.println(c6)         //finds cv
+      out0.println(c6.get(fd0)(56480,null))
+      val c7 = Converters(classOf[A1.AA.Z], classOf[Integer], classOf[String], null)
+      out0.println(c7)         //finds cv
+      out0.println(c7.get(fd0)(89310,null))
+      val c8 = Converters(A1.AA.Y.getClass, classOf[Integer], classOf[String], null)
+      out0.println(c8)         //finds cv - repeat and see that there is no object spawning
+      out0.println(c8.get(fd0)(564801,null))
     }
   }
 }
