@@ -30,7 +30,6 @@ trait Locator {
  * 
  */
 trait ParserBuilder {
-  import ParserBuilder._
 
   /** Element type produced by this parser */
   type Kind
@@ -145,4 +144,9 @@ object ParserBuilder {
   class SkipException extends Exception
   val skipEnd = new SkipException { override def fillInStackTrace() = this }
   val skip    = new SkipException { override def fillInStackTrace() = this }
+  
+  /** define useful generics */
+  type P[-x]    = ParserBuilder { type Kind>:x }
+  type Impl[-x] = P[x]#Impl
+  
 }

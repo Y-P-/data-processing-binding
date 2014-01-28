@@ -15,12 +15,9 @@ import loader.core.ParserBuilder
  *    if it can be formatted by a terminal formatter, then that formatter is used. Otherwise we recurse on the non-terminal formatter.
  */
 object Formatters {
+  import ParserBuilder.Impl
   
-  type P[-x]    = ParserBuilder { type Kind>:x }
-  type Impl[-x] = P[x]#Impl
-  
-  /** A formatter takes an input X, possibly associated with an Elt of some kind,
-   *  and it manipulates an 'output' Elt of another kind.
+  /** A formatter takes an input X and it manipulates an 'output' String parser.
    */
   trait Formatter[X] {
     def apply[P<:Impl[String]](x:X,p:P):Unit
@@ -93,5 +90,8 @@ object Formatters {
   val FmtJEnum     = ZFormatter[java.lang.Enum[_]]
   val FmtEnum      = ZFormatter[Enumeration#Value]
 
+  def fmtReflect() = {
+    
+  }
 
 }

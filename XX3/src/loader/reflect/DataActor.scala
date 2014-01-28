@@ -20,8 +20,8 @@ object DataActor {
   
   //utility for apply below: matches a character and a reflexive setter
   protected[this] def get(cz:RichClass[_],name:String,x:Char) = {
-    lazy val m = utils.Reflect.AccessibleElements(cz.methods)
-    lazy val f = utils.Reflect.AccessibleElements(cz.fields)
+    lazy val m = cz.methods
+    lazy val f = cz.fields
     x match {
       case 'b' => m.find (testMethod(_,"set"+name.charAt(0).toUpper+name.substring(1)))  .map(new BeanElt(_))
       case 's' => m.find (testMethod(_,name+"_$eq"))                                     .map(new ScalaElt(_))

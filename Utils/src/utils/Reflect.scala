@@ -8,81 +8,124 @@ import scala.reflect.ClassTag
 import java.lang.reflect.Field
 
 object Reflect {
-  class NoSuchMethodException(msg:String=null) extends Exception(msg)
-  class TooManyMethodException(msg:String=null) extends Exception(msg)
-  object cannotCompare extends Exception { override def fillInStackTrace = this }
-
-  abstract class AccessibleElements[X<:AccessibleObject:ClassTag](l:Array[X]) {
-    implicit val wrapped:scala.collection.mutable.ArrayOps[X] = l
-    def getModifiers(x:X):Int
-    def isSynthetic(x:X):Boolean
-    def isBridge(x:X):Boolean
-    def getName(x:X):String
-    def <(x1:X,x2:X):Boolean
-    def debug(x:X) = {
-      val m = getModifiers(x)
-      print(getName(x))
+  
+  abstract class AccessibleElement {
+    type Kind>:Null<:AccessibleObject
+    def obj:Kind
+    def getModifiers:Int
+    def isSynthetic:Boolean
+    def isBridge:Boolean
+    def getName:String
+    def compareTo(m:Kind):Option[Int] 
+    def debug = {
+      val m = getModifiers
+      print(getName)
       if (Modifier.isPublic(m)) print(" public")
       if (Modifier.isPrivate(m)) print(" private")
       if (Modifier.isProtected(m)) print(" protected")
-      if (isSynthetic(x)) print(" synthetic")
-      if (isBridge(x)) print(" bridge") 
+      if (isSynthetic) print(" synthetic")
+      if (isBridge) print(" bridge") 
     }
-    final def min:X = {
-      var min:X = null.asInstanceOf[X]
-      for (x <- wrapped) {
-        if (min==null || <(x,min)) min=x                  //first item, or smaller item
-        else if (! <(min,x)) return null.asInstanceOf[X]  //item is not comparable: failure
+  }
+  object AccessibleElement {
+    val nonComparable = new Exception { override def fillInStackTrace=this }
+    val nonUniqueMin  = new Exception { override def fillInStackTrace=this }
+    val s0 = Some(0)
+    val sp = Some(1)
+    val sm = Some(-1)
+    def cmp(c1:Class[_],c2:Class[_]):Option[Int] = {
+      val b1 = c1.isAssignableFrom(c2)
+      val b2 = c2.isAssignableFrom(c1)
+      if (b1) if (b2) s0 else sp
+      else    if (b2) sm else None
+    }
+    /** Compares two lists of classes, to determine if they are compatible, and their
+     *  relation order.
+     *  @param start, the expected order if any ; if unknown, use None
+     *  @param r1 the first class list
+     *  @param r2 the second class list
+     *  @return s0 if the lists are equal,
+     *          sp if r1>r2 (i.e. all classes in r2 are derived from classes in r1)
+     *          sm if r1<r2 (i.e. all classes in r1 are derived from classes in r2)
+     *          None if the classes cannot be compared
+     */
+    def cmp(r1:Array[Class[_]],r2:Array[Class[_]],start:Option[Int]):Option[Int] = {
+      if (r1.length!=r2.length) return None
+      var c=start
+      var i:Int=0
+      while (i<r1.length) {
+        cmp(r1(i),r2(i)) match {
+          case None          => return None       //non comparable classes
+          case `sp` if c==sm => return None       //comparable, but order inverted from what was seen before
+          case `sm` if c==sp => return None       //comparable, but order inverted from what was seen before
+          case `s0`          => if (c==None) c=s0 //equal: do nothing
+          case r             => c=r               //order can be selected
+        }
+        i += 1
       }
-      min
+      c
+    }
+    final def min[E<:AccessibleObject](l:Array[E]):E = min[E,E](l)(identity)
+    
+    final def min[E<:AccessibleObject,X](l:Seq[X])(f:X=>E):X = {
+      if (l.isEmpty) throw nonComparable
+      var min:X = null.asInstanceOf[X]
+      var fMin:E = null.asInstanceOf[E]
+      for (x <- l) {
+        val fX = f(x)
+        if (min==null) { min=x; fMin=fX } //first item
+        else {
+          fX.compareTo(fMin) match {
+            case `sm` => min=x; fMin=fX
+            case `s0` => throw nonUniqueMin
+            case None => throw nonComparable
+            case _    => 
+          }
+        }
+      }
+      min      
+    }
+    final implicit def apply[E<:AccessibleObject](obj:E):AccessibleElement { type Kind=E } = (obj match {
+      case o:Method         => new MethodX(o)
+      case o:Field          => new FieldX(o)
+      case o:Constructor[_] => new ConstructorX(o)
+    }).asInstanceOf[AccessibleElement { type Kind=E }]
+  }
+  implicit final class MethodX(val obj:Method) extends AccessibleElement {
+    final type Kind        = Method
+    final def getModifiers = obj.getModifiers
+    final def isSynthetic  = obj.isSynthetic
+    final def isBridge     = obj.isBridge
+    final def getName      = obj.getName
+    final def compareTo(m:Method):Option[Int] = {
+      import AccessibleElement._
+      if (m==obj) s0
+      else cmp(obj.getParameterTypes, m.getParameterTypes, None) //cmp(m.getReturnType,obj.getReturnType)
     }
   }
-  object AccessibleElements {
-    //Factory for the limited number of AccessibleObject classes
-    def apply[X<:AccessibleObject:ClassTag](l:Array[X]):AccessibleElements[X] = {
-      val x = implicitly[ClassTag[X]].runtimeClass
-      (if      (x==classOf[Method])          new Methods(l.asInstanceOf[Array[Method]])
-       else if (x==classOf[Field])           new Fields(l.asInstanceOf[Array[Field]])
-       else if (x==classOf[Constructor[_]])  new Constructors(l.asInstanceOf[Array[Constructor[_]]])
-       else                                  null).asInstanceOf[AccessibleElements[X]]
+  implicit final class ConstructorX(val obj:Constructor[_]) extends AccessibleElement {
+    final type Kind        = Constructor[_]
+    final def getModifiers = obj.getModifiers
+    final def isSynthetic  = obj.isSynthetic
+    final def isBridge     = false
+    final def getName      = obj.getName
+    final def compareTo(m:Constructor[_]):Option[Int] = {
+      import AccessibleElement._
+      if (m==obj) s0
+      else cmp(obj.getParameterTypes, m.getParameterTypes, None) //cmp(m.getDeclaringClass,obj.getDeclaringClass)
     }
-    implicit def toArray[X<:AccessibleObject](a:AccessibleElements[X]) = a.wrapped
   }
-  
-  def <(m1:Method,m2:Method):Boolean = {
-    val p1 = m1.getParameterTypes
-    val p2 = m1.getParameterTypes
-    if (p1.length!=p2.length) return false
-    for (i <- 0 until p1.length) if (!p2(i).isAssignableFrom(p1(i))) return false
-    return true
-  }
-  def <(m1:Constructor[_],m2:Constructor[_]):Boolean = {
-    val p1 = m1.getParameterTypes
-    val p2 = m1.getParameterTypes
-    if (p1.length!=p2.length) return false
-    for (i <- 0 until p1.length) if (!p2(i).isAssignableFrom(p1(i))) return false
-    return true
-  }
-  class Methods(l:Array[Method]) extends AccessibleElements[Method](l) {
-    final def getModifiers(x:Method)         = x.getModifiers
-    final def isSynthetic(x:Method)          = x.isSynthetic
-    final def isBridge(x:Method)             = x.isBridge
-    final def getName(x:Method)              = x.getName
-    final def <(m1:Method,m2:Method):Boolean = Reflect.<(m1,m2)
-  }
-  class Fields(l:Array[Field]) extends AccessibleElements[Field](l) {
-    final def getModifiers(x:Field)        = x.getModifiers
-    final def isSynthetic(x:Field)         = x.isSynthetic
-    final def isBridge(x:Field)            = false
-    final def getName(x:Field)             = x.getName
-    final def <(m1:Field,m2:Field):Boolean = false
-  }
-  class Constructors(l:Array[Constructor[_]]) extends AccessibleElements[Constructor[_]](l) {
-    final def getModifiers(x:Constructor[_]) = x.getModifiers
-    final def isSynthetic(x:Constructor[_])  = x.isSynthetic
-    final def isBridge(x:Constructor[_])     = false
-    final def getName(x:Constructor[_])      = x.getName
-    final def <(c1:Constructor[_],c2:Constructor[_]):Boolean = Reflect.<(c1,c2)
+  implicit final class FieldX(val obj:Field) extends AccessibleElement {
+    final type Kind        = Field
+    final def getModifiers = obj.getModifiers
+    final def isSynthetic  = obj.isSynthetic
+    final def isBridge     = false
+    final def getName      = obj.getName
+    final def compareTo(m:Field):Option[Int] = {
+      import AccessibleElement._
+      if (m==obj) s0
+      else cmp(Array(m.getType,m.getDeclaringClass),Array(obj.getType,obj.getDeclaringClass),None)
+    }
   }
     
   /** Provides some Java reflection utilities.
@@ -105,8 +148,8 @@ object Reflect {
     //     found in relation to each other when they are not! e.g. List[Double] and List[Method]
     //     both erase to List and are superficially seen as compatible, even though they obviously
     //     do not share much in common.
-    def <(c:Class[_]):Boolean = c.isAssignableFrom(this.c)
-    def >(c:Class[_]):Boolean = this.c.isAssignableFrom(c)
+    final def <(c:Class[_]):Boolean = c.isAssignableFrom(this.c)
+    final def >(c:Class[_]):Boolean = this.c.isAssignableFrom(c)
     final def <(c:RichClass[_]):Boolean = this < c.c
     final def >(c:RichClass[_]):Boolean = this > c.c
     //finds appropriate constructors matching the expected class list, whatever order, expect for the mandatory first classes that must be in the correct order. Generics are out.

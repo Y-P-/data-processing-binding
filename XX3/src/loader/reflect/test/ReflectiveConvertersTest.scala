@@ -185,9 +185,9 @@ object ReflectiveConvertersTest {
       //also used to check how the Reflect framework behaves given inheritance
       out0.println ("---- S to V using CtxDef#Elt in X1 instancied with fd0 ----")
       checkBase[CtxDef#Elt](classOf[X1], cS, cW, null) //OK, can find only V3
-      checkBase[CtxDef#Elt](classOf[X1], cS, cV, null) //no, more than one: V1,V3
-      checkBase[CtxDef#Elt](classOf[X1], cT, cV, null) //no, more than one: V1,V2,V3,V4
-      checkBase[CtxDef#Elt](classOf[X1], cT, cW, null) //no, more than one: V3,V4
+      checkBase[CtxDef#Elt](classOf[X1], cS, cV, null) //more than one: V1,V3 (min = V3)
+      checkBase[CtxDef#Elt](classOf[X1], cT, cV, null) //more than one: V1,V2,V3,V4 (min = V2)
+      checkBase[CtxDef#Elt](classOf[X1], cT, cW, null) //no, more than one: V3,V4 (no min)
       out0.println ("---- S to V using CtxDef#Elt in X0 instancied with fd0 ----")
       checkBase[CtxDef#Elt](classOf[X0], cS, cW, null) //OK, can find only V3
       checkBase[CtxDef#Elt](classOf[X0], cS, cV, null) //OK, can find only V3
@@ -196,7 +196,7 @@ object ReflectiveConvertersTest {
       out0.println ("---- S to V using Def#Elt in X1 instancied with fd0 ----")
       checkBase[Def#Elt](classOf[X1], cS, cW, null) //no
       checkBase[Def#Elt](classOf[X1], cS, cV, null) //OK, can find only V1
-      checkBase[Def#Elt](classOf[X1], cT, cV, null) //no, more than one: V1,V4
+      checkBase[Def#Elt](classOf[X1], cT, cV, null) //no, more than one: V1,V4 (min = V4)
       checkBase[Def#Elt](classOf[X1], cT, cW, null) //OK, can find only V4
       out0.println ("---- S to V using Def#Elt in X0 instancied with fd0 ----")
       checkBase[Def#Elt](classOf[X0], cS, cW, null) //no

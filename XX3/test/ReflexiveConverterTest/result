@@ -125,8 +125,10 @@ invoked V.toV8
 ---- S to V using CtxDef#Elt in X1 instancied with fd0 ----
 Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$X0.toV3(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
 invoked V.toV3
-None
-None
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$X0.toV3(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$V loader.reflect.test.ReflectiveConvertersTest$X1.toV2(loader.reflect.test.ReflectiveConvertersTest$T,loader.core.CtxCore$Def$Elt))
+invoked V.toV2
 None
 ---- S to V using CtxDef#Elt in X0 instancied with fd0 ----
 Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$X0.toV3(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
@@ -139,7 +141,8 @@ None
 None
 Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$V loader.reflect.test.ReflectiveConvertersTest$X1.toV1(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.definition$Def$Elt))
 invoked V.toV1
-None
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$X0.toV4(loader.reflect.test.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
+invoked V.toV4
 Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$X0.toV4(loader.reflect.test.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
 invoked V.toV4
 ---- S to V using Def#Elt in X0 instancied with fd0 ----

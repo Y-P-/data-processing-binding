@@ -218,16 +218,11 @@ object Converters {
       val cp = checkParams(m.getParameterTypes,a,if (isSrc) 0 else 1)
       if (cp==null) None else Option((cp,m))
     }
-    val l = utils.Reflect.AccessibleElements(in.methods).flatMap(m=>check(m))
-    if (l.isEmpty) return None
-    var min:(Array[Int],Method) = null
-    for (x <- l) {
-      if (min==null) min=x                                    //first item
-      else if (utils.Reflect.<(x._2,min._2)) {                //or smaller item
-        if (utils.Reflect.<(min._2,x._2)) return None         //only differs by return type: ambiguous
-        else min=x
-      } else if (! utils.Reflect.<(min._2,x._2)) return None  //item is not comparable: failure
+    try {
+      val min = utils.Reflect.AccessibleElement.min(in.methods.flatMap(m=>check(m)))(_._2)
+      Some(if (isSrc) MethodConverter1[U,V,E](min._1,min._2,src,dst) else MethodConverter2[U,V,E](in,min._1,min._2,src,dst))
+    } catch {
+      case utils.Reflect.AccessibleElement.nonComparable => None
     }
-    Some(if (isSrc) MethodConverter1[U,V,E](min._1,min._2,src,dst) else MethodConverter2[U,V,E](in,min._1,min._2,src,dst))
   }
 }
