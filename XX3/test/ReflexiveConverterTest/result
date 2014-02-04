@@ -152,6 +152,36 @@ Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W
 invoked V.toV4
 Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$X0.toV4(loader.reflect.test.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
 invoked V.toV4
+---- S to V using CtxDef#Elt in Y1 instancied with fd0 ----
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+---- S to V using CtxDef#Elt in Y0 instancied with fd0 ----
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$W loader.reflect.test.ReflectiveConvertersTest$Y0.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+invoked V.toV3
+---- S to V using Def#Elt in Y1 instancied with fd0 ----
+None
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$V loader.reflect.test.ReflectiveConvertersTest$Y1.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.definition$Def$Elt))
+invoked V.toV1
+Some(MethodConverter2 with public loader.reflect.test.ReflectiveConvertersTest$V loader.reflect.test.ReflectiveConvertersTest$Y1.fromX(loader.reflect.test.ReflectiveConvertersTest$S,loader.core.definition$Def$Elt))
+invoked V.toV1
+None
+---- S to V using Def#Elt in Y0 instancied with fd0 ----
+None
+None
+None
+None
 ---- Standard Java classes, compatibility with static methods, classes without ConvertData, deep nested classes ----
 Some(MethodConverter1 with public java.lang.String java.lang.Integer.toString())
 654
@@ -171,3 +201,5 @@ Some(MethodConverter2 with public java.lang.String loader.reflect.test.Reflectiv
 89310
 Some(MethodConverter2 with public java.lang.String loader.reflect.test.ReflectiveConvertersTest$A1$AA$Y$.cv(java.lang.Integer))
 564801
+Some(ConstructorConverter with public java.util.Date(long))
+Thu Jan 01 04:05:11 CET 1970

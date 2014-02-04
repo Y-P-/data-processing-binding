@@ -1,12 +1,10 @@
 package loader.reflect
 
+import java.lang.reflect.{Constructor,Method,Modifier}
 import scala.reflect.ClassTag
 import utils.StringConverter._
-import loader.core.definition.Def
 import utils.Reflect._
-import java.lang.reflect.Constructor
-import java.lang.reflect.Method
-import java.lang.reflect.Modifier
+import loader.core.definition.Def
 import loader.annotations.Convert
 
 /**
@@ -17,9 +15,9 @@ import loader.annotations.Convert
  *   this would happen when a field is itself an object that was not created from a simple string
  *   generic types are not supported (because all generics of a raw class project on that class) 
  */
-trait Converter[-U<:AnyRef,+V,-E<:Def#Elt] {
-  def src:RichClass[_>:U]  //the maximal class accepted by that converter
-  def dst:RichClass[_<:V]  //the minimal class returned by the converter
+trait Converter[-U,+V,-E<:Def#Elt] {
+  def src:Class[_>:U]  //the maximal class accepted by that converter
+  def dst:Class[_<:V]  //the minimal class returned by the converter
   def apply(fd:ConvertData):(U,E)=>V
 }
 
@@ -40,9 +38,9 @@ object ConvertData {
  */
 object Converters {
   
-  abstract class StringConverter[+V](val dst:RichClass[_<:V]) extends Converter[String,V,Def#Elt] {
+  abstract class StringConverter[+V](val dst:Class[_<:V]) extends Converter[String,V,Def#Elt] {
     def this(s:utils.StringConverter[V]) = this(s.dst)
-    val src = ^(classOf[String])
+    val src = classOf[String]
   }
   object StringConverter {
     implicit def toX[R](cz:StringConverter[R]):utils.ClassMap.Factory[_,StringConverter[_]] = new utils.ClassMap.Factory[R,StringConverter[R]] {
@@ -162,67 +160,91 @@ object Converters {
                         CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean,CvvClass,CvvPattern,
                         CvvEnum,CvvJEnum
                         )
- 
-  protected trait MethodConverter {
-    def m:Method
-  }
-  //m is a method with no param, or one or two params in (ConvertData,Def#Elt) (in this order)
+                         
+  //c is a constructor with no param, or one to three params in (U,ConvertData,Def#Elt), U being mandatory and first
   //it belongs to class U
-  final protected class MethodConverter1[-U<:AnyRef,+V,-E<:Def#Elt] private (p:Array[Int], val m:Method, val src:RichClass[_>:U], val dst:RichClass[_<:V]) extends Converter[U,V,E] with MethodConverter {
-    def apply(fd:ConvertData):(U,E)=>V = {
-      (u,e)=>m.invoke(u,buildParams(Array(fd,e),p):_*).asInstanceOf[V]
-    }
+  final protected class ConstructorConverter[-U,+V,-E<:Def#Elt](p:Array[Int], c:Constructor[_<:V], val src:Class[_>:U], val dst:Class[_<:V]) extends Converter[U,V,E] {
+    def apply(fd:ConvertData):(U,E)=>V = (u,e)=>c.newInstance(buildParams(Array(u.asInstanceOf[AnyRef],fd,e),p):_*)
+    override def toString:String = s"ConstructorConverter with $c"
+  }
+  //m is a method with no param, or one or two params in (ConvertData,Def#Elt)
+  //it belongs to class U
+  final protected class MethodConverter1[-U,+V,-E<:Def#Elt](p:Array[Int], m:Method, val src:Class[_>:U], val dst:Class[_<:V]) extends Converter[U,V,E] {
+    def apply(fd:ConvertData):(U,E)=>V = (u,e)=>m.invoke(u,buildParams(Array(fd,e),p):_*).asInstanceOf[V]
     override def toString:String = s"MethodConverter1 with $m"
   }
-  protected object MethodConverter1 {
-    def apply[U<:AnyRef,V,E<:Def#Elt](p:Array[Int], m:Method, src:RichClass[_>:U], dst:RichClass[_<:V]) = if (p==null) null else new MethodConverter1[U,V,E](p,m,src,dst)
-  }
-  //m is a method with one to three params in (U, ConvertData, Def#Elt) (in this order, U being mandatory)
+  //m is a method with one to three params in (U, ConvertData, Def#Elt) (U being mandatory and first)
   //m can be either static, or belong to some class which is not U, of which one instance will be spawned in order to serve for the invocation
-  final protected class MethodConverter2[U<:AnyRef,+V,-E<:Def#Elt](in:RichClass[_],p:Array[Int], val m:Method, val src:RichClass[_>:U], val dst:RichClass[_<:V]) extends Converter[U,V,E] with MethodConverter {
+  final protected class MethodConverter2[U,+V,-E<:Def#Elt](in:Class[_],p:Array[Int], m:Method, val src:Class[_>:U], val dst:Class[_<:V]) extends Converter[U,V,E] {
     def apply(fd:ConvertData):(U,E)=>V = {
       val helper = if (Modifier.isStatic(m.getModifiers)) {
         //static: find a matching method on the 3 params (src,ConvertData,Def#Elt), src being first and mandatory
         (null,null)
       } else {
-        if (in.asObject != null) (in.asObject,null)              //return a singleton object
+        val o = in.asObject
+        if (o != null) (o,null)                                  //return a singleton object
         else in.findConstructor(Array(czConvertData),0) match {  //instance: find a matching constructor on possibly 1 param (ConvertData)
           case x if x.length>1  => throw new IllegalStateException(s"too many constructor match the accepted entries for ${m.getDeclaringClass}") 
           case x if x.length==0 => throw new IllegalStateException(s"no constructor match the accepted entries for ${m.getDeclaringClass}") 
           case x                => (x(0)._1.newInstance(buildParams(Array(fd),x(0)._2):_*),x(0)._2) //create an appropriate helper class with the right params
         }
       }
-      //wrong, was suppoed to detect and forbid invocations which contained fd if fd is used in the constructor ; seems unecessarily restricive. And code is wrong (compares indexes!)
-      //if (helper._2!=null) for (x <- helper._2) if (p.contains(x)) throw new IllegalStateException(s"method $m cannot be used to convert (is used both in constructor and method)")
-      (u,e)=>m.invoke(helper._1,buildParams(Array(u,fd,e),p):_*).asInstanceOf[V]        
+      (u,e)=>m.invoke(helper._1,buildParams(Array(u.asInstanceOf[AnyRef],fd,e),p):_*).asInstanceOf[V]        
     }
     override def toString:String = s"MethodConverter2 with $m"
   }
-  protected object MethodConverter2 {
-    def apply[U<:AnyRef,V,E<:Def#Elt](in:RichClass[_], p:Array[Int], m:Method, src:RichClass[_>:U], dst:RichClass[_<:V]) = if (p==null) null else new MethodConverter2[U,V,E](in,p,m,src,dst)
-  }
   private[this] val czConvertData:RichClass[_] = classOf[ConvertData]
   
-  //finds a method in class 'in' that is an appropriate converter from U to V. If none satisfy, null is returned.
-  //bridge or synthetic methods are rejected (i.e. we accept only user defined methods)
-  //a Convert eligible method takes precedence over any other method
-  //if a name is specified, only methods with that name are examined, otherwise (null or "") all method are examined and the "best" match kept.
-  def apply[U<:AnyRef,V,E<:Def#Elt:ClassTag](in:RichClass[_], src:RichClass[U], dst:RichClass[V], name:String):Option[Converter[U,V,E]] = {
+  /** finds a method in class 'in' that is an appropriate converter from U to V. If none satisfy, null is returned.
+   *  Bridge or synthetic methods are rejected (i.e. we accept only user defined methods)
+   *  Note that it is possible to convert a class to itself ; this may make sense in some contexts and it is not,
+   *  as one could naively believe, the identity operation.
+   *  @param in, a class that is used to process the conversion, it can (but doesn't have to be src or dst)
+   *         if it is src, then the converted from object is used to invoke the converter method
+   *         it can be an object (in which case the class is obj.type)
+   *         it cannot be null
+   *  @param src, the source class for the conversion
+   *  @param dst, the target class for the conversion
+   *  @param name, the name of the method used for the conversion (an utility class might contain more than one conversion)
+   *         if null, then we look for constructors
+   *         if empty, then we try to find the closest method in in that matches the parameter types
+   *         otherwise, we find the closest method that matches both name and parameter types
+   *  @return a converter, or None if no converter could be found (or too many matched)
+   */
+  def apply[U,V,E<:Def#Elt:ClassTag](in:Class[_], src:Class[_>:U], dst:Class[_<:V], name:String):Option[Converter[U,V,E]] = {
     val czE:RichClass[_] = implicitly[ClassTag[E]].runtimeClass
     val isSrc = src<in
+    val isDst = in<dst //condition that must be met to search constructors
+    val a:Array[RichClass[_]] = if (isSrc) Array(czConvertData,czE) else Array(src,czConvertData,czE)
     //Returns a converter for a method that satisfies the constraints for being used for conversion to V, None otherwise
-    def check(m:Method):Option[(Array[Int],Method)] = {
+    def checkMethod(m:Method):Option[(Array[Int],Method)] = {
       if (name!=null && name.length>0 && m.getName!=name) return None
       if (!(dst>m.getReturnType)) return None //the return type must be must be acceptable as dst
-      val a:Array[RichClass[_]] = if (isSrc) Array(czConvertData,czE) else Array(src,czConvertData,czE)
       val cp = checkParams(m.getParameterTypes,a,if (isSrc) 0 else 1)
       if (cp==null) None else Option((cp,m))
     }
+    //Returns a converter for a constructor that satisfies the constraints for being used for conversion to V, None otherwise
+    def checkConstructor(c:Constructor[_]):Option[(Array[Int],Constructor[_])] = {
+      val cp = checkParams(c.getParameterTypes,a,if (isSrc) 0 else 1)
+      if (cp==null) None else Option((cp,c))
+    }
     try {
-      val min = utils.Reflect.AccessibleElement.min(in.methods.flatMap(m=>check(m)))(_._2)
-      Some(if (isSrc) MethodConverter1[U,V,E](min._1,min._2,src,dst) else MethodConverter2[U,V,E](in,min._1,min._2,src,dst))
+      //if name.length==0 check constructors, if name.length>0 check methods, if name==null check both
+      val l:Array[(Array[Int],java.lang.reflect.AccessibleObject)] = name match {
+        case null if isDst    => in.methods.flatMap(m=>checkMethod(m)) ++ in.constructors.flatMap(c=>checkConstructor(c))
+        case null             => in.methods.flatMap(m=>checkMethod(m))
+        case n if n.length==0 => if (isDst) in.constructors.flatMap(c=>checkConstructor(c)) else throw utils.Reflect.AccessibleElement.nonComparable
+        case n if n.length>0  => in.methods.flatMap(m=>checkMethod(m))
+      }
+      val min = utils.Reflect.AccessibleElement.min(l)(_._2)
+      min._2 match {
+        case c:Constructor[_]  => Some(new ConstructorConverter[U,V,E](min._1,c.asInstanceOf[Constructor[_<:V]],src,dst))
+        case m:Method if isSrc => Some(new MethodConverter1[U,V,E](min._1,m,src,dst))
+        case m:Method          => Some(new MethodConverter2[U,V,E](in,min._1,m,src,dst))
+      }
     } catch {
       case utils.Reflect.AccessibleElement.nonComparable => None
+      case utils.Reflect.AccessibleElement.nonUniqueMin  => None
     }
   }
 }

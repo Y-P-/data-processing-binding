@@ -15,8 +15,8 @@ import java.lang.reflect.InvocationTargetException
  */
 trait Converter[-U<:AnyRef,+V] {
   type Info  //a data structure used to guide the conversion
-  def src:RichClass[_>:U]  //the maximal class accepted by that converter
-  def dst:RichClass[_<:V]  //the minimal class returned by the converter
+  def src:Class[_>:U]  //the maximal class accepted by that converter
+  def dst:Class[_<:V]  //the minimal class returned by the converter
   def apply(u:U,i:Info):V
 }
 
@@ -26,8 +26,8 @@ trait Converter[-U<:AnyRef,+V] {
 abstract class StringConverter[+S:ClassTag] extends Converter[String,S] {
   final protected[this] type T = S   //for easy access inside
   type Info <: String=>S
-  def src = utils.Reflect.RichClass(classOf[String])
-  val dst:RichClass[_<:S] = utils.Reflect.RichClass(implicitly[ClassTag[S]].runtimeClass.asInstanceOf[Class[_<:S]])
+  def src = classOf[String]
+  val dst:Class[_<:S] = implicitly[ClassTag[S]].runtimeClass.asInstanceOf[Class[_<:S]]
   def apply(s:String,i:Info):S = i(s)
 }
 
@@ -290,7 +290,7 @@ object StringConverter {
       val base = name.substring(end)
       val x = if (base.indexOf('.')<0) //class name ends with XXX$YYY => the enclosing class is XXX
                 try   { Class.forName(name.substring(0, end)+"$") }
-                catch { case _ => throw new IllegalArgumentException(s"Enumeration ${dst.c} must be stable; reflection will fail.") }
+                catch { case _:Throwable => throw new IllegalArgumentException(s"Enumeration ${dst.c} must be stable; reflection will fail.") }
               else
                 throw new IllegalArgumentException(s"Enumeration ${dst.c} is not precise enough; reflection will fail.")
       val m = x.getMethod("withName", classOf[String])

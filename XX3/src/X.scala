@@ -14,7 +14,7 @@ import loader.core.names.QName
 
 
 object Test {
-    
+  
   def main(args:Array[String]):Unit = {
     val userCtx = new loader.core.UserContext[Element { type Kind<:String }] {
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5))

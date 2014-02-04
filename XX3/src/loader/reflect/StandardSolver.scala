@@ -52,12 +52,10 @@ class StandardSolver[-E<:Def#Elt:ClassTag](defaultString:(Class[_]=>Option[Strin
           case  s  => s                    //use that specific method
         }
         val in = name.substring(0,idx) match {
-          case "_" => null                 //local method in class src or dst
-          case  s  => ^(Class.forName(s))  //class for conversion is given
+          case "_" => null              //local method in class src or dst
+          case  s  => Class.forName(s)  //class for conversion is given
         }
-        val s = ^(src).asInstanceOf[RichClass[_<:AnyRef]]  //ok, bad, but anyway this also works for primitive types.
-        val d = ^(dst)
-        (if (in==null) Converters(s,s,d,fName).orElse(Converters(d,s,d,fName)) else Converters(in,s,d,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
+        (if (in==null) Converters(src,src,dst,fName).orElse(Converters(dst,src,dst,fName)) else Converters(in,src,dst,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
       } catch {  //many reasons for failure here!
         case e:Throwable => Left(s"failed to fetch converter $name for $src => $dst: $e")
       }

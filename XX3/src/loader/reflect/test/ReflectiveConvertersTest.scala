@@ -135,6 +135,16 @@ object ReflectiveConvertersTest {
     def toV2(u:T,e:CtxDef#Elt):V = invoke(u.out,2)
   }
 
+  class Y0(fd:ConvertData) {
+    def invoke(out:PrintWriter, n:Int):W = { out.println(s"invoked V.toV$n"); new W(out) }
+    def fromX(u:S,e:CtxDef#Elt):W = invoke(u.out,3)
+    def fromY(u:T,e:Def#Elt):W    = invoke(u.out,4)
+  }
+  class Y1(fd:ConvertData) extends Y0(fd) {
+    def fromX(u:S,e:Def#Elt):V    = invoke(u.out,1)
+    def fromY(u:T,e:CtxDef#Elt):V = invoke(u.out,2)
+  }
+  
   /** Test to verify that DataActors are correctly found */
   @Test class ReflexiveConverterTest extends StandardTester {
     val cS = classOf[S]
@@ -191,18 +201,43 @@ object ReflectiveConvertersTest {
       out0.println ("---- S to V using CtxDef#Elt in X0 instancied with fd0 ----")
       checkBase[CtxDef#Elt](classOf[X0], cS, cW, null) //OK, can find only V3
       checkBase[CtxDef#Elt](classOf[X0], cS, cV, null) //OK, can find only V3
-      checkBase[CtxDef#Elt](classOf[X0], cT, cV, null) //no, more than one: V3,V4
-      checkBase[CtxDef#Elt](classOf[X0], cT, cW, null) //no, more than one: V3,V4
+      checkBase[CtxDef#Elt](classOf[X0], cT, cV, null) //no, more than one: V3,V4 (no min)
+      checkBase[CtxDef#Elt](classOf[X0], cT, cW, null) //no, more than one: V3,V4 (no min)
       out0.println ("---- S to V using Def#Elt in X1 instancied with fd0 ----")
       checkBase[Def#Elt](classOf[X1], cS, cW, null) //no
       checkBase[Def#Elt](classOf[X1], cS, cV, null) //OK, can find only V1
-      checkBase[Def#Elt](classOf[X1], cT, cV, null) //no, more than one: V1,V4 (min = V4)
+      checkBase[Def#Elt](classOf[X1], cT, cV, null) //more than one: V1,V4 (min = V4)
       checkBase[Def#Elt](classOf[X1], cT, cW, null) //OK, can find only V4
       out0.println ("---- S to V using Def#Elt in X0 instancied with fd0 ----")
       checkBase[Def#Elt](classOf[X0], cS, cW, null) //no
       checkBase[Def#Elt](classOf[X0], cS, cV, null) //no
       checkBase[Def#Elt](classOf[X0], cT, cV, null) //OK, can find only V4
       checkBase[Def#Elt](classOf[X0], cT, cW, null) //OK, can find only V4
+
+      //checking that we can find an appropriate converter with overloading
+      //this is broadly a copy of the previous test series, with minor adaptations
+      //some tests are likely redundant ; it doesn't really matter
+      out0.println ("---- S to V using CtxDef#Elt in Y1 instancied with fd0 ----")
+      checkBase[CtxDef#Elt](classOf[Y1], cS, cW, "fromX") //OK, can find only 3
+      checkBase[CtxDef#Elt](classOf[Y1], cS, cV, "fromX") //more than one: 1,3 (min = 3)
+      checkBase[CtxDef#Elt](classOf[Y1], cT, cV, "fromX") //more than one: 1,3 (min = 3)
+      checkBase[CtxDef#Elt](classOf[Y1], cT, cW, "fromX") //OK, can find only 3
+      out0.println ("---- S to V using CtxDef#Elt in Y0 instancied with fd0 ----")
+      checkBase[CtxDef#Elt](classOf[Y0], cS, cW, "fromX") //OK, can find only 3
+      checkBase[CtxDef#Elt](classOf[Y0], cS, cV, "fromX") //OK, can find only 3
+      checkBase[CtxDef#Elt](classOf[Y0], cT, cV, "fromX") //OK, can find only 3
+      checkBase[CtxDef#Elt](classOf[Y0], cT, cW, "fromX") //OK, can find only 3
+      out0.println ("---- S to V using Def#Elt in Y1 instancied with fd0 ----")
+      checkBase[Def#Elt](classOf[Y1], cS, cW, "fromX") //no
+      checkBase[Def#Elt](classOf[Y1], cS, cV, "fromX") //OK, can find only 1
+      checkBase[Def#Elt](classOf[Y1], cT, cV, "fromX") //OK, can find only 1
+      checkBase[Def#Elt](classOf[Y1], cT, cW, "fromX") //no
+      out0.println ("---- S to V using Def#Elt in Y0 instancied with fd0 ----")
+      checkBase[Def#Elt](classOf[Y0], cS, cW, "fromX") //no
+      checkBase[Def#Elt](classOf[Y0], cS, cV, "fromX") //no
+      checkBase[Def#Elt](classOf[Y0], cT, cV, "fromX") //no
+      checkBase[Def#Elt](classOf[Y0], cT, cW, "fromX") //no
+      
       
       out0.println ("---- Standard Java classes, compatibility with static methods, classes without ConvertData, deep nested classes ----")
       val c0 = Converters(classOf[Integer], classOf[Integer], classOf[String], null)
@@ -232,6 +267,9 @@ object ReflectiveConvertersTest {
       val c8 = Converters(A1.AA.Y.getClass, classOf[Integer], classOf[String], null)
       out0.println(c8)         //finds cv - repeat and see that there is no object spawning
       out0.println(c8.get(fd0)(564801,null))
+      val c9 = Converters(classOf[java.util.Date], classOf[Long], classOf[java.util.Date], null)
+      out0.println(c9)         //finds Date(long), a constructor ; also checks that we support primitive types
+      out0.println(c9.get(fd0)(11111111L,null))
     }
   }
 }

@@ -135,7 +135,7 @@ object Reflect {
   implicit final class RichClass[+U](val c:Class[_<:U]) {
     final val isFinal = Modifier.isFinal(c.getModifiers())
     //scala singleton associated with this class if appropriate
-    lazy val asObject:U = (try {
+    def asObject:U = (try {
       val f = c.getDeclaredField("MODULE$")
       val m = f.getModifiers
       if (Modifier.isFinal(m) && Modifier.isStatic(m)) f.get(null) else null
@@ -271,7 +271,7 @@ object Reflect {
     false
   }
       
-      //XXX for fun...
+      //XXX for fun... test on the Scala reflective API sho it is very slow for our requirements
       def copy[T<:AnyRef:scala.reflect.ClassTag](b:T,p1: String):T = {
         import scala.reflect.runtime.{ currentMirror => cm }
         import scala.reflect.runtime.universe._
