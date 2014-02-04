@@ -218,7 +218,6 @@ object Converters {
     val a:Array[RichClass[_]] = if (isSrc) Array(czConvertData,czE) else Array(src,czConvertData,czE)
     //Returns a converter for a method that satisfies the constraints for being used for conversion to V, None otherwise
     def checkMethod(m:Method):Option[(Array[Int],Method)] = {
-      if (name!=null && name.length>0 && m.getName!=name) return None
       if (!(dst>m.getReturnType)) return None //the return type must be must be acceptable as dst
       val cp = checkParams(m.getParameterTypes,a,if (isSrc) 0 else 1)
       if (cp==null) None else Option((cp,m))
@@ -231,10 +230,10 @@ object Converters {
     try {
       //if name.length==0 check constructors, if name.length>0 check methods, if name==null check both
       val l:Array[(Array[Int],java.lang.reflect.AccessibleObject)] = name match {
-        case null if isDst    => in.methods.flatMap(m=>checkMethod(m)) ++ in.constructors.flatMap(c=>checkConstructor(c))
-        case null             => in.methods.flatMap(m=>checkMethod(m))
-        case n if n.length==0 => if (isDst) in.constructors.flatMap(c=>checkConstructor(c)) else throw utils.Reflect.AccessibleElement.nonComparable
-        case n if n.length>0  => in.methods.flatMap(m=>checkMethod(m))
+        case null if isDst    => in.methods.flatMap(checkMethod) ++ in.constructors.flatMap(checkConstructor)
+        case null             => in.methods.flatMap(checkMethod)
+        case n if n.length==0 => if (isDst) in.constructors.flatMap(checkConstructor) else throw utils.Reflect.AccessibleElement.nonComparable
+        case n if n.length>0  => in.methods.filter(_.getName==name).flatMap(checkMethod)
       }
       val min = utils.Reflect.AccessibleElement.min(l)(_._2)
       min._2 match {
