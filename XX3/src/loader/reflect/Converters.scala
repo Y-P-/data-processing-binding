@@ -27,10 +27,11 @@ trait ConvertData {
   def param:String   //info for transforming the data within the processor  
 }
 object ConvertData {
-  val empty = new ConvertData {
+  val empty = apply("")
+  def apply(p:String) = new ConvertData {
     val check = ""
     val valid = ""
-    val param = ""
+    val param = p
   }
 }
 

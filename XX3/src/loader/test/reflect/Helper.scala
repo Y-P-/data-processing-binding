@@ -1,4 +1,4 @@
-package loader.reflect.test
+package loader.test.reflect
 
 import loader.reflect.AutoConvertData
 import scala.reflect.ClassTag

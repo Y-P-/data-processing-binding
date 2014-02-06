@@ -1,4 +1,4 @@
-package loader.reflect.test
+package loader.test.reflect
 
 import java.util.Date
 import loader.reflect.Binder

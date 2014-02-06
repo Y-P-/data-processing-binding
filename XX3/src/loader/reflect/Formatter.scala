@@ -1,5 +1,6 @@
 package loader.reflect
 
+import scala.reflect.ClassTag
 import loader.core.ParserBuilder
 
 /** In some ways, the class that reverses Converters.
@@ -16,45 +17,48 @@ import loader.core.ParserBuilder
  */
 object Formatters {
   import ParserBuilder.Impl
+
+  val noStringConversion = new Exception { override def fillInStackTrace=this }
   
-  /** A formatter takes an input X and it manipulates an 'output' String parser.
+  /** A formatter takes an input X and it manipulates an 'output' parser of kind K.
+   *  Most of the time, K will be String.
    */
-  trait Formatter[X] {
-    def apply[P<:Impl[String]](x:X,p:P):Unit
+  trait Formatter[X,K] {
+    def apply[P<:Impl[K]](x:X,p:P):Unit
   }
 
-  trait FormatData {
-    def fmt:String
+  trait FormatData[K] {
+    def fmt:K
   }
   
-  abstract class FmtBuilder[X] { self=>
-    def apply(fd:FormatData):Formatter[X]
-    def map[Y](f:Y=>X):FmtBuilder[Y] = new FmtBuilder[Y] {
-      def apply(fd:FormatData):Formatter[Y] = new Formatter[Y] {
+  abstract class FmtBuilder[X,K] { self=>
+    def apply(fd:FormatData[K]):Formatter[X,K]
+    def map[Y](f:Y=>X):FmtBuilder[Y,K] = new FmtBuilder[Y,K] {
+      def apply(fd:FormatData[K]):Formatter[Y,K] = new Formatter[Y,K] {
         protected[this] val fx = self.apply(fd)
-        def apply[P<:Impl[String]](x:Y,p:P):Unit = fx.apply(f(x),p)
+        def apply[P<:Impl[K]](x:Y,p:P):Unit = fx.apply(f(x),p)
       }
     }
   }
   
   /** A basic formatter sitting on the String.format method */
-  protected final class XFormatter[X<:AnyRef](fd:FormatData,default:String) extends Formatter[X] {
+  protected final class XFormatter[X<:AnyRef](fd:FormatData[String],default:String) extends Formatter[X,String] {
     protected[this] val fmt = if (fd.fmt==null || fd.fmt.length==0) default else fd.fmt
     def apply[P<:Impl[String]](x:X,p:P):Unit = p.pull(String.format(fmt,x))
   }
   protected object XFormatter {
-    def apply[X<:AnyRef](default:String) = new FmtBuilder[X] {
-      def apply(fd:FormatData) = new XFormatter[X](fd,"%d")
+    def apply[X<:AnyRef](default:String) = new FmtBuilder[X,String] {
+      def apply(fd:FormatData[String]) = new XFormatter[X](fd,"%d")
     }
   }
   /** A basic formatter sitting on the toString method */
-  protected final class ZFormatter[X<:AnyRef] extends Formatter[X] {
+  protected final class ZFormatter[X<:AnyRef] extends Formatter[X,String] {
     def apply[P<:Impl[String]](x:X,p:P):Unit = p.pull(x.toString)
   }
   protected object ZFormatter {
-    def apply[X<:AnyRef] = new FmtBuilder[X] {
+    def apply[X<:AnyRef] = new FmtBuilder[X,String] {
       protected[this] val x = new ZFormatter[X]
-      def apply(fd:FormatData) = x
+      def apply(fd:FormatData[String]) = x
     }
   }
   
@@ -73,9 +77,9 @@ object Formatters {
   val FmtJDouble  = XFormatter[java.lang.Double]("%d")
   val FmtDouble   = FmtJDouble.map(new java.lang.Double(_:Double))
   
-  val FmtBoolean = new FmtBuilder[Boolean] {
+  val FmtBoolean = new FmtBuilder[Boolean,String] {
     protected[this] type X = Boolean
-    def apply(fd:FormatData):Formatter[X] = new Formatter[X] {
+    def apply(fd:FormatData[String]):Formatter[X,String] = new Formatter[X,String] {
       protected[this] val fmt = if (fd.fmt==null || fd.fmt.length==0) Array("true","false") else fd.fmt.split(",")
       def apply[P<:Impl[String]](x:X,p:P):Unit = p.pull(fmt(if (x) 0 else 1))
     }
@@ -90,8 +94,13 @@ object Formatters {
   val FmtJEnum     = ZFormatter[java.lang.Enum[_]]
   val FmtEnum      = ZFormatter[Enumeration#Value]
 
-  def fmtReflect() = {
-    
+  /** A formatter that will use an appropriate String conversion defined on a ConvertData */
+  def fmtReflect[U](name:String,in:Class[_],src:Class[U]) = new FmtBuilder[U,String] {
+    val cv = Converters[U,String,Null](in,src,classOf[String],name).getOrElse(throw noStringConversion)
+    def apply(fd:FormatData[String]):Formatter[U,String] = new Formatter[U,String] {
+      protected[this] val fmt = cv(ConvertData(fd.fmt))  //no check, no valid
+      def apply[P<:Impl[String]](u:U,p:P):Unit = p.pull(fmt(u,null))
+    }
   }
 
 }

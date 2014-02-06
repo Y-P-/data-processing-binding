@@ -1,4 +1,4 @@
-package test
+package loader.test
 import loader.annotations._
 import java.io.StringWriter
 import java.io.Writer

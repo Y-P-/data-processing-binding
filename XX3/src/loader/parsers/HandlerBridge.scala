@@ -30,8 +30,8 @@ abstract class HandlerBridge extends ParserBuilder {self=>
     
     def apply(d:CharReader):Unit
 
-    def read(in: java.io.Reader): Unit =
-      this.apply(in)
+    def read(in: java.io.Reader): Unit = this.apply(in)
+    
     override def read(uri: URI, encoding: String): Unit = 
       this.apply(CharReader(ByteArrayReader(uri),if (encoding == null) "ISO-8859-15" else encoding))
   }

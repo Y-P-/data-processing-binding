@@ -1,0 +1,727 @@
+load=struct
+test=3
+include="@include:$(PWD)/verysmall1.txt?mode=struct;audit=(lvl=5);encoding=ISO-8859-15;f.keyGenerator=comp;(moi=yves;lui=pierre)"
+include="@include:$(PWD)/verysmall2.txt?mode=struct;encoding=ISO-8859-15"
+even1 = "@${test[1]}:toto${include[1]/header/set_ai_aggresive}hiips!"
+even2 = $(test.TestCK$Exec:$(user))$(test.TestCK$Exec:ho,ho,ho)
+#include="${include[1]/*|include[2]/*}"
+test=578
+name = "Grand Campaign (1836)"
+encap2 = { {on=1 off=2} {on=4 off=5} {on=5 off=9} }
+encap = { {on=1 off=2} {on=4 off=5} }
+test=578
+oye = {on=11 off=22}
+header = { 
+    tag = "" 
+    tutorial = yes 
+    startdate = { year = 1869 month = january day = 13 } 
+    enddate = { year = 1936 month = january day = 0 } 
+    saved = yes 
+    free = yes 
+    optionmode = 0 
+    set_ai_aggresive = 2
+    set_difficulty = 2 
+    set_gamespeed = 3 
+    set_fow = 1 
+    optionfile = "scenarios\save games\USA_1869_January_pre_war.eug.cfg" 
+    selectable = { ABU AFG ARG ATJ AUS AWA BAS BEL BER BHO BHU BIK BOL BRZ BRU BUN CHL CHI CLM DAN ECU EGY ETH FRA GRE GWA HAI HEJ HYD IND JAI JAS NIP JOD KAL KOR KUT LAD LIB LUA LUC HOW MAK MEW MEX MOD MOL MON MOR MYS NAG NEJ NEP HOL OMA ORA ORI TUR PAP PRG PAR PER PEU POR PRU RUS SAR SER SEM SIA SIK SOK SPA SWE SWI TIB TRN TRA TRI TUN TUS SIC ENG UCA URU USA VNZ WAL ADE ZAN NGF SGF } 
+    id = { type = 4712 id = 546749 } 
+    id = { type = 4912 id = 4027 } 
+    id = { type = 5297 id = 29 } 
+    id = { type = 5300 id = 14111 } 
+    id = { type = 5510 id = 1002 } 
+    id = { type = 5610 id = 1002 } 
+    id = { type = 5720 id = 1002 } 
+    id = { type = 5810 id = 1009 } 
+    id = { type = 5815 id = 1009 } 
+    id = { type = 5910 id = 1006 } 
+    id = { type = 5915 id = 1009 } 
+    id = { type = 6010 id = 1013 } 
+    id = { type = 7710 id = 1007 } 
+    id = { type = 7810 id = 1010 } 
+    id = { type = 7910 id = 1004 } 
+    id = { type = 8010 id = 1006 } 
+    id = { type = 8110 id = 1003 } 
+    id = { type = 8510 id = 100104 } 
+    id = { type = 8515 id = 1002 } 
+    id = { type = 8610 id = 2002 } 
+    id = { type = 8710 id = 1002 } 
+    id = { type = 8810 id = 1002 } 
+    id = { type = 8910 id = 1002 } 
+    id = { type = 9010 id = 1003 } 
+    id = { type = 9110 id = 1002 } 
+    id = { type = 9210 id = 1002 } 
+    id = { type = 9310 id = 1002 } 
+    id = { type = 9410 id = 1002 } 
+    pop = 32631 
+    rgo = 4028 
+    capital = { 0 0 0 0 0 0 1368 999 936 0 930 971 978 810 0 752 0 0 0 0 0 0 0 0 0 422 0 0 0 0 0 790 833 0 0 0 0 0 0 0 0 0 0 0 0 0 342 0 0 0 0 0 0 0 0 840 841 855 815 737 846 0 311 0 0 0 376 290 0 255 0 0 657 0 280 655 0 708 1439 1879 1476 1323 0 0 0 1884 1895 1883 2278 1952 1945 1929 1940 1932 1931 1501 1920 1919 1918 1498 1917 1483 1897 1905 0 1464 1469 1484 1462 0 1496 1490 0 1504 1519 1518 2253 2155 0 1258 1318 1816 0 0 2525 1551 1643 1616 1521 1958 0 0 0 0 2337 0 0 0 0 0 0 588 0 0 0 0 0 0 1697 0 0 1731 1711 0 0 0 0 0 0 0 0 0 1751 2462 2651 2427 2647 2607 2394 2388 2081 2295 1862 2090 1303 0 2700 2693 1987 0 0 2509 0 0 0 0 0 0 0 0 0 0 0 0 847 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 399 } 
+    total = { 69 2108 141 1522 46 1333 72 913 25 780 15 732 126 414 31 389 11 342 32 321 59 302 77 300 66 235 67 195 74 187 13 179 62 175 58 163 125 137 75 93 57 87 163 85 148 64 166 53 170 52 173 37 168 30 6 28 177 26 176 26 127 20 162 19 60 19 78 19 169 16 56 13 152 12 81 12 7 9 95 7 90 7 80 5 101 3 96 3 119 2 113 2 94 2 91 1 108 1 105 1 115 1 172 1 129 1 117 0 98 0 110 0 181 0 87 0 16 -1 17 -1 61 -1 14 -1 18 -1 47 -1 64 -1 63 -1 48 -1 45 -1 68 -1 9 -1 70 -1 19 -1 44 -1 54 -1 43 -1 53 -1 71 -1 51 -1 49 -1 50 -1 40 -1 39 -1 82 -1 83 -1 84 -1 38 -1 37 -1 52 -1 36 -1 35 -1 34 -1 33 -1 20 -1 21 -1 30 -1 29 -1 28 -1 73 -1 42 -1 27 -1 26 -1 22 -1 76 -1 5 -1 104 -1 41 -1 24 -1 65 -1 160 -1 109 -1 203 -1 204 -1 112 -1 205 -1 202 -1 197 -1 279 -1 290 -1 118 -1 289 -1 199 -1 200 -1 122 -1 123 -1 201 -1 4 -1 3 -1 196 -1 278 -1 288 -1 130 -1 131 -1 132 -1 133 -1 287 -1 135 -1 136 -1 137 -1 138 -1 139 -1 140 -1 2 -1 142 -1 143 -1 144 -1 145 -1 146 -1 147 -1 0 -1 149 -1 150 -1 295 -1 286 -1 153 -1 154 -1 155 -1 156 -1 157 -1 158 -1 159 -1 23 -1 161 -1 285 -1 1 -1 277 -1 276 -1 275 -1 294 -1 284 -1 283 -1 274 -1 273 -1 282 -1 272 -1 281 -1 175 -1 293 -1 280 -1 271 -1 179 -1 180 -1 270 -1 182 -1 183 -1 184 -1 185 -1 186 -1 187 -1 188 -1 189 -1 190 -1 191 -1 192 -1 193 -1 292 -1 195 -1 265 -1 231 -1 198 -1 232 -1 269 -1 268 -1 291 -1 267 -1 266 -1 235 -1 206 -1 207 -1 208 -1 209 -1 210 -1 211 -1 212 -1 213 -1 214 -1 215 -1 216 -1 217 -1 218 -1 219 -1 220 -1 221 -1 222 -1 223 -1 224 -1 225 -1 226 -1 227 -1 228 -1 229 -1 230 -1 248 -1 247 -1 233 -1 234 -1 264 -1 236 -1 237 -1 238 -1 239 -1 240 -1 241 -1 242 -1 243 -1 244 -1 245 -1 246 -1 262 -1 263 -1 249 -1 250 -1 251 -1 252 -1 253 -1 254 -1 255 -1 256 -1 257 -1 258 -1 259 -1 260 -1 261 -1 116 -1 120 -3 114 -4 103 -4 111 -5 89 -5 85 -5 164 -5 8 -6 99 -8 55 -9 121 -9 178 -12 165 -13 171 -13 124 -13 128 -15 107 -16 174 -16 97 -17 134 -17 92 -17 79 -17 100 -18 102 -20 93 -20 12 -28 86 -29 88 -34 106 -68 194 -100 167 -132 151 -190 10 -205 296 -17549 } 
+    prestige = { 141 1189 15 671 69 654 46 554 31 460 11 341 25 275 32 224 62 145 126 142 72 142 125 108 13 102 151 95 57 94 6 93 77 82 170 74 163 73 67 73 173 63 75 59 176 52 166 52 167 47 127 44 59 43 66 41 177 40 119 36 95 34 169 34 168 32 85 31 7 25 55 24 296 19 162 19 74 18 89 17 58 17 79 17 97 16 152 12 96 12 102 10 116 10 111 10 10 7 164 7 90 7 88 4 12 4 78 3 91 2 181 2 99 1 94 0 129 0 92 0 76 -1 61 -1 18 -1 63 -1 64 -1 65 -1 53 -1 17 -1 68 -1 16 -1 70 -1 71 -1 14 -1 73 -1 52 -1 295 -1 54 -1 50 -1 49 -1 48 -1 47 -1 294 -1 20 -1 83 -1 84 -1 45 -1 293 -1 292 -1 44 -1 43 -1 42 -1 41 -1 51 -1 291 -1 24 -1 40 -1 39 -1 38 -1 290 -1 37 -1 9 -1 289 -1 36 -1 288 -1 104 -1 287 -1 35 -1 34 -1 286 -1 109 -1 285 -1 19 -1 112 -1 284 -1 283 -1 282 -1 21 -1 281 -1 118 -1 22 -1 280 -1 30 -1 122 -1 123 -1 29 -1 5 -1 4 -1 28 -1 27 -1 33 -1 130 -1 131 -1 132 -1 133 -1 279 -1 135 -1 136 -1 274 -1 138 -1 139 -1 140 -1 3 -1 142 -1 143 -1 144 -1 145 -1 146 -1 147 -1 0 -1 149 -1 150 -1 2 -1 26 -1 153 -1 154 -1 155 -1 156 -1 157 -1 158 -1 159 -1 160 -1 161 -1 23 -1 1 -1 82 -1 137 -1 220 -1 216 -1 273 -1 272 -1 218 -1 278 -1 277 -1 271 -1 267 -1 175 -1 270 -1 269 -1 276 -1 179 -1 180 -1 268 -1 182 -1 183 -1 184 -1 185 -1 186 -1 187 -1 188 -1 189 -1 190 -1 191 -1 192 -1 193 -1 275 -1 195 -1 196 -1 197 -1 198 -1 199 -1 200 -1 201 -1 202 -1 203 -1 204 -1 205 -1 206 -1 207 -1 208 -1 209 -1 210 -1 211 -1 212 -1 213 -1 214 -1 215 -1 266 -1 217 -1 242 -1 219 -1 243 -1 221 -1 222 -1 223 -1 224 -1 225 -1 226 -1 227 -1 228 -1 229 -1 230 -1 231 -1 232 -1 233 -1 234 -1 235 -1 236 -1 237 -1 238 -1 239 -1 240 -1 241 -1 254 -1 253 -1 244 -1 245 -1 246 -1 247 -1 248 -1 249 -1 250 -1 251 -1 252 -1 264 -1 265 -1 255 -1 256 -1 257 -1 258 -1 259 -1 260 -1 261 -1 262 -1 263 -1 174 -5 107 -8 165 -8 106 -8 100 -9 124 -11 60 -11 128 -11 80 -11 121 -20 148 -31 117 -256 114 -277 93 -280 178 -285 8 -287 103 -289 98 -289 108 -293 115 -293 171 -296 194 -303 172 -308 87 -309 134 -313 56 -313 105 -315 110 -315 101 -317 113 -318 86 -363 81 -423 120 -1015 } 
+    military = { 69 232 72 138 141 49 25 46 46 44 15 37 11 32 148 30 74 19 32 17 31 17 62 17 77 13 66 13 125 12 75 11 78 10 163 10 67 7 59 7 13 7 58 5 81 5 121 4 166 4 170 4 6 4 152 4 168 3 90 3 177 3 57 3 80 3 176 3 162 2 167 2 101 2 127 2 8 2 7 2 60 2 113 2 126 2 119 2 87 1 92 1 99 1 108 1 124 1 105 1 94 1 134 1 174 1 169 1 10 1 55 1 56 1 12 1 173 1 115 1 165 1 164 1 86 0 116 0 129 0 79 0 106 0 172 0 102 0 151 0 178 0 114 0 120 0 194 0 91 0 107 0 110 0 103 0 96 0 100 0 98 0 97 0 89 0 88 0 93 0 171 0 128 0 111 0 85 0 95 0 117 0 296 0 181 0 51 -1 84 -1 83 -1 53 -1 52 -1 82 -1 50 -1 33 -1 49 -1 17 -1 18 -1 16 -1 104 -1 76 -1 19 -1 47 -1 109 -1 20 -1 73 -1 112 -1 4 -1 2 -1 71 -1 70 -1 48 -1 3 -1 133 -1 68 -1 14 -1 122 -1 123 -1 44 -1 21 -1 5 -1 42 -1 22 -1 65 -1 130 -1 131 -1 132 -1 26 -1 41 -1 135 -1 136 -1 137 -1 138 -1 139 -1 140 -1 1 -1 142 -1 143 -1 144 -1 145 -1 146 -1 147 -1 0 -1 149 -1 150 -1 64 -1 40 -1 153 -1 154 -1 155 -1 156 -1 157 -1 158 -1 159 -1 160 -1 161 -1 28 -1 39 -1 63 -1 23 -1 35 -1 38 -1 27 -1 37 -1 9 -1 61 -1 54 -1 24 -1 36 -1 175 -1 118 -1 34 -1 45 -1 179 -1 180 -1 43 -1 182 -1 183 -1 184 -1 185 -1 186 -1 187 -1 188 -1 189 -1 190 -1 191 -1 192 -1 193 -1 30 -1 195 -1 196 -1 197 -1 198 -1 199 -1 200 -1 201 -1 202 -1 203 -1 204 -1 205 -1 206 -1 207 -1 208 -1 209 -1 210 -1 211 -1 212 -1 213 -1 214 -1 215 -1 216 -1 217 -1 218 -1 219 -1 220 -1 221 -1 222 -1 223 -1 224 -1 225 -1 226 -1 227 -1 228 -1 229 -1 230 -1 231 -1 232 -1 233 -1 234 -1 235 -1 236 -1 237 -1 238 -1 239 -1 240 -1 241 -1 242 -1 243 -1 244 -1 245 -1 246 -1 247 -1 248 -1 249 -1 250 -1 251 -1 252 -1 253 -1 254 -1 255 -1 256 -1 257 -1 258 -1 259 -1 260 -1 261 -1 262 -1 263 -1 264 -1 265 -1 266 -1 267 -1 268 -1 269 -1 270 -1 271 -1 272 -1 273 -1 274 -1 275 -1 276 -1 277 -1 278 -1 279 -1 280 -1 281 -1 282 -1 283 -1 284 -1 285 -1 286 -1 287 -1 288 -1 289 -1 290 -1 291 -1 292 -1 293 -1 294 -1 295 -1 29 -1 } 
+    industry = { 69 1548 46 1011 141 879 72 703 25 596 15 359 126 341 59 273 77 245 66 201 32 191 74 158 67 151 58 149 31 142 11 140 13 120 125 103 62 85 75 52 163 38 57 37 148 34 166 23 60 17 56 11 170 11 168 10 127 9 78 7 162 7 81 6 173 4 177 2 80 2 152 2 90 2 91 0 95 0 94 0 101 0 117 0 172 0 96 0 129 0 108 0 98 0 110 0 105 0 115 0 113 0 38 -1 52 -1 53 -1 54 -1 40 -1 39 -1 18 -1 48 -1 16 -1 51 -1 50 -1 14 -1 63 -1 64 -1 65 -1 37 -1 19 -1 49 -1 17 -1 68 -1 71 -1 47 -1 73 -1 35 -1 34 -1 76 -1 5 -1 33 -1 20 -1 21 -1 30 -1 82 -1 83 -1 84 -1 29 -1 44 -1 28 -1 43 -1 45 -1 27 -1 26 -1 41 -1 36 -1 22 -1 24 -1 42 -1 9 -1 70 -1 61 -1 160 -1 199 -1 190 -1 191 -1 104 -1 192 -1 295 -1 193 -1 294 -1 109 -1 293 -1 195 -1 112 -1 292 -1 196 -1 197 -1 189 -1 291 -1 118 -1 266 -1 267 -1 278 -1 122 -1 123 -1 277 -1 4 -1 3 -1 281 -1 276 -1 290 -1 130 -1 131 -1 132 -1 133 -1 289 -1 135 -1 136 -1 137 -1 138 -1 139 -1 140 -1 2 -1 142 -1 143 -1 144 -1 145 -1 146 -1 147 -1 0 -1 149 -1 150 -1 288 -1 275 -1 153 -1 154 -1 155 -1 156 -1 157 -1 158 -1 159 -1 23 -1 161 -1 287 -1 1 -1 274 -1 273 -1 286 -1 285 -1 265 -1 215 -1 264 -1 272 -1 284 -1 283 -1 271 -1 175 -1 219 -1 282 -1 270 -1 179 -1 180 -1 221 -1 182 -1 183 -1 184 -1 185 -1 186 -1 187 -1 188 -1 262 -1 279 -1 226 -1 269 -1 268 -1 228 -1 263 -1 229 -1 227 -1 198 -1 280 -1 200 -1 201 -1 202 -1 203 -1 204 -1 205 -1 206 -1 207 -1 208 -1 209 -1 210 -1 211 -1 212 -1 213 -1 214 -1 236 -1 216 -1 217 -1 218 -1 259 -1 220 -1 239 -1 222 -1 223 -1 224 -1 225 -1 258 -1 257 -1 260 -1 261 -1 230 -1 231 -1 232 -1 233 -1 234 -1 235 -1 246 -1 237 -1 238 -1 248 -1 240 -1 241 -1 242 -1 243 -1 244 -1 245 -1 251 -1 247 -1 252 -1 249 -1 250 -1 255 -1 253 -1 254 -1 256 -1 181 -1 169 -2 87 -2 176 -3 120 -3 116 -4 114 -4 103 -4 7 -5 119 -6 111 -7 8 -8 89 -9 164 -10 99 -11 85 -12 178 -12 171 -13 121 -14 165 -14 124 -15 128 -15 107 -16 174 -17 100 -18 134 -19 92 -19 93 -21 97 -21 79 -21 55 -22 6 -22 102 -23 86 -30 12 -31 88 -36 106 -68 194 -101 167 -158 10 -210 151 -238 296 -17560 } 
+    ENG = { desc = "" countrytactics = "" playername = "United Kingdom : " } 
+    FRA = { desc = "" countrytactics = "" playername = "France : " } 
+    PRU = { desc = "" countrytactics = "" playername = "Prussia : " } 
+    AUS = { desc = "" countrytactics = "" playername = "Austria : " } 
+    RUS = { desc = "" countrytactics = "" playername = "Russia : " } 
+    TUR = { desc = "" countrytactics = "" playername = "Ottoman Empire : " } 
+    HOL = { desc = "" countrytactics = "" playername = "Netherlands : " } 
+    SWE = { desc = "" countrytactics = "" playername = "Sweden : " } 
+    SPA = { desc = "" countrytactics = "" playername = "Spain : " } 
+    USA = { desc = "" countrytactics = "" playername = "USA : YVES-AC041C8984" } 
+    CHI = { desc = "" countrytactics = "" playername = "China : " } 
+    } 
+
+globaldata = { 
+    startdate = { year = 1869 month = january day = 13 } 
+    enddate = { year = 1936 month = january day = 0 } 
+    treaty = { 
+        id = { type = 4712 id = 519581 } 
+        type = peace 
+        country = "UCA" 
+        country = "ENG" 
+        continent = 0 
+        startdate = { year = 1867 month = august day = 10 } 
+        expirydate = { year = 1872 month = august day = 10 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 528289 } 
+        type = peace 
+        country = "SGF" 
+        country = "PRU" 
+        continent = 0 
+        startdate = { year = 1868 month = january day = 10 } 
+        expirydate = { year = 1873 month = january day = 10 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 544227 } 
+        type = peace 
+        country = "AUS" 
+        country = "PRU" 
+        continent = 0 
+        startdate = { year = 1868 month = november day = 17 } 
+        expirydate = { year = 1873 month = november day = 17 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545485 } 
+        type = peace 
+        country = "FRA" 
+        country = "LUB" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545494 } 
+        type = peace 
+        country = "FRA" 
+        country = "LIP" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545499 } 
+        type = peace 
+        country = "FRA" 
+        country = "HAN" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545504 } 
+        type = peace 
+        country = "FRA" 
+        country = "HAM" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545513 } 
+        type = peace 
+        country = "FRA" 
+        country = "BRA" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545520 } 
+        type = peace 
+        country = "FRA" 
+        country = "BRE" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545526 } 
+        type = peace 
+        country = "FRA" 
+        country = "MEC" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545527 } 
+        type = peace 
+        country = "FRA" 
+        country = "NAS" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 545534 } 
+        type = peace 
+        country = "FRA" 
+        country = "OLD" 
+        continent = 0 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1873 month = december day = 14 } 
+        } 
+    treaty = { 
+        id = { type = 4712 id = 546637 } 
+        type = peace 
+        country = "MEX" 
+        country = "ENG" 
+        continent = 0 
+        startdate = { year = 1869 month = january day = 12 } 
+        expirydate = { year = 1874 month = january day = 12 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 231 } 
+        defensive = yes 
+        participant = { TRA ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 502 } 
+        defensive = yes 
+        participant = { MYS ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 505 } 
+        defensive = yes 
+        participant = { HYD ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 508 } 
+        defensive = yes 
+        participant = { NAG ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 511 } 
+        defensive = yes 
+        participant = { BAS ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 514 } 
+        defensive = yes 
+        participant = { ORI ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 517 } 
+        defensive = yes 
+        participant = { BUN ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 525 } 
+        defensive = yes 
+        participant = { BHO ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 530 } 
+        defensive = yes 
+        participant = { IND ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 533 } 
+        defensive = yes 
+        participant = { JAI ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 536 } 
+        defensive = yes 
+        participant = { MEW ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 539 } 
+        defensive = yes 
+        participant = { JOD ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 542 } 
+        defensive = yes 
+        participant = { BER ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 553 } 
+        defensive = yes 
+        participant = { JAS ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 556 } 
+        defensive = yes 
+        participant = { BIK ENG } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 612 } 
+        defensive = yes 
+        participant = { SER TUR } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 615 } 
+        defensive = yes 
+        participant = { WAL TUR } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 618 } 
+        defensive = yes 
+        participant = { MOL TUR } 
+        startdate = { year = 1836 month = january day = 0 } 
+        expirydate = { year = 1936 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 342770 } 
+        defensive = yes 
+        participant = { ZAN OMA } 
+        startdate = { year = 1856 month = january day = 0 } 
+        expirydate = { year = 1956 month = january day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 438255 } 
+        defensive = yes 
+        participant = { ECU PAP } 
+        startdate = { year = 1862 month = march day = 11 } 
+        expirydate = { year = 1962 month = march day = 11 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 482478 } 
+        defensive = yes 
+        participant = { LUC PAR } 
+        startdate = { year = 1865 month = january day = 28 } 
+        expirydate = { year = 1870 month = january day = 28 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 506226 } 
+        defensive = yes 
+        participant = { SAR FRA } 
+        startdate = { year = 1866 month = september day = 15 } 
+        expirydate = { year = 1871 month = september day = 15 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 513012 } 
+        defensive = no 
+        participant = { MEX UCA } 
+        startdate = { year = 1867 month = march day = 5 } 
+        expirydate = { year = 1872 month = march day = 5 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 515909 } 
+        defensive = no 
+        exception = "BRZ" 
+        participant = { PRG URU } 
+        startdate = { year = 1867 month = may day = 14 } 
+        expirydate = { year = 1872 month = may day = 14 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 521243 } 
+        defensive = no 
+        exception = "AUS" 
+        participant = { PAR MOD } 
+        startdate = { year = 1867 month = september day = 24 } 
+        expirydate = { year = 1872 month = september day = 24 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 534319 } 
+        defensive = yes 
+        participant = { ENG USA } 
+        startdate = { year = 1868 month = may day = 0 } 
+        expirydate = { year = 1873 month = may day = 0 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 545469 } 
+        defensive = yes 
+        participant = { NGF PRU } 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1968 month = december day = 14 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 545470 } 
+        defensive = yes 
+        participant = { SGF AUS } 
+        startdate = { year = 1868 month = december day = 14 } 
+        expirydate = { year = 1968 month = december day = 14 } 
+        } 
+    alliance = { 
+        id = { type = 4712 id = 546108 } 
+        defensive = yes 
+        participant = { PAP AUS } 
+        startdate = { year = 1868 month = december day = 29 } 
+        expirydate = { year = 1873 month = december day = 29 } 
+        } 
+    war = { 
+        id = { type = 4712 id = 529406 } 
+        date = { year = 1868 month = february day = 3 } 
+        enddate = { year = 1869 month = january day = 13 } 
+        colonial = no 
+        great_war = no 
+        attackers = { 
+            id = { type = 4712 id = 529404 } 
+            defensive = no 
+            participant = { FRA } 
+            startdate = { year = 1868 month = february day = 3 } 
+            expirydate = { year = 1873 month = february day = 3 } 
+            } 
+        defenders = { 
+            id = { type = 4712 id = 529405 } 
+            defensive = no 
+            participant = { PRU } 
+            startdate = { year = 1868 month = february day = 3 } 
+            expirydate = { year = 1873 month = february day = 3 } 
+            } 
+        losses = { tag = BRE value = 610.000 } 
+        losses = { tag = HAM value = 133.318 } 
+        losses = { tag = HAN value = 69.250 } 
+        losses = { tag = LUB value = 100.998 } 
+        losses = { tag = PRU value = 271.581 } 
+        losses = { tag = MEC value = 21.112 } 
+        losses = { tag = FRA value = 774.720 } 
+        } 
+    worldmarket = { 
+        cotton = 9971.542 
+        dye = 9985.550 
+        tobacco = 183.964 
+        tea = 195.264 
+        coffee = 181.405 
+        opium = 6.511 
+        wool = 195.264 
+        silk = 9974.026 
+        cattle = 181.351 
+        fish = 195.264 
+        fruit = 195.264 
+        grain = 195.264 
+        coal = 327.098 
+        sulphur = 602.836 
+        iron = 9215.717 
+        precious_metal = 14.682 
+        timber = 155.169 
+        tropical_wood = 402.640 
+        rubber = 10000.002 
+        oil = 0.000 
+        steel = 0.000 
+        cement = 110.494 
+        glass = 168.506 
+        fuel = 0.000 
+        ammunition = 0.000 
+        small_arms = 0.000 
+        artillery = 0.000 
+        barrels = 0.000 
+        fertilizer = 18.956 
+        explosives = 0.000 
+        clipper_convoy = 0.000 
+        steamer_convoy = 0.000 
+        machine_parts = 0.000 
+        automobiles = 0.000 
+        aeroplanes = 0.000 
+        electric_gear = 0.000 
+        telephones = 0.000 
+        wine = 13.337 
+        liquor = 101.336 
+        canned_food = 0.000 
+        fabric = 24.523 
+        regular_clothes = 5.454 
+        luxury_clothes = 0.000 
+        lumber = 34.222 
+        paper = 13.337 
+        furniture = 3.067 
+        luxury_furniture = 0.000 
+        radio = 0.000 
+        } 
+    flags = { 
+        flg_1850_compromise_1 = 0 
+        flg_1850_compromise_2 = 0 
+        flg_1850_compromise_3 = 1 
+        flg_2nd_Oriental = 0 
+        flg_ANNa = 1 
+        flg_ANNb = 0 
+        flg_annexing_texas = 1 
+        flg_Arrow_War_Lost = 0 
+        flg_Austria_contests = 1 
+        flg_Austrian_vengeance = 0 
+        flg_CSA_guerilla = 0 
+        flg_DAN_SWE_1 = 0 
+        flg_DAN_SWE_2 = 0 
+        flg_ENGCrimea = 0 
+        flg_euro_intervention = 1 
+        flg_French_Arrow = 0 
+        flg_JapanDutch = 0 
+        flg_kansas_nebraska_1 = 1 
+        flg_kansas_nebraska_2 = 0 
+        flg_kansas_nebraska_3 = 0 
+        flg_Lin = 1 
+        flg_McClellan = 0 
+        flg_Opium_Stop = 0 
+        flg_Opium_War_Lost = 0 
+        flg_Persian_reforms = 0 
+        flg_Qishan = 0 
+        flg_Qiying = 0 
+        flg_Self_Strength = 0 
+        flg_slave_alabama = 1 
+        flg_slave_arizona = 0 
+        flg_slave_arkansas = 1 
+        flg_slave_california = 0 
+        flg_slave_delaware = 1 
+        flg_slave_florida = 1 
+        flg_slave_georgia = 1 
+        flg_slave_kansas = 0 
+        flg_slave_kentucky = 1 
+        flg_slave_louisiana = 1 
+        flg_slave_maryland = 1 
+        flg_slave_mississippi = 1 
+        flg_slave_missouri = 1 
+        flg_slave_nebraska = 0 
+        flg_slave_newmexico = 0 
+        flg_slave_northcarolina = 1 
+        flg_slave_sequoyah = 1 
+        flg_slave_tennessee = 1 
+        flg_slave_texas = 1 
+        flg_slave_virginia = 1 
+        flg_southern_secession = 0 
+        flg_USA_CW_victory = 0 
+        flg_USA_MEX_tension = 0 
+        NILE_DISCOVERED = 0 
+        NPOLE_DISCOVERED = 0 
+        PANAMA_CHANNEL = 0 
+        SPOLE_DISCOVERED = 0 
+        SUEZ_CHANNEL = 0 
+        zanzibar_independent = 5 
+        } 
+    income_modifier = 0.000 
+    } 
+
+provinc1 = { 
+    id = 8 
+    life_sustainability = 25 
+    claim = mission 
+    claimant = "RUS" 
+    pop = { 
+        id = 14704 
+        culture = "aleutian" 
+        workforce = farmers 
+        religion = pagan 
+        ideology = liberal 
+        dominant_issue = anti_military 
+        secondary_issue = secularized 
+        militancy = 5.000 
+        consciousness = 5.000 
+        size = 0.010 
+        cash = 20.000 
+        } 
+    pop = { 
+        id = 17267 
+        culture = "aleutian" 
+        workforce = farmers 
+        religion = pagan 
+        ideology = liberal 
+        dominant_issue = anti_military 
+        secondary_issue = secularized 
+        militancy = 5.000 
+        consciousness = 5.000 
+        size = 0.010 
+        cash = 20.000 
+        } 
+    goods = fish 
+    amount = 30 
+    } 
+
+province = { 
+    id = 9 
+    life_sustainability = 25 
+    claim = fort 
+    claimant = "RUS" 
+    pop = { 
+        id = 17268 
+        culture = "aleutian" 
+        workforce = farmers 
+        religion = pagan 
+        ideology = liberal 
+        dominant_issue = anti_military 
+        secondary_issue = secularized 
+        militancy = 5.000 
+        consciousness = 5.000 
+        size = 0.030 
+        cash = 20.000 
+        } 
+    goods = fish 
+    amount = 30 
+    } 
+
+province = { 
+    id = 10 
+    life_sustainability = 30 
+    pop = { 
+        id = 14705 
+        culture = "aleutian" 
+        workforce = labourers 
+        religion = pagan 
+        ideology = conservative 
+        dominant_issue = laissez_faire 
+        secondary_issue = limited_citizenship 
+        militancy = 0.000 
+        consciousness = 8.887 
+        size = 0.024 
+        cash = 0.000 
+        } 
+    goods = timber 
+    amount = 100 
+    } 
+
+province = { 
+    id = 12 
+    life_sustainability = 30 
+    claim = trade_post 
+    claimant = "RUS" 
+    pop = { 
+        id = 14706 
+        culture = "aleutian" 
+        workforce = farmers 
+        religion = pagan 
+        ideology = liberal 
+        dominant_issue = anti_military 
+        secondary_issue = secularized 
+        militancy = 5.000 
+        consciousness = 5.000 
+        size = 0.010 
+        cash = 20.000 
+        } 
+    pop = { 
+        id = 17269 
+        culture = "aleutian" 
+        workforce = farmers 
+        religion = pagan 
+        ideology = liberal 
+        dominant_issue = anti_military 
+        secondary_issue = secularized 
+        militancy = 5.000 
+        consciousness = 5.000 
+        size = 0.010 
+        cash = 20.000 
+        } 
+    goods = fish 
+    amount = 25 
+    } 
+
+province = { 
+    id = 13 
+    life_sustainability = 30 
+    pop = { 
+        id = 14707 
+        culture = "aleutian" 
+        workforce = farmers 
+        religion = pagan 
+        ideology = liberal 
+        dominant_issue = anti_military 
+        secondary_issue = secularized 
+        militancy = 5.000 
+        consciousness = 5.000 
+        size = 0.010 
+        cash = 20.000 
+        } 
+    pop = { 
+        id = 17270 
+        culture = "aleutian" 
+        workforce = farmers 
+        religion = pagan 
+        ideology = liberal 
+        dominant_issue = anti_military 
+        secondary_issue = secularized 
+        militancy = 5.000 
+        consciousness = 5.000 
+        size = 0.010 
+        cash = 20.000 
+        } 
+    goods = fish 
+    amount = 25 
+    }
+    
+province = { 
+    id = 130 
+}
+    
+history = { 7700 7701 7702 7400 6700 6918 7221 1504 4602 7800 30190 34600 36602 36900 37201 31501 15200 32500 16800 21127 21144 21133 14400 14100 14800 6901 3900 37700 46302 21124 21146 3901 3300 4900 3500 3600 3400 3700 4000 4100 3800 4200 4500 4300 4700 5100 5200 5000 18200 18300 18400 18500 1506 34700 36901 1100 8100 1101 6920 1508 4609 7227 36600 44104 36406 21118 6902 14135 36703 34100 31301 37200 14136 6903 12501 7703 7704 14401 14101 14817 21114 21113 21143 34608 14185 12503 6939 36614 37204 16803 16801 21117 21122 21125 36903 25239 38500 14000 34602 7402 12617 36904 37202 37203 13000 14120 21135 21132 44106 34701 30513 30306 30314 36902 34601 36920 33800 36601 37205 33400 21120 21131 36218 15100 36217 6940 31502 31503 6904 14137 30514 36905 31504 600 4903 18403 4703 4611 4503 18203 18503 5203 4303 5103 4203 4003 4103 3903 3803 3703 5003 3603 3503 3403 3303 18303 36219 7242 21145 34603 1300 6910 36701 21121 37209 46601 46801 11700 34604 36906 32501 32400 32401 32402 14139 6906 14299 44105 37206 36704 37207 44115 36702 1518 13200 7244 1502 34605 21130 36907 6200 6600 6201 4617 6204 1513 6205 30517 33300 36700 1301 7218 1502 13001 36204 30150 36603 45101 36200 34606 32502 4615 4620 3001 25207 25221 36908 15101 30338 15201 14199 14803 14126 14109 14160 12600 16300 1511 1510 36909 12511 2502 1104 37708 36913 37210 37701 34200 31302 37211 32503 16600 46600 21136 36926 12601 16601 33402 43902 2513 1111 30598 30800 6605 30599 36919 4637 5805 1526 31505 14112 14113 25202 25237 21110 32507 37707 37212 30300 21107 38501 38502 30316 30180 12603 12604 14117 1107 36500 36501 44103 36917 30304 37215 6954 36918 37220 33801 21111 21115 36604 12605 12607 12608 12609 12610 36923 30302 30534 25223 6952 30363 30322 45100 14810 2500 38503 38505 38504 38506 12606 30153 16602 12623 12531 12625 30191 21137 44107 49203 36705 17300 5704 4619 3000 37225 30350 30351 6207 6601 6208 4618 6211 30525 1514 6212 30518 48300 4624 3003 31310 30564 49302 14181 5705 30540 30151 36927 30310 29902 30365 30318 30364 29901 29900 37705 30011 36706 36930 36617 30324 4625 7229 1521 1522 4626 31304 30541 49200 6953 7212 36605 21106 29904 36928 36931 36933 36934 30354 30356 7223 4604 7226 4605 30200 36606 1524 4621 3707 4622 1515 3407 1516 18508 3206 4908 3203 4307 3119 5107 3118 3907 3115 3307 3807 3114 3308 3204 4107 3127 4007 3116 4207 3117 18407 3507 3111 3607 3112 18408 3202 5207 3120 18207 3122 4507 3123 46300 14106 } 
+
+sleepevent = { 7701 7702 7704 16801 7218 1502 4620 3001 1510 12604 12607 12608 12609 12610 3000 30525 3003 1522 }
+event = "db\tech\industry_inventions.txt" event = "db\tech\army_inventions.txt" event = "db\tech\navy_inventions.txt" event = "db\tech\commerce_inventions.txt" event = "db\tech\culture_inventions.txt" event = "db\events\randomevents.txt" event = "db\events\economic_events.txt" event = "db\events\political_events.txt" event = "db\events\campaign_events.txt" event = "db\events\Expansion_Random_Events.txt" event = "db\events\global_revolutions.txt" event = "db\events\revolution.txt" event = "db\events\forcedreforms.txt" event = "db\events\civilize.txt" event = "db\events\anhalt.txt" event = "db\events\annam.txt" event = "db\events\argentina.txt" event = "db\events\austria.txt" event = "db\events\baden.txt" event = "db\events\bavaria.txt" event = "db\events\belgium.txt" event = "db\events\brauschweig.txt" event = "db\events\brazil.txt" event = "db\events\bremen.txt" event = "db\events\burma.txt" event = "db\events\china.txt" event = "db\events\coburg.txt" event = "db\events\costa_rica.txt" event = "db\events\csa.txt" event = "db\events\denmark.txt" event = "db\events\dominican_republic.txt" event = "db\events\ecuador.txt" event = "db\events\egypt.txt" event = "db\events\el_salvador.txt" event = "db\events\france.txt" event = "db\events\frankfurt.txt" event = "db\events\germany.txt" event = "db\events\greece.txt" event = "db\events\haiti.txt" event = "db\events\hamburg.txt" event = "db\events\hanover.txt" event = "db\events\hawaii.txt" event = "db\events\hesse-darmstadt.txt" event = "db\events\hesse-kassel.txt" event = "db\events\holstein.txt" event = "db\events\honduras.txt" event = "db\events\india.txt" event = "db\events\ireland.txt" event = "db\events\italy.txt" event = "db\events\japan.txt" event = "db\events\korea.txt" event = "db\events\liberia.txt" event = "db\events\lippe.txt" event = "db\events\lombardia.txt" event = "db\events\lubeck.txt" event = "db\events\lucca.txt" event = "db\events\mecklenburg.txt" event = "db\events\meiningen.txt" event = "db\events\mexico.txt" event = "db\events\modena.txt" event = "db\events\nassau.txt" event = "db\events\netherlands.txt" event = "db\events\ngf.txt" event = "db\events\nicaragua.txt" event = "db\events\oldenburg.txt" event = "db\events\oranje.txt" event = "db\events\ottoman.txt" event = "db\events\papacy.txt" event = "db\events\parma.txt" event = "db\events\persia.txt" event = "db\events\peru.txt" event = "db\events\prussia.txt" event = "db\events\russia.txt" event = "db\events\sardinia.txt" event = "db\events\saxony.txt" event = "db\events\sgf.txt" event = "db\events\sicilies.txt" event = "db\events\sweden.txt" event = "db\events\switzerland.txt" event = "db\events\spain.txt" event = "db\events\texas.txt" event = "db\events\transvaal.txt" event = "db\events\tuscany.txt" event = "db\events\uca.txt" event = "db\events\usa.txt" event = "db\events\uk.txt" event = "db\events\venice.txt" event = "db\events\weimar.txt" event = "db\events\wurttemberg.txt" event = "db\events\flavor_eng.txt" event = "db\events\flavor_aus.txt" event = "db\events\flavor_dan.txt" event = "db\events\flavor_eth.txt" event = "db\events\flavor_ita.txt" event = "db\events\flavor_lom.txt" event = "db\events\flavor_pap.txt" event = "db\events\flavor_rus.txt" event = "db\events\flavor_swi.txt" event = "db\events\flavor_fra.txt" event = "db\events\flavor_swe.txt" event = "db\events\flavor_ger.txt" event = "db\events\flavor_pru.txt" event = "db\events\flavor_sac.txt" event = "db\events\flavor_hes.txt" event = "db\events\flavor_hls.txt" event = "db\events\flavor_ham.txt" event = "db\events\flavor_bay.txt" event = "db\events\flavor_bad.txt" event = "db\events\flavor_nwz.txt" event = "db\events\flavor_ast.txt" event = "db\events\flavor_tur.txt" event = "db\events\flavor_ind.txt" event = "db\events\flavor_oma.txt" event = "db\events\flavor_sca.txt" event = "db\events\flavor_nor.txt" event = "db\events\flavor_can.txt" event = "db\events\flavor_gre.txt" event = "db\events\flavor_bel.txt" event = "db\events\flavor_anh.txt" event = "db\events\flavor_cob.txt" event = "db\events\flavor_han.txt" event = "db\events\flavor_old.txt" event = "db\events\flavor_spa.txt" event = "db\events\flavor_peu.txt" event = "db\events\flavor_brz.txt" event = "db\events\flavor_uru.txt" event = "db\events\flavor_mex.txt" event = "db\events\flavor_arg.txt" event = "db\events\flavor_dom.txt" event = "db\events\flavor_hai.txt" event = "db\events\flavor_usa.txt" event = "db\events\canals.txt" event = "db\events\poland.txt" event = "db\events\native.txt" event = "db\events\luxemburg_prot.txt" event = "db\events\latin_monetary.txt" event = "db\events\worldfairs.txt" event = "db\events\exploration.txt" event = "db\events\province_owner.txt" event = "db\events\goldevents.txt" event = "db\events\oilevents.txt" event = "db\events\ai_events.txt" 
+
+interface = { 
+    mouse = { x = 816 y = 681 } 
+    map = { x = 5765 y = 3617 } 
+    mapmode = 0 
+    zoom = 1 
+    group1 = { } 
+    group2 = { } 
+    group3 = { } 
+    group4 = { } 
+    group5 = { } 
+    group6 = { } 
+    group7 = { } 
+    group8 = { } 
+    group9 = { } 
+    group0 = { } 
+    } 
+
+combat = { 
+    id = { type = 4712 id = 546421 } 
+    type = land 
+    province = 785 
+    date = { year = 1869 month = january day = 6 } 
+    attackers = { { type = 4712 id = 544337 } { type = 4712 id = 546099 } } 
+    defenders = { { type = 4712 id = 14159 } } 
+    }
+
+x = 5x
+x = 7x
+
+xx = {
+  { a=3 b=5 }
+  { a=2 b=4 }
+}

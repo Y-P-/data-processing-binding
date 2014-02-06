@@ -1,4 +1,4 @@
-package test
+package loader.test
 
 import scala.collection.mutable.HashMap
 

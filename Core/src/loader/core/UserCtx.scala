@@ -4,7 +4,6 @@ import definition._
 import events.EventHandler
 import context.Context
 import loader.core.names.QName
-import loader.core.context.FieldAnnot
 
 
 abstract class UserContext[-Elt<:Def#Elt] {
