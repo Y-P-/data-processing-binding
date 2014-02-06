@@ -66,7 +66,6 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
     marks0('"')=Quote
     marks0('#')= if (withComments) Comment else Str
     marks0('\n')=NewLine
-    onInit(this)
     
     @inline private[this] def err(kind:Int,state:Int,msg:String) = JsonParser.this.err(info(kind,state),msg)
     @inline protected[this] final def marks(i:Int) = if ((i&0xFFFFFF80)!=0) Str else marks0(i&0x7F)
@@ -247,6 +246,11 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
     
     def info(kind:Int,state:Int):String = s"transition from  state $state with kind $kind at line $line0 and depth $depth0 ; last token known: '$str0'"
   }
+  
+  final class Processor(i:Info) extends utils.parsers.Processor {
+    def apply(d:CharReader):Unit = i(d)
+    def state:State = i
+  }
 
   /**
    * Runs the parser on the given CharReader.
@@ -267,6 +271,6 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
    * 
    * This is thread safe, except possibly spy which is used for update if so requested.
    */
-  final def apply(d:CharReader):Unit = (new Info)(d)
+  final def get:Processor = new Processor(new Info)
   final def abort(n:Int) = throw new ParserUtilities.Jump(n)
 }

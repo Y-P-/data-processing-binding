@@ -9,6 +9,7 @@ class Json(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:B
   def apply(start:BaseProcessor#Top[Kind]):Parser = new Parser(start)
   
   class Parser(val start:BaseProcessor#Top[Kind]) extends JsonParser(maxSz,maxDepth,nlInString,withComments) with super.Parser { self=>
+    protected[this] val proc = get
     override final val canSkip = true
     override def skipToEnd():Nothing = abort(0)  //this parser can skip to the end of the current data structure
   }

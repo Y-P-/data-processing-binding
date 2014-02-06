@@ -87,7 +87,6 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
     if (esc!=0) quoteClass0(esc)=1 //escaped char
     quoteClass0(quote)=2 //end of string
     quoteClass0('\n')=3  //new line
-    onInit(this)
     
     @inline private[this] final def err(kind:Int,state:Int,msg:String) = StructParser.this.err(info(kind,state),msg)
     //execution shows this removes array limits checks (in addition to being necessary!)
@@ -242,6 +241,11 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
     
     def info(kind:Int,state:Int):String = s"transition from  state $state with kind $kind at line $line and depth $depth ; last token known: '$str'"
   }
+  
+  final class Processor(i:Info) extends utils.parsers.Processor {
+    def apply(d:CharReader):Unit = i(d)
+    def state:State = i
+  }
 
   /**
    * Runs the parser on the given CharReader.
@@ -262,7 +266,7 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
    * 
    * This is thread safe, except possibly spy which is used for update if so requested.
    */
-  def apply(d:CharReader):Unit = (new Info)(d)
+  def get:Processor = new Processor(new Info)
   def abort(n:Int):Nothing = throw new Jump(n)
 }
 

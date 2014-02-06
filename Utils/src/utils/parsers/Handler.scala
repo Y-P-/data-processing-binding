@@ -1,7 +1,9 @@
 package utils.parsers
 
+import utils.CharReader
+
 trait Handler {
-  def onInit(ps:State):Unit   //gives the parser state on initialization. This is how you can get the line count or current depth.
+  //def onInit(ps:State):Unit   //gives the parser state on initialization. This is how you can get the line count or current depth.
   //the standard client code sits here
   def push(idx:Int):Unit      //found array element
   def push(name:String):Unit  //found object field
@@ -18,4 +20,9 @@ trait State {
   def depth:Int      //current frame depth
   def line:Int       //current line number
   def str:String     //last string read
+}
+
+abstract class Processor {
+  def apply(d:CharReader):Unit
+  def state:State
 }

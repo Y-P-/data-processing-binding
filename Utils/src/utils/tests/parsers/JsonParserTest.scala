@@ -11,7 +11,7 @@ class JsonParserTest(data:String) extends StandardTester {
     val parser = new JsonParser(256,30,false,true) with TestHandlerBridge {
       val out = out0
     }
-    parser(ByteArrayReader(file(data)))
+    parser.get(ByteArrayReader(file(data)))
   }
 }
 

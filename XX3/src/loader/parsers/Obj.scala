@@ -8,9 +8,9 @@ class Obj() extends HandlerBridge {self=>
   def apply(start:BaseProcessor#Top[Kind]):Parser = new Parser(start)
   
   class Parser(val start:BaseProcessor#Top[Kind]) extends super.Parser { self=>
+    protected[this] val proc = null
     override final val canSkip:Boolean = true
     override def skipToEnd():Nothing = throw new IllegalStateException //abort(0)  //this parser can skip to the end of the current data structure
-    def apply(d:utils.CharReader):Unit = throw new IllegalStateException("An object parser cannot parse characters")
   }
 }
 
