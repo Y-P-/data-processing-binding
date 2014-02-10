@@ -242,12 +242,21 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
       doFrame(d,r)
     }
   
-    final def apply(d:CharReader) = try { frame(0)=9; doFrame(d,8) } catch { case `exit`=> }
+    final def apply(d:CharReader) = try {
+      //reset variables ; ensures that we can reuse the same instance for consecutive runs
+      depth0=0
+      line0=0
+      str0=null
+      frame(0)=9
+      doFrame(d,8)
+    } catch {
+      case `exit`=>
+    }
     
     def info(kind:Int,state:Int):String = s"transition from  state $state with kind $kind at line $line0 and depth $depth0 ; last token known: '$str0'"
   }
   
-  final class Processor(i:Info) extends utils.parsers.Processor {
+  final protected class Processor(i:Info) extends utils.parsers.CharProcessor {
     def apply(d:CharReader):Unit = i(d)
     def state:State = i
   }
@@ -271,6 +280,6 @@ abstract class JsonParser(maxSz:Int,maxDepth:Int,nlInString:Boolean,withComments
    * 
    * This is thread safe, except possibly spy which is used for update if so requested.
    */
-  final def get:Processor = new Processor(new Info)
+  final def newProc:Processor = new Processor(new Info)
   final def abort(n:Int) = throw new ParserUtilities.Jump(n)
 }

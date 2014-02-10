@@ -100,7 +100,6 @@ trait ParserBuilder {
       if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
       r
     }
-    //XXX final protected[this] val subst:(Kind)=>Kind = if (userCtx.vars==null) null else features.substBuilder(userCtx.vars)(cur,_) //variable substitution call
     /** Read data from an URI.
      */
     def read(uri:URI,encoding:String):Unit = {
@@ -140,13 +139,17 @@ trait ParserBuilder {
 }
 
 object ParserBuilder {
-  import scala.language.existentials
   class SkipException extends Exception
   val skipEnd = new SkipException { override def fillInStackTrace() = this }
   val skip    = new SkipException { override def fillInStackTrace() = this }
   
   /** define useful generics */
-  type P[-x]    = ParserBuilder { type Kind>:x }
-  type Impl[-x] = P[x]#Impl
-  
+  protected[this] type P0[-x] = ParserBuilder { type Kind>:x }
+  protected[this] type P1[+x] = ParserBuilder { type Kind<:x }
+  type Impl[-x] = P0[x]#Impl
+  type Exc[+x]  = P1[x]#Executor
+}
+
+abstract class AbstractParserBuilder extends ParserBuilder {
+  abstract class Impl extends super.Impl
 }

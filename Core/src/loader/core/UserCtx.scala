@@ -4,28 +4,32 @@ import definition._
 import events.EventHandler
 import context.Context
 import loader.core.names.QName
+import loader.core.context.FieldAnnot
 
 
-abstract class UserContext[-Elt<:Def#Elt] {
-  protected[this] type E = Elt
+abstract class UserContext[-E<:Def#Elt] {
+  protected[this] type Elt = E
   //the handler for generated events 
-  def eventHandler:EventHandler[E] = null
+  def eventHandler:EventHandler[_>:E] = null
   //parameter that asks the parser to accelerate where it can (i.e. skip unecessary data)
   val fast = true
-  //for name conversions
-  def qName(elt:E):QName = QName(elt)
-  //for local name fast access when this applies. Override this if neither parser not processor use namespaces/attributes
-  def localName(elt:E):String = qName(elt).local
-  //XXX to be removed parameters for substitution
-  val vars:scala.collection.Map[String,String] = null
-  //dynamic solver
-  def solveDynamic(elt:E,fd:Context#FieldMapping):Context#FieldMapping = null
+  /** build an element context */
+  def apply(e:Elt):EltContext
   
-  /** For includes */
-  //detects includes: called only in onVal calls.
-  def isInclude(elt:E)(s:elt.Kind):Boolean = false
-  //include solver
-  def solveInclude(elt:E)(s:elt.Kind):ParserBuilder#Executor = null
-  //mapper from x.Kind to elt.Kind
-  def getMapper(elt:E)(x:ParserBuilder#Executor):(elt.Element,x.builder.Kind)=>elt.Kind = null
+  class EltContext(protected[this] val elt:Elt) {
+    protected[this] type K = elt.Kind
+    /** qName for the element */
+    def qName = QName(elt)
+    /** Solving an include for e with data K */
+    def solveInclude(s:K):ParserBuilder.Exc[K] = null
+    /** Mapping the parser Kind to the processor Kind */
+    def getMapper(x:ParserBuilder#Executor):(Elt,x.builder.Kind)=>K = null
+    /** Solving dynamic mappings */
+    def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
+  }
 }
+object UserContext {
+  type Ctx[-k,-E<:Def#Elt { type Kind <: k }] = UserContext[E]
+}
+
+

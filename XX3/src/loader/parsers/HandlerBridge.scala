@@ -21,7 +21,7 @@ abstract class HandlerBridge extends ParserBuilder {self=>
   val kindClass = classOf[Kind]
   
   trait Parser extends utils.parsers.Handler with Impl { self=>
-    protected[this] val proc:utils.parsers.Processor
+    final protected[this] val proc = newProc
     def location:String = proc.state.line.toString
     def err(detail: String, cause: String): Nothing = throw new IllegalStateException(cause)
     def handler: PartialFunction[Throwable,Unit] = { case e:Throwable => throw new IllegalStateException(e) }

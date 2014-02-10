@@ -237,12 +237,25 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
       doFrame(d,r)
     }
   
-    private[StructParser] final def apply(d:CharReader) = try { frame(0)=0; doFrame(d,0) } catch { case `exit`=> }
+    /** Analyses the data in d.
+     *  This method is not thread safe.
+     */
+    private[StructParser] final def apply(d:CharReader) = try {
+      //reset variables ; ensures that we can reuse the same instance for consecutive runs
+      depth0=0
+      line0=0
+      str0=null
+      str1=null
+      frame(0)=0
+      doFrame(d,0)
+    } catch {
+      case `exit`=>
+    }
     
     def info(kind:Int,state:Int):String = s"transition from  state $state with kind $kind at line $line and depth $depth ; last token known: '$str'"
   }
   
-  final class Processor(i:Info) extends utils.parsers.Processor {
+  final protected class Processor(i:Info) extends utils.parsers.CharProcessor {
     def apply(d:CharReader):Unit = i(d)
     def state:State = i
   }
@@ -266,7 +279,7 @@ abstract class StructParser(open:Char,close:Char,equal:Char,sep:Char,quote:Char,
    * 
    * This is thread safe, except possibly spy which is used for update if so requested.
    */
-  def get:Processor = new Processor(new Info)
+  def newProc:Processor = new Processor(new Info)
   def abort(n:Int):Nothing = throw new Jump(n)
 }
 

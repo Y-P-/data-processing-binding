@@ -11,7 +11,7 @@ class StructParserTest(data:String) extends StandardTester {
     val parser = new StructParser('{','}','=',';','"','#',256,30,false,'^',Array(('t','\t'),('n','\n'),('u','+'))) with TestHandlerBridge {
       val out = out0
     }
-    parser.get(ByteArrayReader(file(data)))
+    parser.newProc(ByteArrayReader(file(data)))
   }
 }
 

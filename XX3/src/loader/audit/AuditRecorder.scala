@@ -62,4 +62,5 @@ object AuditRecorder {
 
   final val ignore = (ar:Recorder,lr:LogRecord) => true                //ignore log
   final val print  = (ar:Recorder,lr:LogRecord) => {println(lr);true}  //print log
+  final def print(out:java.io.PrintWriter) = (ar:Recorder,lr:LogRecord) => {out.println(lr);true}
 }

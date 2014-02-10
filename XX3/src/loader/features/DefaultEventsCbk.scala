@@ -49,6 +49,11 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
       }
       override def onVal[R<:R0](s:K, f: (K)=>R):R = {
         val r = f(s)
+        elt(ReadTagEvt(r, s))
+        r
+      }
+      override def onInclude[R<:R0](s:K, x:ParserBuilder.Exc[K], f: (K,ParserBuilder.Exc[K])=>R):R = {
+        val r = f(s,x)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
         r
@@ -76,6 +81,12 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
         elt(ReadTagEvt(r, s))
         r
       }
+      override def onInclude[R<:R0](s:K, x:ParserBuilder.Exc[K], f: (K,ParserBuilder.Exc[K])=>R):R = {
+        val r = f(s,x)
+        elt(IncludeSuccessEvt(s))
+        elt(ReadTagEvt(r, s))
+        r
+      }
       override def onEnd[R<:R0](f: =>R):R = {
         if (lst.fd.annot.min>0 && lst.index<lst.fd.annot.min || lst.fd.annot.max>0 && lst.index>lst.fd.annot.max)
           lst.parent(InvalidCardinalityEvt(lst.name, lst.fd.annot.min, lst.fd.annot.max, lst.index))
@@ -88,6 +99,12 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
     case _ => new Inner(e0) {
       override def onVal[R<:R0](s:K, f: (K)=>R):R = {
         val r = f(s)
+        elt(ReadTagEvt(r, s))
+        r
+      }
+      override def onInclude[R<:R0](s:K, x:ParserBuilder.Exc[K], f: (K,ParserBuilder.Exc[K])=>R):R = {
+        val r = f(s,x)
+        elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
         r
       }

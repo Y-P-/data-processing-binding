@@ -1,6 +1,7 @@
 package loader.core.callbacks
 
 import loader.core.definition._
+import loader.core.ParserBuilder
 
 /** Defines a Callback, which is some code which executes in place of the original code in a Motor#Element.
  *  Methods are redirected to the function values with the same name. The general contract for these functions is:
@@ -44,13 +45,13 @@ import loader.core.definition._
  *        Usure whether any of this has any significant impact.
  */
 abstract class Callback[-E0,-S0,-R0,K>:Null] { self=>
+  private type Ex = ParserBuilder.Exc[K]
   class Inner(protected[this] val elt:E0) {
     def onName[S<:S0](name:String, f: (String)=>S):S           = f(name)
     def onInit(f: =>Unit):Unit                                 = f
     def onBeg(f: =>Unit):Unit                                  = f
     def onVal[R<:R0](s:K,f: (K) =>R):R                         = f(s)
-    def isInclude(s:K,f: (K) =>Boolean):Boolean                = f(s)
-    def onInclude[R<:R0](s:K,f: (K) =>R):R                     = f(s)
+    def onInclude[R<:R0](s:K,e:Ex, f: (K,Ex) =>R):R            = f(s,e)
     def onEnd[R<:R0](f: =>R):R                                 = f
     def onChild[E<:E0,R<:R0](child:E,r:R,f: (E,R) =>Unit):Unit = f(child,r)  
   }
@@ -66,8 +67,7 @@ abstract class Callback[-E0,-S0,-R0,K>:Null] { self=>
         override def onName[S<:S1](name:String, f: (String)=>S):S           = cbOut.onName(name,cbIn.onName(_,f))
         override def onBeg(f: =>Unit):Unit                                  = cbOut.onBeg(cbIn.onBeg(f))
         override def onVal[R<:R1](s:K,f: (K)=>R):R                          = cbOut.onVal(s,cbIn.onVal(_,f))
-        override def isInclude(s:K,f: (K)=>Boolean):Boolean                 = cbOut.isInclude(s,cbIn.isInclude(_,f))
-        override def onInclude[R<:R1](s:K,f: (K)=>R):R                      = cbOut.onInclude(s,cbIn.onInclude(_,f))
+        override def onInclude[R<:R1](s:K, e:Ex, f: (K,Ex) =>R):R           = cbOut.onInclude(s,e,cbIn.onInclude(_,_,f))
         override def onEnd[R<:R1](f: =>R):R                                 = cbOut.onEnd(cbIn.onEnd(f))
         override def onChild[E<:E1,R<:R1](child:E,r:R,f: (E,R)=>Unit):Unit  = cbOut.onChild(child,r,cbIn.onChild(_:E,_:R,f))
       }
