@@ -25,8 +25,8 @@ object Core {
      */
     trait Motor extends super.Motor {
       //implementations : top builders
-      def apply(cbks:Cbks*):Top[Kind] = builder(new Status(""), cbks:_*)
-      def apply():Top[Kind] = builder(new Status(""))
+      def apply(cbks:Cbks*) = builder(new Status(""), cbks:_*)
+      def apply() = builder(new Status(""))
       
       //implementation of a full Element class using the motor defined methods
       class ElementBase(protected var parser0:Parser, val name: String, val parent: Element, val childBuilder: Bld) extends Element with Processor

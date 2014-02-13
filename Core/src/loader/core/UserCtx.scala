@@ -21,9 +21,7 @@ abstract class UserContext[-E<:Def#Elt] {
     /** qName for the element */
     def qName = QName(elt)
     /** Solving an include for e with data K */
-    def solveInclude(s:K):ParserBuilder.Exc[K] = null
-    /** Mapping the parser Kind to the processor Kind */
-    def getMapper(x:ParserBuilder#Executor):(Elt,x.builder.Kind)=>K = null
+    def solver(s:K):()=>elt.Ret = null
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
   }

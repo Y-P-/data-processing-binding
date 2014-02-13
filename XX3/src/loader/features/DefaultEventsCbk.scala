@@ -52,8 +52,8 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onInclude[R<:R0](s:K, x:ParserBuilder.Exc[K], f: (K,ParserBuilder.Exc[K])=>R):R = {
-        val r = f(s,x)
+      override def onInclude[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+        val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
         r
@@ -81,8 +81,8 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onInclude[R<:R0](s:K, x:ParserBuilder.Exc[K], f: (K,ParserBuilder.Exc[K])=>R):R = {
-        val r = f(s,x)
+      override def onInclude[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+        val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
         r
@@ -102,8 +102,8 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onInclude[R<:R0](s:K, x:ParserBuilder.Exc[K], f: (K,ParserBuilder.Exc[K])=>R):R = {
-        val r = f(s,x)
+      override def onInclude[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+        val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
         r

@@ -99,8 +99,8 @@ object CtxCore {
       protected def getData(parent:Element,s:Status):Data
       
       //implementations : top builders
-      def apply(fd:Context#FieldMapping,cbks:Cbks*):Top[Kind] = builder(new Status("",1,fd,false), cbks:_*)
-      def apply(fd:Context#FieldMapping):Top[Kind] = builder(new Status("",1,fd,false))
+      def apply(fd:Context#FieldMapping,cbks:Cbks*) = builder(new Status("",1,fd,false), cbks:_*)
+      def apply(fd:Context#FieldMapping) = builder(new Status("",1,fd,false))
       
       //a default stub ; it will be ovverriden by the Struct/List/Terminal implementation
       protected def onName(e:Element,name:String): Status  = null

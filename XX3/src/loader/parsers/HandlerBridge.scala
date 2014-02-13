@@ -3,7 +3,7 @@ package loader.parsers
 import java.net.URI
 import utils.parsers.State
 import utils.{CharReader,ByteArrayReader}
-import loader.core.{ParserBuilder,ParserSpawner,Locator}
+import loader.core.{AbstractParserBuilder,ParserBuilder,ParserSpawner,Locator}
 import loader.core.definition.Def
 
 /** A standard bridge between utils.parsers.Handler and ParserBuilder.Parser.
@@ -11,7 +11,7 @@ import loader.core.definition.Def
  *  - def apply(d:CharReader):Unit  (statring the underlying parser)
  *  - behaviour with abort
  */
-abstract class HandlerBridge extends ParserBuilder {self=>
+abstract class HandlerBridge extends AbstractParserBuilder {self=>
   import ParserBuilder._
 
   type Kind = String                              //produces strings
@@ -20,7 +20,7 @@ abstract class HandlerBridge extends ParserBuilder {self=>
   val procClass = classOf[Def]
   val kindClass = classOf[Kind]
   
-  trait Parser extends utils.parsers.Handler with Impl { self=>
+  trait Parser extends Impl with utils.parsers.Handler { self=>
     final protected[this] val proc = newProc
     def location:String = proc.state.line.toString
     def err(detail: String, cause: String): Nothing = throw new IllegalStateException(cause)
@@ -32,4 +32,5 @@ abstract class HandlerBridge extends ParserBuilder {self=>
     override def read(uri: URI, encoding: String): Unit = 
       this.apply(CharReader(ByteArrayReader(uri),if (encoding == null) "ISO-8859-15" else encoding))
   }
+  abstract class AbstractParser extends Parser
 }

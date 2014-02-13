@@ -30,10 +30,11 @@ object CtxTest {
     override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
     def apply(e:Elt) = new EltContext(e)
     class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
-      override def solveInclude(s:e.Kind):ParserBuilder.Exc[e.Kind] = {
+      override def solver(s:K):()=>e.Ret = {
         if (!s.asInstanceOf[String].startsWith("@include:")) return null
-        return null
-        //p.run(load("verysmall1"), "UTF-8")
+        return e.incl[String,e.Ret](null,
+                      p.run(load("verysmall1"), "UTF-8").asInstanceOf[(loader.core.ParserBuilder{type Kind <: String; type BaseProcessor >: loader.core.CtxCore.Def <: loader.core.definition.Def{type Ret <: loader.core.CtxCore.Def#Ret}})#Executor],
+                      null)
       }
       override def qName = {
         val q=super.qName

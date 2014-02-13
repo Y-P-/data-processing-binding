@@ -34,7 +34,7 @@ trait ParserBuilder {
   /** Element type produced by this parser */
   type Kind
   //The base processor kind accepted.
-  //Usually Def for generality, could be for exemple loader.motors.Struct.ctx.type for strong coupling.
+  //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
   type BaseProcessor <: Def { type Parser>:Impl }
   
@@ -46,40 +46,30 @@ trait ParserBuilder {
   /** Loading from an uri with encoding possibly specified. */
   def run(uri: URI, encoding: String) = exec(_.read(uri, encoding))
   /** running with that element builder as root */
-  def apply(start:BaseProcessor#Top[Kind]):Impl
+  def apply(start:BaseProcessor#Launcher[Kind]):Impl
   /** executor for a specific invoker */
   def exec(f: Impl=>Unit) = new Executor(f)
   
-  /**
-   * A class that contains all information required to run a parser, except the builder used.
+  /** A class that contains all information required to run a parser, except the builder used.
    *  It is most notably handy for turning the parser into an iterable or using xpath.
    *  You should normally not have to subclass this.
    */
   class Executor(f: Impl=>Unit) {
     import scala.language.existentials
     val builder:ParserBuilder.this.type = ParserBuilder.this
-    final def apply(start:builder.BaseProcessor#Top[builder.Kind]) = {
+    final def apply(start:BaseProcessor#Launcher[Kind]) = {
       val r = ParserBuilder.this.apply(start)
       r.invoke(f(r))
     }
   }
   
   trait Impl extends Locator {
-    def parsClass:Class[_<:Impl] = getClass
-    val start:BaseProcessor#Top[Kind]
-    //dynamic check to ensure that the parser can run with the processor.
-    //usually, the compile time check is sufficient, but not in case of includes.
-    // 1) Check parser is acceptable for processor
-    if (parsClass!=null && start.processor.parsClass!=null && !(start.processor.parsClass.isAssignableFrom(parsClass)))
-      throw new IncludeException(1,parsClass,start.processor.procClass)
-    // 2) Check processor is acceptable for parser
-    if (procClass!=null && start.processor.procClass!=null && !(procClass.isAssignableFrom(start.processor.procClass)))
-      throw new IncludeException(2,start.processor.procClass,parsClass)
-    // 3) Check parser kind is compatible with Top kind
-    start.check(ParserBuilder.this)
-    
+    type Kind = ParserBuilder.this.Kind
+    final def parsClass:Class[_<:Impl]        = getClass
     final val builder:ParserBuilder.this.type = ParserBuilder.this
-    val top:start.processor.Element = start.init(this)
+    val start:BaseProcessor#Launcher[Kind]
+    //creating the parser also creates the associated top element.
+    val top:start.Element = start(this)
     protected[this] var cur:top.Element = top
     protected[this] var ignore:Int = 0
     def current:top.Element = cur
@@ -144,12 +134,10 @@ object ParserBuilder {
   val skip    = new SkipException { override def fillInStackTrace() = this }
   
   /** define useful generics */
-  protected[this] type P0[-x] = ParserBuilder { type Kind>:x }
-  protected[this] type P1[+x] = ParserBuilder { type Kind<:x }
-  type Impl[-x] = P0[x]#Impl
-  type Exc[+x]  = P1[x]#Executor
+  type Impl[-x] = (ParserBuilder { type Kind>:x })#Impl
+  type Exc[+x]  = (ParserBuilder { type Kind<:x })#Executor
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class Impl extends super.Impl
+  abstract class AbstractImpl extends super.Impl
 }

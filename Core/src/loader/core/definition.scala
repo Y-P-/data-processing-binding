@@ -10,29 +10,6 @@ object definition {
   
   //val isIncludeException = new Exception { override def fillInStackTrace = this }
   
-  /** Binds together a processor (type Def), a parser (through the init method which creates that processor initial element),
-   *  and a mapper method (which bridges the gap between the parser produced type and the processor expected type.)
-   */
-  abstract class Top[-Kind:ClassTag,+D<:Def] protected (val processor:D) {
-    val kindClass = implicitly[ClassTag[Kind]].runtimeClass
-    def init:processor.Parser=>processor.Element
-    def mapper:(processor.Element,Kind)=>processor.Kind  //cannot be argument because of processor dependance
-    def map(elt:processor.Element,s:Kind):processor.Kind = if (mapper==null) s.asInstanceOf[processor.Kind] else mapper(elt,s)
-    def check(p:ParserBuilder) = if (kindClass!=null && p.kindClass!=null && !kindClass.isAssignableFrom(p.kindClass)) throw new IncludeException(3,p.kindClass,kindClass)
-  }
-  object Top {
-    /** Factory. Necessary because dependent types are not supported by class constructors.
-     *  @param processor, the processor used
-     *  @param mapper0, a mapping method to go from Kind to processor.Kind ; if null, both are assumed equal
-     *  @param init0, the method that returns the top element spawned by a parser for the given processor ; usually this implies some call to that processor EltBuilder method
-     */
-    def apply[Kind:ClassTag,D<:Def](processor:D)(mapper0:(processor.Element,Kind)=>processor.Kind, init0:processor.Parser=>processor.Element):Top[Kind,processor.type] =
-      new Top[Kind,processor.type](processor) {
-        val init   = init0
-        val mapper = mapper0
-      }
-  }
-  
   /** This serves as a base for Status.
    *  In turn, Status is a class that serves as intermediary to build a child item from a parent item.
    */
@@ -62,6 +39,83 @@ object definition {
     def procClass = getClass
     def parsClass:Class[_<:ParserBuilder#Impl]
     def kindClass:Class[Kind]
+    implicit val kindTag:ClassTag[Kind] = ClassTag(kindClass)
+    
+    /** Binds together a processor (type Def), a parser (through the init method which creates that processor initial element),
+     *  and a mapper method (which bridges the gap between the parser produced type and the processor expected type.)
+     *  @param K, the kind of data produced by the parser
+     *  @param P, the parser class used, that produces tokens of class K
+     *  @param mapper, a method that converts K to Kind, the data type expected by the processor ; if null, we assume K=Kind
+     *  @param init, the method that spawns the top element ; this is usually produced through the appropriate call to an EltBuilder
+     */
+    final class Launcher[-K:ClassTag] (mapper:(Element,K)=>Kind, init: Parser=>Element) {
+      final type Element = Def.this.Element
+      val kindClass = implicitly[ClassTag[K]].runtimeClass
+      def map(elt:Element,s:K):Kind = if (mapper==null) s.asInstanceOf[Kind] else mapper(elt,s)
+      /** Creates the top Element for the given parser. This indeed does the binding between parser and processor. */
+      def apply(p:Parser { type Kind<:K }):Element = {
+        //XXX change the exception (not include!), see the associated messages
+        //XXX check K vs Kind ?
+        //dynamic check to ensure that the parser can run with the processor.
+        //usually, the compile time check is sufficient, but not in case of includes.
+        // 1) Check parser is acceptable for processor
+        if (p.parsClass!=null && parsClass!=null && !(parsClass.isAssignableFrom(p.parsClass)))
+          throw new IncludeException(1,p.parsClass,procClass)
+        // 2) Check processor is acceptable for parser
+        if (p.builder.procClass!=null && procClass!=null && !(p.builder.procClass.isAssignableFrom(procClass)))
+          throw new IncludeException(2,procClass,p.builder.procClass)
+        // 3) Check parser kind is compatible with Top kind
+        if (kindClass!=null && p.builder.kindClass!=null && !kindClass.isAssignableFrom(p.builder.kindClass))
+          throw new IncludeException(3,p.builder.kindClass,kindClass)
+        init(p)
+      }
+    }
+    
+    /** Describes the requirements for an include, i.e. a sub-engine that works from the current processor state.
+     *  When the sub-engine exits, the processor is left in the same state as it entered (i.e. same current element.)
+     *  @param K, the kind of data produced by the sub-parser
+     *  @param R, the kind of result produced by the sub-engine
+     *  @param mapper, a method to coerce K to Kind (expected by the current engine)
+     *  @param exc, an executor that contains the data to include
+     *  @param retMapper, a method to coerce return data
+     */
+    class Include[+K:ClassTag,+R>:Ret] (
+              mapper:(Element,K)=>Kind,
+              exc:(ParserBuilder { type Kind<:K; type BaseProcessor >: selfDef.type <: loader.core.definition.Def { type Ret<:R } }) # Executor,
+              retMapper:R=>Ret
+            )  extends (Element=>Ret) {
+      def apply(elt:Element):Ret = {
+        val old = elt.parser
+        try {
+          //create a Launcher using this processor and the current element
+          //replace the current element parser with the new one
+          //then start the executor and coerce the returned value to the appropriate Ret value
+          val r = exc(selfDef(mapper,(p:Parser)=>{elt.parser=p; elt}))
+          if (retMapper==null) r.asInstanceOf[Ret] else retMapper(r)
+        } finally {
+          elt.parser=old
+        }        
+      }
+    }
+    object Include {
+      def apply(exc:ParserBuilder#Executor) = {
+        type K = Kind
+        type R = Ret
+        new Include[K,R](
+          null,
+          exc.asInstanceOf[(ParserBuilder { type Kind<:K; type BaseProcessor >: selfDef.type <: loader.core.definition.Def { type Ret<:R } }) # Executor],
+          null)
+      }
+    }
+    
+    /** Creates the association that binds this processor with a Parser implementation.
+     */
+    def apply[K:ClassTag](mapper:(Element,K)=>Kind,builder:EltBuilder,s:Status,cbks:Cbks*):Launcher[K] =
+      new Launcher[K](mapper,p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
+    def apply[K:ClassTag](mapper:(Element,K)=>Kind,init:Parser=>Element):Launcher[K] =
+      new Launcher[K](mapper,init)
+
+    
     
     /** The standard, elementary methods dealing with parser events ; a subclass will usually refine this
      *  The order in which these methods are executed is:
@@ -86,12 +140,17 @@ object definition {
       def parser : Parser
       def definition:Def.this.type = Def.this
       protected def onName(name: String): Status
-      protected def onInit(): Unit                                      //called on all elements on creation
-      protected def onBeg(): Unit                                       //called on beginning of a struct
-      protected def onVal(v: Kind): Ret                                 //called when receiving a value
-      protected def onInclude(v: Kind, e: ParserBuilder.Exc[Kind]): Ret //called when receiving an include (as defined by the EltCtx solveInclude)
-      protected def onEnd(): Ret                                        //called at the end of a struct
-      protected def onChild(child: Element, r: Ret): Unit               //called when a struct is receiving a child value
+      protected def onInit(): Unit                             //called on all elements on creation
+      protected def onBeg(): Unit                              //called on beginning of a struct
+      protected def onVal(v: Kind): Ret                        //called when receiving a value
+      protected def onInclude(v: Kind, e: ()=>Ret): Ret        //called when receiving an include (as defined by the EltCtx solveInclude)
+      protected def onEnd(): Ret                               //called at the end of a struct
+      protected def onChild(child: Element, r: Ret): Unit      //called when a struct is receiving a child value
+      def incl[K:ClassTag,R>:Ret] (
+              mapper:(Element,K)=>Kind,
+              exc:(ParserBuilder { type Kind<:K; type BaseProcessor >: selfDef.type <: loader.core.definition.Def { type Ret<:R } }) # Executor,
+              retMapper:R=>Ret
+            ):()=>Ret
     }
     
     /** Reason for which Impl exists.
@@ -107,8 +166,8 @@ object definition {
       /** Fields */
       def parent : Element  //parent item
       def name   : String   //element name
-      def parser : Parser   //parser creating that element
-      protected def parser_=(parser:Parser):Unit //parser has write access for handling includes
+      def parser : Parser   //parser creating that element: Beware => this can change in case of includes
+      protected[Def] def parser_=(parser:Parser):Unit //parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
       def childBuilder:Bld
       /** building a child spawning children of a possibly different nature */
@@ -130,6 +189,31 @@ object definition {
         case h    => h.applyOrElse((this,evt),(x:(Element,Event))=>())
       }
       
+     /** Builds an include on the current element, i.e. a sub-engine that works from the current processor state.
+      *  When the sub-engine exits, the processor is left in the same state as it entered (i.e. same current element.)
+      *  @param K, the kind of data produced by the sub-parser
+      *  @param R, the kind of result produced by the sub-engine
+      *  @param mapper, a method to coerce K to Kind (expected by the current engine)
+      *  @param exc, an executor that contains the data to include
+      *  @param retMapper, a method to coerce return data
+      */
+      def incl[K:ClassTag,R>:Ret] (
+              mapper:(Element,K)=>Kind,
+              exc:(ParserBuilder { type Kind<:K; type BaseProcessor >: selfDef.type <: loader.core.definition.Def { type Ret<:R } }) # Executor,
+              retMapper:R=>Ret
+            ):()=>Ret = ()=>{
+        val old = parser
+        try {
+          //create a Launcher using this processor and the current element
+          //replace the current element parser with the new one
+          //then start the executor and coerce the returned value to the appropriate Ret value
+          val r:R = exc(selfDef(mapper,(p:Parser)=>{parser=p; self}))
+          if (retMapper==null) r.asInstanceOf[Ret] else retMapper(r)
+        } finally {
+          parser=old
+        }        
+      }
+      
       /** Ensure the call to doBeg is done as late as possible, but in time. begDone ~ lazy val */
       private var begDone=false
       private def doBeg():Unit = if (!begDone) { begDone=true; if (parent!=null) parent.doBeg; onBeg; }
@@ -141,44 +225,21 @@ object definition {
       def pull(v:Kind)   = {
         parent.doBeg
         parent.onChild(this,
-          eltCtx.solveInclude(v) match {
+          eltCtx.solver(v) match {
             case null => onVal(v)
             case i    => onInclude(v,i)
           })
       }
       
-      /** standard invoker, used on the top level element */
+      /** standard invoker, used on the top level elements */
       def invoke(f: =>Unit): Ret = {
         if (!isInclude) onBeg()  //onBeg method as already been called on included elements
         f
         onEnd() //note that for included elements, the onBeg was called using the top parser when the onEnd is called using the bottom one.
       }
       
-      /** Used to change the parser during an include. */
-      //creates a Top from this element for an include
-      //callbacks are automatically carried over
-      //!! Mutation: we change the current parser for this element
-      //the parser will do some runtime checks to ensure that the processor (Element) and parser (from P) can work together.
-      //the casts that follow will then work.
-      //We must check:
-      // - we have a transformer function from the the new parser kind to the current kind
-      // - we use a processor supported by the new parser and that the new parser is accepted by this processor.
-      //protected def asTop(x:ParserBuilder.Exc[Kind])(mapper:(Element,x.builder.Kind)=>Kind) = new Top[x.builder.Kind](mapper,x.builder.kindClass,childBuilder,null,null) {
-      //  override def init:Parser=>processor.Element = (p) => { self.parser = p; self }
-      //}
-      
-      /** Handles an include */
-      protected def onInclude(v:Kind, x:ParserBuilder.Exc[Kind]): Ret = {
-        val old = parser
-        try {
-          //We are going to spawn a parser executor out of nowhere.
-          //There is no reason that it can accept the current Processor and we have to check this and then cast as appropriate (see asInclude).
-          //XXX x(asTop(x)(eltCtx.getMapper(x)).asInstanceOf[x.builder.BaseProcessor#Top[x.builder.Kind]]).asInstanceOf[Ret]  //run it with this element as top element; The return cast is always true because the element we are working on is still in the same class as this
-          null.asInstanceOf[Ret]
-        } finally {
-          parser = old
-        }
-      }
+      /** the standard processing for includes. This likely should not be altered. */
+      protected def onInclude(v: Kind, e: ()=>Ret): Ret = e()
             
       /** Some convenient methods.
        *  Methods prefixed by g are general and use up the full parent chain.
@@ -205,12 +266,6 @@ object definition {
       def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.name}"))
       override def toString = { val s=new java.io.StringWriter; print(s); s.toString }      
     }
-    
-    type Top[-k] = definition.Top[k,Def.this.type]
-    def top[K:ClassTag](mapper:(Element,K)=>Kind,builder:EltBuilder,s:Status):Top[K] =
-      Top(Def.this)(mapper,builder(_,s))
-    def top[K:ClassTag](mapper:(Element,K)=>Kind,builder:EltBuilder,s:Status,cbks:Cbks*):Top[K] =
-      Top(Def.this)(mapper,p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
       
     /** Defines how Element are built.
      *  - apply(Element,Status,Bld)           is the nominal builder
@@ -221,14 +276,14 @@ object definition {
      *  - apply(Status)                       a builder for a root element (no parent) which uses the current builder for its children
      */
     abstract class EltBuilder {
-      def apply(s: Status):Top[Kind]                                                 = top[Kind](null.asInstanceOf[(Element,Kind)=>Kind],this,s)(ClassTag(kindClass))
-      def apply(s: Status, cbks: Cbks*):Top[Kind]                                    = top[Kind](null.asInstanceOf[(Element,Kind)=>Kind],this,s,cbks:_*)(ClassTag(kindClass))
-      def apply[K:ClassTag](mapper:(Element,K)=>Kind, s: Status):Top[K]              = top(mapper,this,s)
-      def apply[K:ClassTag](mapper:(Element,K)=>Kind, s: Status, cbks: Cbks*):Top[K] = top(mapper,this,s,cbks:_*)
-      def apply(p: Parser, s: Status): Element                                                     = apply(p,null,s,this)
-      def apply(p: Parser, s: Status, childBuilder: Bld): Element                                  = apply(p,null,s,childBuilder)
-      def apply(p: Parser, s: Status, cbks: Cbks*): Element                                        = apply(p,s,this,cbks:_*)
-      def apply(p: Parser, s: Status, childBuilder: Bld, cbks: Cbks*): Element                     = WithCallbacks(p,null,s,cbks,childBuilder,childBuilder)
+      def apply(s: Status)                                                          = Def.this.apply(null.asInstanceOf[(Element,Kind)=>Kind],this,s)
+      def apply(s: Status, cbks: Cbks*)                                             = Def.this.apply(null.asInstanceOf[(Element,Kind)=>Kind],this,s,cbks:_*)
+      def apply[K:ClassTag](mapper:(Element,K)=>Kind, s: Status)                    = Def.this.apply(mapper,this,s)
+      def apply[K:ClassTag](mapper:(Element,K)=>Kind, s: Status, cbks: Cbks*)       = Def.this.apply(mapper,this,s,cbks:_*)
+      def apply(p: Parser, s: Status): Element                                      = apply(p,null,s,this)
+      def apply(p: Parser, s: Status, childBuilder: Bld): Element                   = apply(p,null,s,childBuilder)
+      def apply(p: Parser, s: Status, cbks: Cbks*): Element                         = apply(p,s,this,cbks:_*)
+      def apply(p: Parser, s: Status, childBuilder: Bld, cbks: Cbks*): Element      = WithCallbacks(p,null,s,cbks,childBuilder,childBuilder)
       def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld): Element
       def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld, cbks: Cbks*): Element with WithCallbacks
       def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld, cb: Cbk, cbks: Cbks*): Element with WithCallback
@@ -240,12 +295,12 @@ object definition {
       /** When handling Callbacks, we will want to reach the parent behaviour. */
       val cb: callbacks.Callback[Element,Status,Ret,Kind] //the callback for the current element
       val cbx = cb(this)
-      abstract override protected def onName(name: String): Status                        = if (cbx==null) super.onName(name) else cbx.onName(name, super.onName)
-      abstract override protected def onBeg(): Unit                                       = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
-      abstract override protected def onVal(v: Kind): Ret                                 = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
-      abstract override protected def onInclude(v: Kind, x: ParserBuilder.Exc[Kind]): Ret = if (cbx==null) super.onInclude(v,x) else cbx.onInclude(v, x, super.onInclude)
-      abstract override protected def onEnd(): Ret                                        = if (cbx==null) super.onEnd() else cbx.onEnd(super.onEnd)
-      abstract override protected def onChild(child: Element, r: Ret): Unit               = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
+      abstract override protected def onName(name: String): Status               = if (cbx==null) super.onName(name) else cbx.onName(name, super.onName)
+      abstract override protected def onBeg(): Unit                              = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
+      abstract override protected def onVal(v: Kind): Ret                        = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
+      abstract override protected def onInclude(v: Kind, x: ()=>Ret): Ret        = if (cbx==null) super.onInclude(v,x) else cbx.onInclude(v, x, super.onInclude)
+      abstract override protected def onEnd(): Ret                               = if (cbx==null) super.onEnd() else cbx.onEnd(super.onEnd)
+      abstract override protected def onChild(child: Element, r: Ret): Unit      = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
     }
     /** Modifies the current element to manage a callback tree
      *  Children are built according to the following rules:
@@ -363,11 +418,12 @@ object definition {
          */
         protected[this] var parser0:Parser
         def parser = parser0
-        protected def parser_=(parser:Parser):Unit = parser0=parser
+        protected[definition] def parser_=(parser:Parser):Unit = parser0=parser
       }  
     }
     
     implicit def toBuilder(impl:Impl):Bld = impl.builder
   }
 
+  type D0[-i,+r] = Def { type Parser>:i; type Ret<:r }
 }

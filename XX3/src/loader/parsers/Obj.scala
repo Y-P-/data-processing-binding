@@ -6,9 +6,9 @@ import utils.parsers.CharProcessor
 
 class Obj() extends HandlerBridge {self=>
 
-  def apply(start:BaseProcessor#Top[Kind]):Parser = new Parser(start)
+  def apply(start:BaseProcessor#Launcher[Kind]):Parser = new Parser(start)
   
-  class Parser(val start:BaseProcessor#Top[Kind]) extends super.Parser { self=>
+  class Parser(val start:BaseProcessor#Launcher[Kind]) extends super.Parser { self=>
     def newProc:CharProcessor = null
     override final val canSkip:Boolean = true
     override def skipToEnd():Nothing = throw new IllegalStateException //abort(0)  //this parser can skip to the end of the current data structure
