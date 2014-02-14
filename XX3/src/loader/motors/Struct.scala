@@ -17,9 +17,7 @@ object Struct extends Processor {self=>
     type Kind    = String
     type Ret     = Unit
     type Data    = Null
-    type Parser  = ParserBuilder#Impl  //any parser
-    def kindClass = classOf[Kind]
-    def parsClass = classOf[Parser]
+    type Parser  = ParserBuilder#Parser  //any parser
     
     /**
      * @param out, where to write to
@@ -32,7 +30,7 @@ object Struct extends Processor {self=>
       val out:Writer  //where to write to
       val indent:Int  //indent value as space number ; 0 means all output on one line
     
-      type Result = Unit
+      type Ret = Unit
  
       protected def getData(parent:Element,s:Status):Data = null
 

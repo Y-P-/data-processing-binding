@@ -33,7 +33,7 @@ object CtxTest {
       override def solver(s:K):()=>e.Ret = {
         if (!s.asInstanceOf[String].startsWith("@include:")) return null
         return e.incl[String,e.Ret](null,
-                      p.run(load("verysmall1"), "UTF-8").asInstanceOf[(loader.core.ParserBuilder{type Kind <: String; type BaseProcessor >: loader.core.CtxCore.Def <: loader.core.definition.Def{type Ret <: loader.core.CtxCore.Def#Ret}})#Executor],
+                      //p.run(load("verysmall1"), "UTF-8").asInstanceOf[(loader.core.ParserBuilder{type Kind <: String; type BaseProcessor >: loader.core.CtxCore.Def <: loader.core.definition.Def{type Ret <: loader.core.CtxCore.Def#Ret}})#Executor],
                       null)
       }
       override def qName = {
@@ -48,7 +48,8 @@ object CtxTest {
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       val m = new motors.Struct.ctx.Motor(out,2,userCtx)
-      p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top])))
+      m(ClassContext(classOf[Data.Top])).run(p,load("small"))
+      //p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top])))
     }
   }
   @Test class CtxCbkTest extends StandardTester {
