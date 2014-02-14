@@ -38,7 +38,7 @@ trait ParserBuilder {self=>
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
-  type BaseProcessor <: Def { type Parser>:self.Parser }
+  type BaseProcessor <: Def { type PB>:self.Parser }
   
   def procClass:Class[_<:BaseProcessor]
   def kindClass:Class[_<:Kind]
@@ -112,7 +112,9 @@ object ParserBuilder {
   class SkipException extends Exception
   val skipEnd = new SkipException { override def fillInStackTrace() = this }
   val skip    = new SkipException { override def fillInStackTrace() = this }
-  type Impl[+k] = (ParserBuilder { type Kind<:k })#Parser
+  
+  type This[-Proc,+k] = ParserBuilder { type Kind<:k; type BaseProcessor>:Proc }
+  type Impl[+k] = PB[Any,k]#Parser
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {

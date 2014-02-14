@@ -25,7 +25,7 @@ object definition {
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
   trait Def { selfDef=>
-    type PB[+k] <: ParserBuilder { type BaseProcessor>:selfDef.type; type Kind<:k }
+    type PB[+k] <: ParserBuilder.This[this.type,k]
     type Parser = PB[Any]#Parser //most of the time, we don't care about the kind produced by the parser
     type Kind>:Null
     type Ret
