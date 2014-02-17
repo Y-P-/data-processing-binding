@@ -25,20 +25,20 @@ object definition {
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
   trait Def { selfDef=>
-    type PB[+k] <: ParserBuilder.This[this.type,k]
-    type Parser = PB[Any]#Parser //most of the time, we don't care about the kind produced by the parser
     type Kind>:Null
     type Ret
     type Element  >: Null <: Elt
+    type Parser   <: ParserBuilder#Impl
     type Status   >: Null <:definition.Status
     type UserCtx = UserContext[Element]
     type Cbk     = callbacks.Callback[Element,Status,Ret,Kind]
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Kind]
     type Bld     = EltBuilder
     
-    def parsClass:Class[_<:ParserBuilder#Parser]
-    def kindClass:Class[_<:Kind]
-    
+    //these do not have to be filled up; they will allow a runtime check on include if they are.
+    def procClass = getClass
+    def parsClass:Class[_<:ParserBuilder#Impl]
+    def kindClass:Class[Kind]
     implicit val kindTag:ClassTag[Kind] = ClassTag(kindClass)
     
     /** Binds together a processor (type Def), a parser (through the init method which creates that processor initial element),
@@ -53,36 +53,28 @@ object definition {
       val kindClass = implicitly[ClassTag[K]].runtimeClass
       def map(elt:Element,s:K):Kind = if (mapper==null) s.asInstanceOf[Kind] else mapper(elt,s)
       /** Creates the top Element for the given parser. This indeed does the binding between parser and processor. */
-      def apply(p:PB[K]#Parser):Element = {
+      def apply(p:Parser { type Kind<:K }):Element = {
         //XXX change the exception (not include!), see the associated messages
         //XXX check K vs Kind ?
         //dynamic check to ensure that the parser can run with the processor.
         //usually, the compile time check is sufficient, but not in case of includes.
         // 1) Check parser is acceptable for processor
-        //if (p.parsClass!=null && parsClass!=null && !(parsClass.isAssignableFrom(p.parsClass)))
-        //  throw new IncludeException(1,p.parsClass,procClass)
+        if (p.parsClass!=null && parsClass!=null && !(parsClass.isAssignableFrom(p.parsClass)))
+          throw new IncludeException(1,p.parsClass,procClass)
         // 2) Check processor is acceptable for parser
-        //if (p.procClass!=null && procClass!=null && !(p.procClass.isAssignableFrom(procClass)))
-        //  throw new IncludeException(2,procClass,p.procClass)
+        if (p.builder.procClass!=null && procClass!=null && !(p.builder.procClass.isAssignableFrom(procClass)))
+          throw new IncludeException(2,procClass,p.builder.procClass)
         // 3) Check parser kind is compatible with Top kind
-        //if (kindClass!=null && p.kindClass!=null && !kindClass.isAssignableFrom(p.kindClass))
-        //  throw new IncludeException(3,p.kindClass,kindClass)
+        if (kindClass!=null && p.builder.kindClass!=null && !kindClass.isAssignableFrom(p.builder.kindClass))
+          throw new IncludeException(3,p.builder.kindClass,kindClass)
         init(p)
       }
-      def apply(p:PB[K])(f:p.Parser=>Unit):Ret = {
-        val r = p(this)
-        r.invoke(f(r))
-      }
-      /** Loading from a Reader. */
-      def run(p:PB[K], in: java.io.Reader) = this(p)(_.read(in))
-      /** Loading from an uri with encoding possibly specified. */
-      def run(p:PB[K], uri: java.net.URI, encoding: String) = this(p)(_.read(uri, encoding))
     }
     
     /** Creates the association that binds this processor with a Parser implementation.
      */
     def apply[K:ClassTag](mapper:(Element,K)=>Kind,builder:EltBuilder,s:Status,cbks:Cbks*):Launcher[K] =
-      new Launcher[K](mapper,(p:Parser)=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
+      new Launcher[K](mapper,p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
     def apply[K:ClassTag](mapper:(Element,K)=>Kind,init:Parser=>Element):Launcher[K] =
       new Launcher[K](mapper,init)
 
@@ -119,6 +111,7 @@ object definition {
       protected def onChild(child: Element, r: Ret): Unit      //called when a struct is receiving a child value
       def incl[K:ClassTag,R>:Ret] (
               mapper:(Element,K)=>Kind,
+              exc:(ParserBuilder { type Kind<:K; type BaseProcessor >: selfDef.type <: loader.core.definition.Def { type Ret<:R } }) # Executor,
               retMapper:R=>Ret
             ):()=>Ret
     }
@@ -169,6 +162,7 @@ object definition {
       */
       def incl[K:ClassTag,R>:Ret] (
               mapper:(Element,K)=>Kind,
+              exc:(ParserBuilder { type Kind<:K; type BaseProcessor >: selfDef.type <: loader.core.definition.Def { type Ret<:R } }) # Executor,
               retMapper:R=>Ret
             ):()=>Ret = ()=>{
         val old = parser
@@ -176,7 +170,7 @@ object definition {
           //create a Launcher using this processor and the current element
           //replace the current element parser with the new one
           //then start the executor and coerce the returned value to the appropriate Ret value
-          val r:R = null.asInstanceOf[R]//exc(selfDef(mapper,(p:Parser)=>{parser=p; self}))
+          val r:R = exc(selfDef(mapper,(p:Parser)=>{parser=p; self}))
           if (retMapper==null) r.asInstanceOf[Ret] else retMapper(r)
         } finally {
           parser=old
