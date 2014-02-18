@@ -15,10 +15,9 @@ object ExtCore {
     }
   }
 
-  trait Impl extends definition.Impl with Def {
+  trait Impl extends definition.Impl with Def { self=>
     type Status = Core.Status
     type Element = Elt
-    trait Motor extends super.Motor { self=>
       protected def getData(parent:Element,s:Status):Data
       //implementations
       protected def onName(e:Element,name:String) = new Status(name)
@@ -35,6 +34,5 @@ object ExtCore {
         def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cbks: Cbks*)         = new ElementCbks(parser,s,parent,childBuilder, cbks:_*)
         def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,s,parent,childBuilder, cb, cbks:_*)
       }
-    }
   }
 }

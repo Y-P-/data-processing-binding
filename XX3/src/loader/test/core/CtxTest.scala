@@ -48,14 +48,14 @@ object CtxTest {
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       val m = new motors.Struct.ctx.Motor(out,2,userCtx)
-      p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top])))
+  //    p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top])))
     }
   }
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       userCtx.buf.getBuffer.setLength(0) //reset buffer
       val m = new motors.Struct.ctx.Motor(out,2,userCtx)
-      p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Unit,String]))
+  //    p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Unit,String]))
       out.print(userCtx.buf)
     }
   }

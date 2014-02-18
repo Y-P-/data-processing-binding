@@ -29,53 +29,33 @@ trait Locator {
  * This means that the top element onBeg/onEnd methods must be called by the user, if necessary.
  * 
  */
-trait ParserBuilder {
+trait ParserBuilder {self=>
 
   /** Element type produced by this parser */
   type Kind
+  /** Actual parser implementation */
+  type Parser <: Impl
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
-  type BaseProcessor <: Def { type Parser>:Impl }
+  type BaseProcessor <: Def { type BaseParser >: self.type }
+
   
-  def procClass:Class[_<:Def]
-  def kindClass:Class[Kind]
-    
-  /** Loading from a Reader. */
-  def run(in: Reader) = exec((x:Impl)=>x.read(in))
-  /** Loading from an uri with encoding possibly specified. */
-  def run(uri: URI, encoding: String) = exec(_.read(uri, encoding))
-  /** running with that element builder as root */
-  def apply(start:BaseProcessor#Launcher[Kind]):Impl
-  /** executor for a specific invoker */
-  def exec(f: Impl=>Unit) = new Executor(f)
+  /** factory for Parser */
+  def apply(bp:BaseProcessor)(f:bp.Launcher[self.type]#X):Parser
   
-  /** A class that contains all information required to run a parser, except the builder used.
-   *  It is most notably handy for turning the parser into an iterable or using xpath.
-   *  You should normally not have to subclass this.
-   */
-  class Executor(f: Impl=>Unit) {
-    import scala.language.existentials
-    val builder:ParserBuilder.this.type = ParserBuilder.this
-    final def apply(start:BaseProcessor#Launcher[Kind]) = {
-      val r = ParserBuilder.this.apply(start)
-      r.invoke(f(r))
-    }
-  }
-  
-  trait Impl extends Locator {
-    type Kind = ParserBuilder.this.Kind
-    final def parsClass:Class[_<:Impl]        = getClass
+  trait Impl extends Locator {this:Parser=>
     final val builder:ParserBuilder.this.type = ParserBuilder.this
-    val start:BaseProcessor#Launcher[Kind]
+    val proc:BaseProcessor
+    val first:proc.Launcher[self.type]#X
     //creating the parser also creates the associated top element.
-    val top:start.Element = start(this)
-    protected[this] var cur:top.Element = top
+    val top:proc.Element = first.initialize(this)
+    protected[this] var cur:proc.Element = top
     protected[this] var ignore:Int = 0
-    def current:top.Element = cur
+    def current:proc.Element = cur
     def userCtx = top.userCtx
     def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()  } catch errHandler finally { cur=cur.parent }
-    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(start.map(cur,v)) } catch errHandler finally { cur=cur.parent }
+    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(first.map(cur,v)) } catch errHandler finally { cur=cur.parent }
     def push(name: String):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
       try { cur=cur.push(name) } catch {
@@ -85,8 +65,8 @@ trait ParserBuilder {
         case e:Throwable            => errHandler(e); ignore+=1 
       }
     }
-    def invoke(f: => Unit):top.Ret = {
-      val r=cur.invoke(f)
+    def invoke(f: this.type => Unit):proc.Ret = {
+      val r=cur.invoke(f(this))
       if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
       r
     }
@@ -132,12 +112,8 @@ object ParserBuilder {
   class SkipException extends Exception
   val skipEnd = new SkipException { override def fillInStackTrace() = this }
   val skip    = new SkipException { override def fillInStackTrace() = this }
-  
-  /** define useful generics */
-  type Impl[-x] = (ParserBuilder { type Kind>:x })#Impl
-  type Exc[+x]  = (ParserBuilder { type Kind<:x })#Executor
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl extends super.Impl
+  abstract class AbstractImpl extends super.Impl { this:Parser=> }
 }

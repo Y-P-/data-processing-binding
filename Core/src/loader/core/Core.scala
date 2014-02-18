@@ -23,10 +23,8 @@ object Core {
     /** Motor simplifies the development of processors by focusing on what must be done.
      *  It removes the burden of defining basic classes and builders.
      */
-    trait Motor extends super.Motor {
       //implementations : top builders
-      def apply(cbks:Cbks*) = builder(new Status(""), cbks:_*)
-      def apply() = builder(new Status(""))
+      def apply(bp:BaseParser,cbks:Cbks*):Launcher[bp.type]#X = launch(bp).attach(new Status(""), cbks:_*)
       
       //implementation of a full Element class using the motor defined methods
       class ElementBase(protected var parser0:Parser, val name: String, val parent: Element, val childBuilder: Bld) extends Element with Processor
@@ -39,6 +37,5 @@ object Core {
         def apply(parser:Parser, parent: Element, c: Status, childBuilder: Bld, cbks: Cbks*)         = new ElementCbks(parser,c.name,parent,childBuilder,cbks:_*)
         def apply(parser:Parser, parent: Element, c: Status, childBuilder: Bld, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,c.name,parent,childBuilder,cb,cbks:_*)
       }
-    }
   }
 }

@@ -14,19 +14,19 @@ import loader.core.definition.Def
 abstract class HandlerBridge extends AbstractParserBuilder {self=>
   import ParserBuilder._
 
-  type Kind = String                              //produces strings
-  type BaseProcessor = Def { type Parser>:Impl }  //any processor
+  type Kind = String                                     //produces strings
+  type BaseProcessor = Def { type Parser>:self.Parser }  //any processor
   
   val procClass = classOf[Def]
   val kindClass = classOf[Kind]
   
   trait Parser extends Impl with utils.parsers.Handler { self=>
-    final protected[this] val proc = newProc
-    def location:String = proc.state.line.toString
+    final protected[this] val charProc = newProc
+    def location:String = charProc.state.line.toString
     def err(detail: String, cause: String): Nothing = throw new IllegalStateException(cause)
     def handler: PartialFunction[Throwable,Unit] = { case e:Throwable => throw new IllegalStateException(e) }
     def push(idx: Int): Unit = push("")
-    def apply(d:CharReader):Unit = proc(d)
+    def apply(d:CharReader):Unit = charProc(d)
     def read(in: java.io.Reader): Unit = this.apply(in)
     
     override def read(uri: URI, encoding: String): Unit = 

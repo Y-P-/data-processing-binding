@@ -95,24 +95,23 @@ object CtxCore {
    */
   trait Impl extends definition.Impl with Def { impl=>
     type Element = Elt
-    trait Motor extends super.Motor { motor=>
       protected def getData(parent:Element,s:Status):Data
       
       //implementations : top builders
-      def apply(fd:Context#FieldMapping,cbks:Cbks*) = builder(new Status("",1,fd,false), cbks:_*)
-      def apply(fd:Context#FieldMapping) = builder(new Status("",1,fd,false))
+      def apply(bp:BaseParser,fd:Context#FieldMapping,cbks:Cbks*) = launch(bp).attach(new Status("",1,fd,false), cbks:_*)
+      def apply(bp:BaseParser,fd:Context#FieldMapping) = launch(bp).attach(new Status("",1,fd,false))
       
-      //a default stub ; it will be ovverriden by the Struct/List/Terminal implementation
+      //a default stub ; it will be overriden by the Struct/List/Terminal implementation
       protected def onName(e:Element,name:String): Status  = null
       
       //concrete definitions
       class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val childBuilder:Bld, val data:Data) extends Processor with Element {
-        def this(parser:Parser, s:Status, parent:Element, childBuilder:Bld) = this(parser,s.name,parent,s.fd,s.idx,childBuilder,motor.getData(parent, s))
-        def getData(s: Status) = motor.getData(this,s)
+        def this(parser:Parser, s:Status, parent:Element, childBuilder:Bld) = this(parser,s.name,parent,s.fd,s.idx,childBuilder,impl.getData(parent, s))
+        def getData(s: Status) = impl.getData(this,s)
       }
-      class Struct(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                             extends ElementBase(parser,s,parent,childBuilder) with impl.Struct
-      class List(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                               extends ElementBase(parser,s,parent,childBuilder) with impl.List
-      class Terminal(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                           extends ElementBase(parser,s,parent,childBuilder) with impl.Terminal
+      class Struct(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                             extends ElementBase(parser,s,parent,childBuilder) with super.Struct
+      class List(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                               extends ElementBase(parser,s,parent,childBuilder) with super.List
+      class Terminal(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                           extends ElementBase(parser,s,parent,childBuilder) with super.Terminal
       class StructCbks(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cbks:Cbks*)          extends Struct(parser,s,parent,childBuilder) with WithCallbacks
       class ListCbks(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cbks:Cbks*)            extends List(parser,s,parent,childBuilder) with WithCallbacks
       class TerminalCbks(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cbks:Cbks*)        extends Terminal(parser,s,parent,childBuilder) with WithCallbacks
@@ -148,6 +147,5 @@ object CtxCore {
         }
         (im reflectMethod copySym)(args: _*).asInstanceOf[T]
       }      
-    }
   }
 }
