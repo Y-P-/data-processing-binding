@@ -25,7 +25,7 @@ object Struct extends Processor {self=>
      * @param out, where to write to
      * @param indent, indent value as space number ; 0 means all output on one line
      */
-    abstract class Inner(val out:Writer, val indent:Int=0, userCtx:UserCtx) extends self.Motor(userCtx)
+    abstract class Inner(bp: BaseParser, val out:Writer, val indent:Int=0, userCtx:UserCtx) extends self.Motor(userCtx)
     
     trait MotorImpl {
       val userCtx:UserCtx
@@ -61,17 +61,19 @@ object Struct extends Processor {self=>
   }
   
   object ctx extends loader.core.CtxCore.Impl with DefImpl {
-    class Motor(out:Writer, indent:Int=0, userCtx:UserCtx) extends Inner(out,indent,userCtx) with super.Motor with MotorImpl
-    def apply(pr: utils.ParamReader, userCtx:UserCtx) = {
+    type BaseParser = ParserBuilder
+    class Motor[-BP<:BaseParser with Singleton](bp: BP, val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher[BP](bp) with MotorImpl
+    def apply(bp: BaseParser)(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
-      new Motor(p._1,p._2,userCtx)
+      new Motor[bp.type](bp,p._1,p._2,userCtx)
     }
   }
   object ext extends loader.core.ExtCore.Impl with DefImpl {
-    class Motor(out:Writer, indent:Int=0, userCtx:UserCtx) extends Inner(out,indent,userCtx) with super.Motor with MotorImpl
-    def apply(pr: utils.ParamReader, userCtx:UserCtx) = {
+    type BaseParser = ParserBuilder
+    class Motor[-BP<:BaseParser with Singleton](bp: BP, val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher[BP](bp) with MotorImpl
+    def apply(bp: BaseParser)(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
-      new Motor(p._1,p._2,userCtx)
+      new Motor[bp.type](bp,p._1,p._2,userCtx)
     }
   }
   

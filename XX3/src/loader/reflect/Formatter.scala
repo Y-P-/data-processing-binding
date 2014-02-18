@@ -16,6 +16,7 @@ import loader.core.ParserBuilder
  *    if it can be formatted by a terminal formatter, then that formatter is used. Otherwise we recurse on the non-terminal formatter.
  */
 object Formatters {
+  /*
   import ParserBuilder.Impl
 
   val noStringConversion = new Exception { override def fillInStackTrace=this }
@@ -102,5 +103,5 @@ object Formatters {
       def apply[P<:Impl[String]](u:U,p:P):Unit = p.pull(fmt(u,null))
     }
   }
-
+*/
 }

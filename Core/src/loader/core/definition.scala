@@ -34,8 +34,6 @@ object definition {
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Kind]
     type Bld     = EltBuilder
     
-    val builder:Bld
-    
     //these do not have to be filled up; they will allow a runtime check on include if they are.
     def procClass = getClass
     def parsClass:Class[_<:ParserBuilder#Impl]
@@ -49,8 +47,10 @@ object definition {
      *  @param mapper, a method that converts K to Kind, the data type expected by the processor ; if null, we assume K=Kind
      *  @param init, the method that spawns the top element ; this is usually produced through the appropriate call to an EltBuilder
      */
-    class Launcher[-BP<:BaseParser with Singleton](bp:BP) {
+    abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) {
       type Element = Def.this.Element
+      def builder:Bld
+      
       class X(mapper:(Element,bp.Kind)=>Kind, init: bp.Parser=>Element) {
         def map(elt:Element,s:bp.Kind):Kind = if (mapper==null) s.asInstanceOf[Kind] else mapper(elt,s)
         def initialize(p:bp.Parser):Element = { //XXX here, check classes
@@ -66,7 +66,6 @@ object definition {
         def apply(mapper:(Element,bp.Kind)=>Kind, s: Status):X          = apply(mapper,s)
       }
     }
-    def launch(bp:BaseParser) = new Launcher[bp.type](bp)
     
     /** The standard, elementary methods dealing with parser events ; a subclass will usually refine this
      *  The order in which these methods are executed is:
@@ -292,12 +291,24 @@ object definition {
     }
   }
   
-  trait Impl extends Def { motor=>
-        
+  trait Impl extends Def { self=>
+    /** An actual implementation class should extend this trait.
+     *  All implementations based on the same core (i.e. extending this trait from the same instance)
+     *  are interoperable.
+     *  See examples for how to use this.
+     */
+    trait Impl {
+      def builder:Bld       //an associated builder
+    }
+    
+    //a factory for reading textual parameters
+    def apply(pr: utils.ParamReader, userCtx:UserCtx):Impl
+    
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      */
+    abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) with Impl { motor=>
       type Result
       type ElementBase<:Element
       // context fields for a motor
@@ -313,7 +324,7 @@ object definition {
       protected def onEnd(self: Element): Ret
       protected def onChild(self: Element, child: Element, r: Ret): Unit
       // Element implementation : redirect calls
-      trait Processor extends Elt { this:ElementBase=>
+      trait Processor extends Elt { self:ElementBase=>
         def userCtx = motor.userCtx
         protected def onName(name: String): Status          = motor.onName(this,name)
         protected def onInit(): Unit                        = motor.onInit(this)
@@ -348,5 +359,8 @@ object definition {
         def parser = parser0
         protected[definition] def parser_=(parser:Parser):Unit = parser0=parser
       }  
+    }
+    
+    implicit def toBuilder(impl:Impl):Bld = impl.builder
   }
 }

@@ -18,21 +18,24 @@ object ExtCore {
   trait Impl extends definition.Impl with Def { self=>
     type Status = Core.Status
     type Element = Elt
+    
+    abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) {
       protected def getData(parent:Element,s:Status):Data
       //implementations
       protected def onName(e:Element,name:String) = new Status(name)
       
-      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val childBuilder:Bld, val data:Data) extends Processor with Element {
+      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val childBuilder:Bld, val data:Data) extends Processor with Elt {
         def this(parser:Parser,s:Status,parent:Element,childBuilder:Bld) = this(parser,s.name,parent,childBuilder,getData(parent,s))
-        def getData(s:Status) = self.getData(this,s)
+        def getData(s:Status) = Launcher.this.getData(this,s)
       }
       class ElementCbks(parser:Parser, s:Status, parent:Element, childBuilder:Bld, val cbks:Cbks*)         extends ElementBase(parser,s,parent,childBuilder)         with WithCallbacks
       class ElementCbk (parser:Parser, s:Status, parent:Element, childBuilder:Bld, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,s,parent,childBuilder,cbks:_*) with WithCallback
-
+    
       override val builder:Bld = new Bld {
         def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld)                      = new ElementBase(parser,s,parent,childBuilder)
         def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cbks: Cbks*)         = new ElementCbks(parser,s,parent,childBuilder, cbks:_*)
         def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,s,parent,childBuilder, cb, cbks:_*)
       }
+    }
   }
 }

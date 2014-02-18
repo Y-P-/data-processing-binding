@@ -32,9 +32,10 @@ object CtxTest {
     class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
       override def solver(s:K):()=>e.Ret = {
         if (!s.asInstanceOf[String].startsWith("@include:")) return null
-        return e.incl[String,e.Ret](null,
-                      p.run(load("verysmall1"), "UTF-8").asInstanceOf[(loader.core.ParserBuilder{type Kind <: String; type BaseProcessor >: loader.core.CtxCore.Def <: loader.core.definition.Def{type Ret <: loader.core.CtxCore.Def#Ret}})#Executor],
-                      null)
+     //   return e.incl[String,e.Ret](null,
+     //                 p.run(load("verysmall1"), "UTF-8").asInstanceOf[(loader.core.ParserBuilder{type Kind <: String; type BaseProcessor >: loader.core.CtxCore.Def <: loader.core.definition.Def{type Ret <: loader.core.CtxCore.Def#Ret}})#Executor],
+     //                 null)
+        null
       }
       override def qName = {
         val q=super.qName
@@ -47,14 +48,15 @@ object CtxTest {
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
-      val m = new motors.Struct.ctx.Motor(out,2,userCtx)
+      val m = new motors.Struct.ctx.Motor[p.type](p,out,2,userCtx)
+      val x = m(ClassContext(classOf[Data.Top]))
   //    p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top])))
     }
   }
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       userCtx.buf.getBuffer.setLength(0) //reset buffer
-      val m = new motors.Struct.ctx.Motor(out,2,userCtx)
+      val m = new motors.Struct.ctx.Motor[p.type](p,out,2,userCtx)
   //    p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Unit,String]))
       out.print(userCtx.buf)
     }
