@@ -96,12 +96,12 @@ object CtxCore {
   trait Impl extends definition.Impl with Def {
     type Element = Elt
     
-    abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) { impl=>
+    abstract class Launcher[+BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) { impl=>
       protected def getData(parent:Element,s:Status):Data
       
       //implementations : top builders
-      def apply(fd:Context#FieldMapping,cbks:Cbks*) = attach(new Status("",1,fd,false), cbks:_*)
-      def apply(fd:Context#FieldMapping)            = attach(new Status("",1,fd,false))
+      def apply(fd:Context#FieldMapping,cbks:Cbks*):X = apply(new Status("",1,fd,false), cbks:_*)
+      def apply(fd:Context#FieldMapping):X            = apply(new Status("",1,fd,false))
       
       //a default stub ; it will be overriden by the Struct/List/Terminal implementation
       protected def onName(e:Element,name:String): Status  = null

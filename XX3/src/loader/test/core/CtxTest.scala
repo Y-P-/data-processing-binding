@@ -47,17 +47,16 @@ object CtxTest {
   
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter) = {
-      val m = new motors.Struct.ctx.Motor[p.type](p,out,2,userCtx)
-      p(m(ClassContext(classOf[Data.Top]))).invoke(_.read(load("small"), "UTF-8"))
+    def apply(file:Solver,out:PrintWriter):Unit = {
+      val m = new motors.Struct.ctx.Motor[p.type](out,2,userCtx)(p)
+      val r:Int = p(m)(m(ClassContext(classOf[Data.Top]))).invoke(_.read(load("small"), "UTF-8"))
     }
   }
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       userCtx.buf.getBuffer.setLength(0) //reset buffer
-      val m = new motors.Struct.ctx.Motor[p.type](p,out,2,userCtx)
-      p(m(ClassContext(classOf[Data.Top]))).invoke(_.read(load("small"), "UTF-8"))
-  //    p.run(load("small"), "UTF-8")(m(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Unit,String]))
+      val m = new motors.Struct.ctx.Motor[p.type](out,2,userCtx)(p)
+      p(m)(m(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Int,String])).invoke(_.read(load("small"), "UTF-8"))
       out.print(userCtx.buf)
     }
   }

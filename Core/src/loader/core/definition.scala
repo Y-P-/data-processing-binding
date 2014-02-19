@@ -34,37 +34,35 @@ object definition {
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Kind]
     type Bld     = EltBuilder
     
-    //these do not have to be filled up; they will allow a runtime check on include if they are.
-    def procClass = getClass
-    def parsClass:Class[_<:ParserBuilder#Impl]
-    def kindClass:Class[Kind]
-    implicit val kindTag:ClassTag[Kind] = ClassTag(kindClass)
-    
-    /** Binds together a processor (type Def), a parser (through the init method which creates that processor initial element),
-     *  and a mapper method (which bridges the gap between the parser produced type and the processor expected type.)
-     *  @param K, the kind of data produced by the parser
-     *  @param P, the parser class used, that produces tokens of class K
-     *  @param mapper, a method that converts K to Kind, the data type expected by the processor ; if null, we assume K=Kind
-     *  @param init, the method that spawns the top element ; this is usually produced through the appropriate call to an EltBuilder
+    /** Loosely binds together a processor (type Def), and a parser.
+     *  The specifics for the binding are closed in inner class X.
+     *  @param BP, the kind of parser used
+     *  @param bp, the parser used
      */
-    abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) {
+    abstract class Launcher[+BP<:BaseParser with Singleton](protected[this] val bp:BP) {
       type Element = Def.this.Element
+      type Ret = Def.this.Ret
       def builder:Bld
-      class X(mapper:(Element,bp.Kind)=>Kind, init: bp.Parser=>Element) {
-        final val proc:Def.this.type = Def.this
+      /** Tightly binds together a processor (type Def), a parser (through the init method which creates that processor initial element),
+       *  and a mapper method (which bridges the gap between the parser produced type and the processor expected type.)
+       *  An instance of this class is required to create a specific parser instance.
+       *  @param mapper, a method that converts parser Kind to processor Kind ; if null, we assume they are equal
+       *  @param init, the method that spawns the top element ; this is usually produced through the appropriate call to an EltBuilder
+       */
+      class X protected[Launcher] (mapper:(Element,bp.Kind)=>Kind, init: bp.Parser=>Element) {
+        type Element = Def.this.Element
+        def launcher:Launcher.this.type = Launcher.this
         def map(elt:Element,s:bp.Kind):Kind = if (mapper==null) s.asInstanceOf[Kind] else mapper(elt,s)
-        def initialize(p:bp.Parser):Element = { //XXX here, check classes
-          init(p)
-        }
+        def initialize(p:bp.Parser):Element = init(p)
       }
+        
+      /** Specific factories for X instances.
+       */
       def apply(mapper:(Element,bp.Kind)=>Kind,init:Parser=>Element):X = new X(mapper,init)
-            
-      object attach {
-        def apply(mapper:(Element,bp.Kind)=>Kind,s:Status,cbks:Cbks*):X = Launcher.this.apply(mapper,p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
-        def apply(s: Status):X                                          = apply(null,s)
-        def apply(s: Status, cbks: Cbks*):X                             = apply(null,s,cbks:_*)
-        def apply(mapper:(Element,bp.Kind)=>Kind, s: Status):X          = Launcher.this.apply(mapper,builder(_,s))
-      }
+      def apply(mapper:(Element,bp.Kind)=>Kind,s:Status,cbks:Cbks*):X = apply(mapper,p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
+      def apply(s: Status):X                                          = apply(null,s)
+      def apply(s: Status, cbks: Cbks*):X                             = apply(null,s,cbks:_*)
+      def apply(mapper:(Element,bp.Kind)=>Kind, s: Status):X          = apply(mapper,builder(_,s))
     }
     
     /** The standard, elementary methods dealing with parser events ; a subclass will usually refine this
@@ -302,13 +300,13 @@ object definition {
     }
     
     //a factory for reading textual parameters
-    def apply(bp:BaseParser)(pr: utils.ParamReader, userCtx:UserCtx):Impl
+    def apply(pr: utils.ParamReader, userCtx:UserCtx)(bp:BaseParser):Impl
     
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      */
-    abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) with Impl { motor=>
+    abstract class Launcher[+BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) with Impl { motor=>
       type Result
       type ElementBase<:Element
       // context fields for a motor

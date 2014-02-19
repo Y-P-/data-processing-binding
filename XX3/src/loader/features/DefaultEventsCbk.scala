@@ -113,10 +113,11 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
 }
 object DefaultCtxEventsCbk {
   import scala.language.implicitConversions
+  import loader.core.callbacks.Callbacks
   //a builder for Callbacks
   def builder[R,K>:Null] = new CallbacksBuilder[loader.motors.Struct.ctx.Elt,loader.core.CtxCore.Status,R,K]
   //converting DefaultCtxEventsCbk into a Callbacks recursive tree
-  implicit def cbks[R,K>:Null](cbk:DefaultCtxEventsCbk[R,K]) = builder(cbk)
+  implicit def cbks[R,K>:Null](cbk:DefaultCtxEventsCbk[R,K]):Callbacks[loader.motors.Struct.ctx.Elt,loader.core.CtxCore.Status,R,K] = builder(cbk)
   
   val readTagIdx = 0
   val fastWarnIdx = 1

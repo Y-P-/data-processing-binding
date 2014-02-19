@@ -34,29 +34,37 @@ trait ParserBuilder {self=>
   /** Element type produced by this parser */
   type Kind
   /** Actual parser implementation */
-  type Parser <: Impl
+  type Parser = Impl[Launch]
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
   type BaseProcessor <: Def { type BaseParser >: self.type }
-
+  
+  type Launch = BaseProcessor#Launcher[self.type]
   
   /** factory for Parser */
-  //def apply(bp:BaseProcessor)(f:bp.Launcher[self.type]#X):Parser
-  def apply(f:BaseProcessor#Launcher[self.type]#X):Parser
+  def apply(launcher:Launch)(exec:launcher.X):Impl[launcher.type]
   
-  trait Impl extends Locator {this:Parser=>
+  /** Base implementation that merges the actual parser with the Processor.
+   *  The actual implementation will mostly have to call push/pull as needed
+   *  while doing its own work ; it doesn't (shouldn't) care about anything else
+   *  in this trait.
+   *  It has access to the launcher (hence the procesor) if need be.
+   *  It also has access to the user context.
+   *  @param launcher, the launcher used for the processor
+   *  @param exec, the executor (launcher.X) for the launcher
+   */
+  trait Impl[+L<:Launch] extends Locator {
     final val builder:ParserBuilder.this.type = ParserBuilder.this
-    //val proc:BaseProcessor
-    val first:BaseProcessor#Launcher[self.type]#X
-    //creating the parser also creates the associated top element.
-    val top = first.initialize(this)
-    protected[this] var cur:top.Element = top
-    protected[this] var ignore:Int = 0
+    val launcher:L
+    def exec:launcher.X
+    val top:launcher.Element = exec.initialize(this) //creating the parser associates the top element for the bound processor.
+    private[this] var cur:top.Element = top
+    private[this] var ignore:Int = 0
     def current:top.Element = cur
     def userCtx = top.userCtx
     def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()  } catch errHandler finally { cur=cur.parent }
-    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(first.map(cur,v)) } catch errHandler finally { cur=cur.parent }
+    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(exec.map(cur,v)) } catch errHandler finally { cur=cur.parent }
     def push(name: String):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
       try { cur=cur.push(name) } catch {
@@ -66,9 +74,10 @@ trait ParserBuilder {self=>
         case e:Throwable            => errHandler(e); ignore+=1 
       }
     }
-    def invoke(f: this.type => Unit):top.Ret = {
+    def onEnd() = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
+    def invoke(f: this.type => Unit):launcher.Ret = {
       val r=cur.invoke(f(this))
-      if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
+      onEnd()
       r
     }
     /** Read data from an URI.
@@ -116,5 +125,5 @@ object ParserBuilder {
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl extends super.Impl { this:Parser=> }
+  abstract class AbstractImpl[+L<:Launch] extends super.Impl[L]
 }

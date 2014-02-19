@@ -19,7 +19,7 @@ object ExtCore {
     type Status = Core.Status
     type Element = Elt
     
-    abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) {
+    abstract class Launcher[+BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) {
       protected def getData(parent:Element,s:Status):Data
       //implementations
       protected def onName(e:Element,name:String) = new Status(name)
