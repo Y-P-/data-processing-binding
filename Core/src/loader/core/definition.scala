@@ -50,20 +50,20 @@ object definition {
     abstract class Launcher[-BP<:BaseParser with Singleton](bp:BP) {
       type Element = Def.this.Element
       def builder:Bld
-      
       class X(mapper:(Element,bp.Kind)=>Kind, init: bp.Parser=>Element) {
+        final val proc:Def.this.type = Def.this
         def map(elt:Element,s:bp.Kind):Kind = if (mapper==null) s.asInstanceOf[Kind] else mapper(elt,s)
         def initialize(p:bp.Parser):Element = { //XXX here, check classes
           init(p)
         }
       }
       def apply(mapper:(Element,bp.Kind)=>Kind,init:Parser=>Element):X = new X(mapper,init)
-      
+            
       object attach {
         def apply(mapper:(Element,bp.Kind)=>Kind,s:Status,cbks:Cbks*):X = Launcher.this.apply(mapper,p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
         def apply(s: Status):X                                          = apply(null,s)
         def apply(s: Status, cbks: Cbks*):X                             = apply(null,s,cbks:_*)
-        def apply(mapper:(Element,bp.Kind)=>Kind, s: Status):X          = apply(mapper,s)
+        def apply(mapper:(Element,bp.Kind)=>Kind, s: Status):X          = Launcher.this.apply(mapper,builder(_,s))
       }
     }
     
@@ -302,7 +302,7 @@ object definition {
     }
     
     //a factory for reading textual parameters
-    def apply(pr: utils.ParamReader, userCtx:UserCtx):Impl
+    def apply(bp:BaseParser)(pr: utils.ParamReader, userCtx:UserCtx):Impl
     
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by

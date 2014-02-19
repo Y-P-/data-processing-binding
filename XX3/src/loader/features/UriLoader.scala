@@ -30,7 +30,7 @@ object URILoaders {
   protected val p2 = Pattern.compile("(.*?)(\\((.*?)\\))?")
   protected val p3 = Pattern.compile("(.*?)(;\\((.*?)\\))?")
   protected val local = new File(".").toURI
-
+/*
   /**
    * Analyzes the given URI and returns an URILoader:
    * @param uri, the uri pointing to the data to load, including local settings.
@@ -70,5 +70,5 @@ object URILoaders {
              params: Map[String, String],
              vars: Map[String, String],
              fast: Boolean): ParserBuilder#Executor = ps(params).run(uri,encoding)
-
+*/
 }

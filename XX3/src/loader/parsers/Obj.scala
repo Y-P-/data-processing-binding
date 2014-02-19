@@ -3,7 +3,7 @@ package loader.parsers
 import loader.core.ParserSpawner
 import utils.parsers.CharProcessor
 
-
+/*
 class Obj() extends HandlerBridge {self=>
 
   def apply(start:BaseProcessor#Launcher[Kind]):Parser = new Parser(start)
@@ -31,3 +31,4 @@ object Obj extends ParserSpawner {
 class PObj {
   
 }
+*/

@@ -42,17 +42,18 @@ trait ParserBuilder {self=>
 
   
   /** factory for Parser */
-  def apply(bp:BaseProcessor)(f:bp.Launcher[self.type]#X):Parser
+  //def apply(bp:BaseProcessor)(f:bp.Launcher[self.type]#X):Parser
+  def apply(f:BaseProcessor#Launcher[self.type]#X):Parser
   
   trait Impl extends Locator {this:Parser=>
     final val builder:ParserBuilder.this.type = ParserBuilder.this
-    val proc:BaseProcessor
-    val first:proc.Launcher[self.type]#X
+    //val proc:BaseProcessor
+    val first:BaseProcessor#Launcher[self.type]#X
     //creating the parser also creates the associated top element.
-    val top:proc.Element = first.initialize(this)
-    protected[this] var cur:proc.Element = top
+    val top = first.initialize(this)
+    protected[this] var cur:top.Element = top
     protected[this] var ignore:Int = 0
-    def current:proc.Element = cur
+    def current:top.Element = cur
     def userCtx = top.userCtx
     def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()  } catch errHandler finally { cur=cur.parent }
     def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(first.map(cur,v)) } catch errHandler finally { cur=cur.parent }
@@ -65,7 +66,7 @@ trait ParserBuilder {self=>
         case e:Throwable            => errHandler(e); ignore+=1 
       }
     }
-    def invoke(f: this.type => Unit):proc.Ret = {
+    def invoke(f: this.type => Unit):top.Ret = {
       val r=cur.invoke(f(this))
       if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
       r

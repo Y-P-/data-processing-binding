@@ -14,8 +14,8 @@ import loader.core.definition.Def
 abstract class HandlerBridge extends AbstractParserBuilder {self=>
   import ParserBuilder._
 
-  type Kind = String                                     //produces strings
-  type BaseProcessor = Def { type Parser>:self.Parser }  //any processor
+  type Kind = String                                         //produces strings
+  type BaseProcessor = Def  { type BaseParser >: self.type } //any processor
   
   val procClass = classOf[Def]
   val kindClass = classOf[Kind]

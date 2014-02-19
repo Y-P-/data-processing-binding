@@ -3,7 +3,7 @@ package loader.parsers
 import loader.core.ParserSpawner
 import utils.parsers.JsonParser
 
-
+/*
 class Json(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:Boolean=false) extends HandlerBridge {self=>
 
   def apply(start:BaseProcessor#Launcher[Kind]):Parser = new Parser(start)
@@ -27,3 +27,4 @@ object Json extends ParserSpawner {
   def apply(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false,withComments:Boolean=false):Json =
     new Json(maxSz,maxDepth,nlInString,withComments)  
 }
+*/

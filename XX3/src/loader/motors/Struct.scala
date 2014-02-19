@@ -14,12 +14,12 @@ import loader.core.ParserBuilder
 object Struct extends Processor {self=>
   
   trait DefImpl extends loader.core.ExtCore.Def {
-    type Kind    = String
-    type Ret     = Unit
-    type Data    = Null
-    type Parser  = ParserBuilder#Impl  //any parser
-    def kindClass = classOf[Kind]
-    def parsClass = classOf[Parser]
+    type Kind        = String
+    type Ret         = Unit
+    type Data        = Null
+    type BaseParser  = ParserBuilder  //any parser
+    def kindClass    = classOf[Kind]
+    def parsClass    = null
     
     /**
      * @param out, where to write to
@@ -61,7 +61,6 @@ object Struct extends Processor {self=>
   }
   
   object ctx extends loader.core.CtxCore.Impl with DefImpl {
-    type BaseParser = ParserBuilder
     class Motor[-BP<:BaseParser with Singleton](bp: BP, val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher[BP](bp) with MotorImpl
     def apply(bp: BaseParser)(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
@@ -69,7 +68,6 @@ object Struct extends Processor {self=>
     }
   }
   object ext extends loader.core.ExtCore.Impl with DefImpl {
-    type BaseParser = ParserBuilder
     class Motor[-BP<:BaseParser with Singleton](bp: BP, val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher[BP](bp) with MotorImpl
     def apply(bp: BaseParser)(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
