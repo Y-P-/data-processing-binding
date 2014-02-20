@@ -29,42 +29,48 @@ trait Locator {
  * This means that the top element onBeg/onEnd methods must be called by the user, if necessary.
  * 
  */
-trait ParserBuilder {self=>
+trait ParserBuilder {selfBuilder=>
 
   /** Element type produced by this parser */
   type Kind
-  /** Actual parser implementation */
-  type Parser = Impl[Launch]
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
-  type BaseProcessor <: Def { type BaseParser >: self.type }
+  type BaseProcessor <: Def { type BaseParser >: selfBuilder.type }
   
-  type Launch = BaseProcessor#Launcher[self.type]
+  /** Actual parser implementation */
+  type Parser[k] <: Impl[k]
+  type Elt[k] = (BaseProcessor { type Kind=k })#Element
+  
+  /** This class glues together a given parser and a given processor.
+   *  It requires:
+   *  @param init, the method that will create the initial (top) element for the processor and a parser instance
+   *  @param mapper, the method that lets translate the parser's Kind to the processor's Kind
+   */
+  class Binder[K](val init:Parser[K]=>Elt[K], val mapper:(Elt[K],Kind)=>K)
   
   /** factory for Parser */
-  def apply(launcher:Launch)(exec:launcher.X):Impl[launcher.type]
+  def apply[K](b:Binder[K]):Impl[K]
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
    *  while doing its own work ; it doesn't (shouldn't) care about anything else
    *  in this trait.
-   *  It has access to the launcher (hence the procesor) if need be.
+   *  It has access to the launcher (hence the processor) if need be.
    *  It also has access to the user context.
    *  @param launcher, the launcher used for the processor
    *  @param exec, the executor (launcher.X) for the launcher
    */
-  trait Impl[+L<:Launch] extends Locator {
-    final val builder:ParserBuilder.this.type = ParserBuilder.this
-    val launcher:L
-    def exec:launcher.X
-    val top:launcher.Element = exec.initialize(this) //creating the parser associates the top element for the bound processor.
-    private[this] var cur:top.Element = top
+  trait Impl[K] extends Locator { this:Parser[K]=>
+    final val builder:selfBuilder.type = selfBuilder
+    val binder:Binder[K]
+    val top:Elt[K] = binder.init(this) //creating the parser associates the top element for the bound processor.
+    private[this] var cur = top
     private[this] var ignore:Int = 0
-    def current:top.Element = cur
+    def current = cur
     def userCtx = top.userCtx
-    def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()  } catch errHandler finally { cur=cur.parent }
-    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(exec.map(cur,v)) } catch errHandler finally { cur=cur.parent }
+    def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()              } catch errHandler finally { cur=cur.parent }
+    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
     def push(name: String):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
       try { cur=cur.push(name) } catch {
@@ -75,11 +81,6 @@ trait ParserBuilder {self=>
       }
     }
     def onEnd() = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
-    def invoke(f: this.type => Unit):launcher.Ret = {
-      val r=cur.invoke(f(this))
-      onEnd()
-      r
-    }
     /** Read data from an URI.
      */
     def read(uri:URI,encoding:String):Unit = {
@@ -87,7 +88,7 @@ trait ParserBuilder {self=>
       val in = new java.io.InputStreamReader(uri.toURL.openStream,e)
       try { read(in) } finally { in.close }
     }
-    /** Read data from an inputstream.
+    /** Read data from an input stream.
      */
     def read(in: Reader): Unit
     
@@ -125,5 +126,5 @@ object ParserBuilder {
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl[+L<:Launch] extends super.Impl[L]
+  abstract class AbstractImpl[K] extends super.Impl[K] { this:Parser[K]=> }
 }

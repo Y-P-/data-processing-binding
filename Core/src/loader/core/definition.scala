@@ -27,7 +27,7 @@ object definition {
     type Ret
     type Element  >: Null <: Elt
     type BaseParser <: ParserBuilder
-    type Parser   = ParserBuilder#Parser
+    type Parser   = ParserBuilder#Parser[_]
     type Status   >: Null <:definition.Status
     type UserCtx = UserContext[Element]
     type Cbk     = callbacks.Callback[Element,Status,Ret,Kind]
@@ -36,33 +36,24 @@ object definition {
     
     /** Loosely binds together a processor (type Def), and a parser.
      *  The specifics for the binding are closed in inner class X.
-     *  @param BP, the kind of parser used
-     *  @param bp, the parser used
+     *  @param K, the kind of data pushed by the parser
+     *  @param mapper, a method that converts parser Kind to processor Kind ; if null, we assume they are equal
      */
-    abstract class Launcher[+BP<:BaseParser with Singleton](protected[this] val bp:BP) {
+    class Launcher {
       type Element = Def.this.Element
-      type Ret = Def.this.Ret
       def builder:Bld
-      /** Tightly binds together a processor (type Def), a parser (through the init method which creates that processor initial element),
-       *  and a mapper method (which bridges the gap between the parser produced type and the processor expected type.)
-       *  An instance of this class is required to create a specific parser instance.
-       *  @param mapper, a method that converts parser Kind to processor Kind ; if null, we assume they are equal
-       *  @param init, the method that spawns the top element ; this is usually produced through the appropriate call to an EltBuilder
-       */
-      class X protected[Launcher] (mapper:(Element,bp.Kind)=>Kind, init: bp.Parser=>Element) {
-        type Element = Def.this.Element
-        def launcher:Launcher.this.type = Launcher.this
-        def map(elt:Element,s:bp.Kind):Kind = if (mapper==null) s.asInstanceOf[Kind] else mapper(elt,s)
-        def initialize(p:bp.Parser):Element = init(p)
+      
+      def invoke[K](p:Parser { type Kind=K }):(p.type=>Unit) => Ret = f=>{
+       // val r=p.top.invoke(f(p))
+       // p.onEnd()
+       // r
+        null.asInstanceOf[Ret]
       }
         
       /** Specific factories for X instances.
        */
-      def apply(mapper:(Element,bp.Kind)=>Kind,init:Parser=>Element):X = new X(mapper,init)
-      def apply(mapper:(Element,bp.Kind)=>Kind,s:Status,cbks:Cbks*):X = apply(mapper,p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*))
-      def apply(s: Status):X                                          = apply(null,s)
-      def apply(s: Status, cbks: Cbks*):X                             = apply(null,s,cbks:_*)
-      def apply(mapper:(Element,bp.Kind)=>Kind, s: Status):X          = apply(mapper,builder(_,s))
+      def apply(s:Status,cbks:Cbks*):Parser=>Element = p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*)
+      def apply(s:Status):Parser=>Element            = builder(_,s)
     }
     
     /** The standard, elementary methods dealing with parser events ; a subclass will usually refine this
@@ -77,7 +68,7 @@ object definition {
      *  However, these methods are important because they provide the entries for callbacks and understanding
      *  them is necessary to coding complex callbacks.
      */
-    trait BaseElt {
+    trait BaseElt { self:Element=>
       type Def      = selfDef.type
       type Ret      = selfDef.Ret
       type Status   = selfDef.Status
@@ -103,11 +94,11 @@ object definition {
      */
     trait Elt extends Traversable[Element] with BaseElt { self:Element=>
       implicit val eltCtx = userCtx(this)
-      def myself:Element = this
+      def myself:this.type = this
       /** Context for use */
       def userCtx:UserCtx
       /** Fields */
-      def parent : Element  //parent item
+      def parent : Def.this.Element  //parent item
       def name   : String   //element name
       def parser : Parser   //parser creating that element: Beware => this can change in case of includes
       protected[Def] def parser_=(parser:Parser):Unit //parser has write access for handling includes
@@ -165,7 +156,7 @@ object definition {
       
       /** The push/pull interface on the processor side
        */
-      def push(n:String) = { val c=build(parser,onName(n),childBuilder); c.onInit(); c }
+      def push(n:String):Def.this.Element = { val c=build(parser,onName(n),childBuilder); c.onInit(); c }
       def pull()         = { doBeg(); parent.onChild(this, onEnd()) }
       def pull(v:Kind)   = {
         parent.doBeg
@@ -194,7 +185,7 @@ object definition {
       def isRoot: Boolean = parent==null        //head of stack
       def isInclude: Boolean = parent match {   //head of sub-stack (i.e. include)
         case null    => false
-        case p       => p.parser != parser
+//XXX        case p       => p.parser != parser
       }
       //iterator on the elements forming the full chain from this element to the top
       def toHead:Iterator[Element] = new Iterator[Element] {
@@ -306,7 +297,7 @@ object definition {
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      */
-    abstract class Launcher[+BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) with Impl { motor=>
+    abstract class Launcher extends super.Launcher with Impl { motor=>
       type Result
       type ElementBase<:Element
       // context fields for a motor
@@ -358,7 +349,5 @@ object definition {
         protected[definition] def parser_=(parser:Parser):Unit = parser0=parser
       }  
     }
-    
-    implicit def toBuilder(impl:Impl):Bld = impl.builder
   }
 }

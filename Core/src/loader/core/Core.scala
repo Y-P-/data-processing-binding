@@ -23,10 +23,10 @@ object Core {
     /** Motor simplifies the development of processors by focusing on what must be done.
      *  It removes the burden of defining basic classes and builders.
      */
-    abstract class Launcher[+BP<:BaseParser with Singleton](bp:BP) extends super.Launcher[BP](bp) {
+    abstract class Launcher extends super.Launcher {
       //implementations : new top builders (standard ones are in object attach)
-      def apply(cbks:Cbks*):X = apply(new Status(""), cbks:_*)
-      def apply():X           = apply(new Status(""))
+      def apply(cbks:Cbks*):Parser=>Element = apply(new Status(""), cbks:_*)
+      def apply():Parser=>Element           = apply(new Status(""))
       
       //implementation of a full Element class using the motor defined methods
       class ElementBase(protected var parser0:Parser, val name: String, val parent: Element, val childBuilder: Bld) extends Element with Processor

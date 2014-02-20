@@ -14,10 +14,10 @@ import loader.core.definition.Def
 abstract class HandlerBridge extends AbstractParserBuilder {self=>
   import ParserBuilder._
 
-  type Kind = String                                         //produces strings
-  type BaseProcessor = Def  { type BaseParser >: self.type } //any processor
+  type Kind = String                                        //produces strings
+  type BaseProcessor = Def { type BaseParser >: self.type } //any processor
     
-  trait Impl[+L<:Launch] extends super.Impl[L] with utils.parsers.Handler {
+  trait Impl[K] extends super.Impl[K] with utils.parsers.Handler {
     final protected[this] val charProc = newProc
     def location:String = charProc.state.line.toString
     def err(detail: String, cause: String): Nothing = throw new IllegalStateException(cause)
@@ -29,5 +29,5 @@ abstract class HandlerBridge extends AbstractParserBuilder {self=>
     override def read(uri: URI, encoding: String): Unit = 
       this.apply(CharReader(ByteArrayReader(uri),if (encoding == null) "ISO-8859-15" else encoding))
   }
-  abstract class AbstractImpl[+L<:Launch] extends Impl[L] { self:Parser=> }
+  abstract class AbstractImpl[K] extends Impl[K]
 }

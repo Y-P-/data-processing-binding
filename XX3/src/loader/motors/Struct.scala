@@ -13,11 +13,11 @@ import loader.core.ParserBuilder
 
 object Struct extends Processor {self=>
   
-  trait DefImpl extends loader.core.ExtCore.Def {
+  trait DefImpl extends loader.core.ExtCore.Def {impl=>
     type Kind        = String
     type Ret         = Int
     type Data        = Null
-    type BaseParser  = ParserBuilder  //any parser
+    type BaseParser  = ParserBuilder //any parser
     
     /**
      * @param out, where to write to
@@ -59,18 +59,20 @@ object Struct extends Processor {self=>
   }
   
   object ctx extends loader.core.CtxCore.Impl with DefImpl {
-    class Motor[+BP<:BaseParser with Singleton](val out:Writer, val indent:Int=0, val userCtx:UserCtx)(bp: BP) extends super.Launcher[BP](bp) with MotorImpl
-    def apply(pr: utils.ParamReader, userCtx:UserCtx)(bp:BaseParser) = {
+    class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher with MotorImpl
+    def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor = {
       val p = readParams(pr)
-      new Motor[bp.type](p._1,p._2,userCtx)(bp)
+      new Motor(p._1,p._2,userCtx)
     }
+    def apply(out:Writer, indent:Int=0, userCtx:UserCtx) = new Motor(out,indent,userCtx)
   }
   object ext extends loader.core.ExtCore.Impl with DefImpl {
-    class Motor[+BP<:BaseParser with Singleton](val out:Writer, val indent:Int=0, val userCtx:UserCtx)(bp: BP) extends super.Launcher[BP](bp) with MotorImpl
+    class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher with MotorImpl
     def apply(pr: utils.ParamReader, userCtx:UserCtx)(bp:BaseParser) = {
       val p = readParams(pr)
-      new Motor[bp.type](p._1,p._2,userCtx)(bp)
+      new Motor(p._1,p._2,userCtx)
     }
+    def apply(out:Writer, indent:Int=0, userCtx:UserCtx) = new Motor(out,indent,userCtx)
   }
   
 }
