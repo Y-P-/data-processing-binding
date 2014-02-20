@@ -40,7 +40,9 @@ trait ParserBuilder {selfBuilder=>
   
   /** Actual parser implementation */
   type Parser[k] <: Impl[k]
-  type Elt[k] = (BaseProcessor { type Kind=k })#Element
+  type Proc[k]   = BaseProcessor { type Kind=k }
+  type Elt[k]    = Proc[k]#Element
+  type Launch[k] = Proc[k]#Launcher
   
   /** This class glues together a given parser and a given processor.
    *  It requires:
@@ -51,13 +53,13 @@ trait ParserBuilder {selfBuilder=>
     def map(e:Elt[K],v:Kind):K = if (mapper==null) v.asInstanceOf[K] else mapper(e,v)
   }
   
-  protected class Bd[K,L<:(BaseProcessor{type Kind=K})#Launcher](val l:L) {
+  protected class Bd[K,L<:Proc[K]](val l:L) {
     class X(init:Parser[K]=>l.Element, mapper:(Elt[K],Kind)=>K) extends Binder[K](init,mapper)
     def apply(init:Parser[K]=>l.Element, mapper:(Elt[K],Kind)=>K) = new X(init,mapper)
   }
   
   /** factory for Binder */
-  def binder[K](bp:(BaseProcessor { type Kind=K })#Launcher)(init:Parser[K]=>bp.Element, mapper:(Elt[K],Kind)=>K):Binder[K] = {
+  def binder[K](bp:Proc[K])(init:Parser[K]=>bp.Element, mapper:(Elt[K],Kind)=>K):Binder[K] = {
     val x = new Bd[K,bp.type](bp)
     new x.X(init,mapper)
   }

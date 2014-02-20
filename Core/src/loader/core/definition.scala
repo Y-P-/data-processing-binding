@@ -44,11 +44,10 @@ object definition {
       type Kind = Def.this.Kind
       def builder:Bld
       
-      def invoke[K](p:Parser { type Kind=K }):(p.type=>Unit) => Ret = f=>{
-       // val r=p.top.invoke(f(p))
-       // p.onEnd()
-       // r
-        null.asInstanceOf[Ret]
+      def invoke(p:Parser):(p.type=>Unit) => Ret = f=>{
+       val r=p.top.invoke(f(p))
+       p.onEnd()
+       r.asInstanceOf[Ret] //XXX
       }
         
       /** Specific factories for X instances.
