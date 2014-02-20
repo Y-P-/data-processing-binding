@@ -47,10 +47,23 @@ trait ParserBuilder {selfBuilder=>
    *  @param init, the method that will create the initial (top) element for the processor and a parser instance
    *  @param mapper, the method that lets translate the parser's Kind to the processor's Kind
    */
-  class Binder[K](val init:Parser[K]=>Elt[K], val mapper:(Elt[K],Kind)=>K)
+  abstract class Binder[K](val init:Parser[K]=>Elt[K], val mapper:(Elt[K],Kind)=>K) {
+    def map(e:Elt[K],v:Kind):K = if (mapper==null) v.asInstanceOf[K] else mapper(e,v)
+  }
+  
+  protected class Bd[K,L<:(BaseProcessor{type Kind=K})#Launcher](val l:L) {
+    class X(init:Parser[K]=>l.Element, mapper:(Elt[K],Kind)=>K) extends Binder[K](init,mapper)
+    def apply(init:Parser[K]=>l.Element, mapper:(Elt[K],Kind)=>K) = new X(init,mapper)
+  }
+  
+  /** factory for Binder */
+  def binder[K](bp:(BaseProcessor { type Kind=K })#Launcher)(init:Parser[K]=>bp.Element, mapper:(Elt[K],Kind)=>K):Binder[K] = {
+    val x = new Bd[K,bp.type](bp)
+    new x.X(init,mapper)
+  }
   
   /** factory for Parser */
-  def apply[K](b:Binder[K]):Impl[K]
+  def apply[K](bd:Binder[K]):Parser[K]
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -69,8 +82,8 @@ trait ParserBuilder {selfBuilder=>
     private[this] var ignore:Int = 0
     def current = cur
     def userCtx = top.userCtx
-    def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()              } catch errHandler finally { cur=cur.parent }
-    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
+    def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()                  } catch errHandler finally { cur=cur.parent }
+    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.map(cur,v)) } catch errHandler finally { cur=cur.parent }
     def push(name: String):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
       try { cur=cur.push(name) } catch {

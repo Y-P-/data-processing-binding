@@ -68,7 +68,7 @@ object Struct extends Processor {self=>
   }
   object ext extends loader.core.ExtCore.Impl with DefImpl {
     class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher with MotorImpl
-    def apply(pr: utils.ParamReader, userCtx:UserCtx)(bp:BaseParser) = {
+    def apply(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
       new Motor(p._1,p._2,userCtx)
     }

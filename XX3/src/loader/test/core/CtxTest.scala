@@ -48,9 +48,9 @@ object CtxTest {
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Unit = {
-      val b = new p.Binder[String](null,null)
-      val m = motors.Struct.ctx[String](out,2,userCtx)
-      val r = p(m)(m(ClassContext(classOf[Data.Top])))//.invoke(_.read(load("small"), "UTF-8"))
+      val m = motors.Struct.ctx(out,2,userCtx)
+      val b =p.binder(m)(m(ClassContext(classOf[Data.Top])),null)
+      val r = p(b).read(load("small"), "UTF-8")
      // val k:Int = r.launcher.invoke(_.read(load("small"), "UTF-8"))
     }
   }

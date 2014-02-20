@@ -39,8 +39,9 @@ object definition {
      *  @param K, the kind of data pushed by the parser
      *  @param mapper, a method that converts parser Kind to processor Kind ; if null, we assume they are equal
      */
-    class Launcher {
+    abstract class Launcher {
       type Element = Def.this.Element
+      type Kind = Def.this.Kind
       def builder:Bld
       
       def invoke[K](p:Parser { type Kind=K }):(p.type=>Unit) => Ret = f=>{
@@ -185,7 +186,7 @@ object definition {
       def isRoot: Boolean = parent==null        //head of stack
       def isInclude: Boolean = parent match {   //head of sub-stack (i.e. include)
         case null    => false
-//XXX        case p       => p.parser != parser
+        case p       => p.parser != parser
       }
       //iterator on the elements forming the full chain from this element to the top
       def toHead:Iterator[Element] = new Iterator[Element] {
@@ -291,7 +292,7 @@ object definition {
     }
     
     //a factory for reading textual parameters
-    def apply(pr: utils.ParamReader, userCtx:UserCtx)(bp:BaseParser):Impl
+    def apply(pr: utils.ParamReader, userCtx:UserCtx):Impl
     
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
