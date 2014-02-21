@@ -39,33 +39,32 @@ trait ParserBuilder {selfBuilder=>
   type BaseProcessor <: Def { type BaseParser >: selfBuilder.type }
   
   /** Actual parser implementation */
-  type Parser[k] <: Impl[k]
-  type Proc[k]   = BaseProcessor { type Kind=k }
-  type Elt[k]    = Proc[k]#Element
-  type Launch[k] = Proc[k]#Launcher
+  type Parser[k,r] <: Impl[k,r]
+  type Proc[k,r]   = BaseProcessor { type Kind=k; type Ret=r }
+  type Elt[k,r]    = Proc[k,r]#Element
+  type Launch[k,r] = Proc[k,r]#Launcher
   
   /** This class glues together a given parser and a given processor.
    *  It requires:
    *  @param init, the method that will create the initial (top) element for the processor and a parser instance
    *  @param mapper, the method that lets translate the parser's Kind to the processor's Kind
    */
-  abstract class Binder[K](val init:Parser[K]=>Elt[K], val mapper:(Elt[K],Kind)=>K) {
-    def map(e:Elt[K],v:Kind):K = if (mapper==null) v.asInstanceOf[K] else mapper(e,v)
+  class Binder[K,R](val init:Parser[K,R]=>Elt[K,R], val mapper:(Elt[K,R],Kind)=>K) {
+    def map(e:Elt[K,R],v:Kind):K = if (mapper==null) v.asInstanceOf[K] else mapper(e,v)
   }
   
-  protected class Bd[K,L<:Proc[K]](val l:L) {
-    class X(init:Parser[K]=>l.Element, mapper:(Elt[K],Kind)=>K) extends Binder[K](init,mapper)
-    def apply(init:Parser[K]=>l.Element, mapper:(Elt[K],Kind)=>K) = new X(init,mapper)
+  protected class Bd[K,R,L<:Proc[K,R]](val l:L) {
+    def apply(init:Parser[K,R]=>l.Element, mapper:(Elt[K,R],Kind)=>K) = new Binder[K,R](init,mapper)
   }
   
-  /** factory for Binder */
-  def binder[K](bp:Proc[K])(init:Parser[K]=>bp.Element, mapper:(Elt[K],Kind)=>K):Binder[K] = {
-    val x = new Bd[K,bp.type](bp)
-    new x.X(init,mapper)
+  /** factory for Binder -note: not path dependant classes in constructors ; this is why we use this complex structure- */
+  def binder[K,R](bp:Proc[K,R])(init:Parser[K,R]=>bp.Element, mapper:(Elt[K,R],Kind)=>K):Binder[K,R] = {
+    val x = new Bd[K,R,bp.type](bp)
+    x(init,mapper)
   }
   
   /** factory for Parser */
-  def apply[K](bd:Binder[K]):Parser[K]
+  def apply[K,R](bd:Binder[K,R]):Parser[K,R]
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -76,10 +75,10 @@ trait ParserBuilder {selfBuilder=>
    *  @param launcher, the launcher used for the processor
    *  @param exec, the executor (launcher.X) for the launcher
    */
-  trait Impl[K] extends Locator { this:Parser[K]=>
+  trait Impl[K,R] extends Locator { this:Parser[K,R]=>
     final val builder:selfBuilder.type = selfBuilder
-    val binder:Binder[K]
-    val top:Elt[K] = binder.init(this) //creating the parser associates the top element for the bound processor.
+    val binder:Binder[K,R]
+    val top:Elt[K,R] = binder.init(this) //creating the parser associates the top element for the bound processor.
     private[this] var cur = top
     private[this] var ignore:Int = 0
     def current = cur
@@ -96,6 +95,11 @@ trait ParserBuilder {selfBuilder=>
       }
     }
     def onEnd() = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
+    def invoke(f:this.type=>Unit):R = {
+      val r=top.invoke(f(this))
+      onEnd()
+      r
+    }
     /** Read data from an URI.
      */
     def read(uri:URI,encoding:String):Unit = {
@@ -141,5 +145,5 @@ object ParserBuilder {
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl[K] extends super.Impl[K] { this:Parser[K]=> }
+  abstract class AbstractImpl[K,R] extends super.Impl[K,R] { this:Parser[K,R]=> }
 }

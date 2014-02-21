@@ -27,7 +27,7 @@ object definition {
     type Ret
     type Element  >: Null <: Elt
     type BaseParser <: ParserBuilder
-    type Parser   = ParserBuilder#Parser[_]
+    type Parser   = ParserBuilder#Parser[_,Ret]
     type Status   >: Null <:definition.Status
     type UserCtx = UserContext[Element]
     type Cbk     = callbacks.Callback[Element,Status,Ret,Kind]
@@ -43,13 +43,7 @@ object definition {
       type Element = Def.this.Element
       type Kind = Def.this.Kind
       def builder:Bld
-      
-      def invoke(p:Parser):(p.type=>Unit) => Ret = f=>{
-       val r=p.top.invoke(f(p))
-       p.onEnd()
-       r.asInstanceOf[Ret] //XXX
-      }
-        
+              
       /** Specific factories for X instances.
        */
       def apply(s:Status,cbks:Cbks*):Parser=>Element = p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*)

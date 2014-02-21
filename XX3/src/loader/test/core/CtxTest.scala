@@ -45,27 +45,24 @@ object CtxTest {
     }
   }
   
-  def exec[K,
-        M<:loader.core.definition.Def { type BaseParser>:P; type Kind=K },
-        P<:ParserBuilder { type BaseProcessor>:M }]
-        (p:P)(m:M)(launch:M#Launcher)(init:launch.type=>p.Parser[K]=>m.Element, mapper:(p.Elt[K],p.Kind)=>K, run:p.Parser[_]=>Unit)
-    = {
-    val b = p.binder(m)(init(launch),mapper)
-    run(p(b))
+  def exec[M<:loader.core.definition.Def { type BaseParser>:P },
+           P<:ParserBuilder { type BaseProcessor>:M }]
+        (p:P)(m:M)(launch:M#Launcher)(init:launch.type=>p.Parser[m.Kind,m.Ret]=>m.Element, mapper:(p.Elt[m.Kind,m.Ret],p.Kind)=>m.Kind, run:p.Parser[m.Kind,m.Ret]=>Unit):m.Ret = {
+    p(p.binder[m.Kind,m.Ret](m)(init(launch),mapper)).invoke(run)
   }
   
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter):Unit = {
+    def apply(file:Solver,out:PrintWriter):Int = {
       val m = motors.Struct.ctx(out,2,userCtx)
-      exec[String,motors.Struct.ctx.type,p.type](p)(motors.Struct.ctx)(m)(_(ClassContext(classOf[Data.Top])),null,_.read(load("small"), "UTF-8"))
+      exec(p)(motors.Struct.ctx)(m)(_(ClassContext(classOf[Data.Top])),null,_.read(load("small"), "UTF-8"))
     }
   }
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       userCtx.buf.getBuffer.setLength(0) //reset buffer
       val m = motors.Struct.ctx(out,2,userCtx)
-      exec[String,motors.Struct.ctx.type,p.type](p)(motors.Struct.ctx)(m)(_(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Int,String]),null,_.read(load("small"), "UTF-8"))
+      val r:Int = exec(p)(motors.Struct.ctx)(m)(_(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Int,String]),null,_.read(load("small"), "UTF-8"))
       out.print(userCtx.buf)
     }
   }
