@@ -34,14 +34,12 @@ object definition {
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Kind]
     type Bld     = EltBuilder
     
-    /** Loosely binds together a processor (type Def), and a parser.
-     *  The specifics for the binding are closed in inner class X.
-     *  @param K, the kind of data pushed by the parser
-     *  @param mapper, a method that converts parser Kind to processor Kind ; if null, we assume they are equal
+    /** Used to define an implementation.
+     *  This is used to define the builder for an implementation. 
      */
-    abstract class Launcher {
-      type Element = Def.this.Element
-      type Kind = Def.this.Kind
+    trait Launcher {
+      type Proc    = Def.this.type
+      val proc:Def.this.type = Def.this
       def builder:Bld
               
       /** Specific factories for X instances.
@@ -125,24 +123,17 @@ object definition {
       *  @param exc, an executor that contains the data to include
       *  @param retMapper, a method to coerce return data
       */
-      /*
-      def incl[K:ClassTag,R>:Ret] (
-              mapper:(Element,K)=>Kind,
-              exc:(ParserBuilder { type Kind<:K; type BaseProcessor >: selfDef.type <: loader.core.definition.Def { type Ret<:R } }) # Executor,
-              retMapper:R=>Ret
-            ):()=>Ret = ()=>{
+      def incl[K](p:BaseParser { type BaseProcessor>:selfDef.type; type Kind=K }, mapper:(Element,K)=>Kind):Ret = {
         val old = parser
         try {
           //create a Launcher using this processor and the current element
           //replace the current element parser with the new one
           //then start the executor and coerce the returned value to the appropriate Ret value
-          val r:R = null.asInstanceOf[R]//exc(selfDef)(selfDef(mapper,(p:Parser)=>{parser=p; self}))
-          if (retMapper==null) r.asInstanceOf[Ret] else retMapper(r)
+          run(p)(null.asInstanceOf[Launcher])((a:Any)=>{(p:Parser)=>{parser=p; self}},mapper,_.read(load("small"), "UTF-8"))  
         } finally {
           parser=old
         }        
       }
-      */
       
       /** Ensure the call to doBeg is done as late as possible, but in time. begDone ~ lazy val */
       private var begDone=false

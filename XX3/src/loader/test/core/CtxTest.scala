@@ -3,6 +3,7 @@ package loader.test.core
 import utils.LogTester._
 import utils.RegexReplacer
 import loader._
+import loader.core.run
 import loader.context.ClassContext
 import loader.core.CtxCore.Def
 import loader.core.definition.Status
@@ -44,25 +45,19 @@ object CtxTest {
       }
     }
   }
-  
-  def exec[M<:loader.core.definition.Def { type BaseParser>:P },
-           P<:ParserBuilder { type BaseProcessor>:M }]
-        (p:P)(m:M)(launch:M#Launcher)(init:launch.type=>p.Parser[m.Kind,m.Ret]=>m.Element, mapper:(p.Elt[m.Kind,m.Ret],p.Kind)=>m.Kind, run:p.Parser[m.Kind,m.Ret]=>Unit):m.Ret = {
-    p(p.binder[m.Kind,m.Ret](m)(init(launch),mapper)).invoke(run)
-  }
-  
+    
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Int = {
       val m = motors.Struct.ctx(out,2,userCtx)
-      exec(p)(motors.Struct.ctx)(m)(_(ClassContext(classOf[Data.Top])),null,_.read(load("small"), "UTF-8"))
+      run(p)(m)(_(ClassContext(classOf[Data.Top])),null,_.read(load("small"), "UTF-8"))
     }
   }
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       userCtx.buf.getBuffer.setLength(0) //reset buffer
       val m = motors.Struct.ctx(out,2,userCtx)
-      val r:Int = exec(p)(motors.Struct.ctx)(m)(_(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Int,String]),null,_.read(load("small"), "UTF-8"))
+      val r:Int = run(p)(m)(_(ClassContext(classOf[Data.Top]), new DefaultCtxEventsCbk[Int,String]),null,_.read(load("small"), "UTF-8"))
       out.print(userCtx.buf)
     }
   }
