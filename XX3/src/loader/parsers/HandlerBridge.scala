@@ -4,7 +4,7 @@ import java.net.URI
 import utils.parsers.State
 import utils.{CharReader,ByteArrayReader}
 import loader.core.{AbstractParserBuilder,ParserBuilder,ParserSpawner,Locator}
-import loader.core.definition.Def
+import loader.core.definition.Processor
 
 /** A standard bridge between utils.parsers.Handler and ParserBuilder.Parser.
  *  You should care about :
@@ -14,8 +14,8 @@ import loader.core.definition.Def
 abstract class HandlerBridge extends AbstractParserBuilder {self=>
   import ParserBuilder._
 
-  type Kind = String                                        //produces strings
-  type BaseProcessor = Def { type BaseParser >: self.type } //any processor
+  type Kind = String                                              //produces strings
+  type BaseProcessor = Processor { type BaseParser >: self.type } //any processor
     
   trait Impl[K,R] extends super.Impl[K,R] with utils.parsers.Handler { this:Parser[K,R]=>
     final protected[this] val charProc = newProc

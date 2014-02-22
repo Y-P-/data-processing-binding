@@ -1,5 +1,5 @@
 package loader.core
-import loader.core.definition.Def
+import loader.core.definition.Processor
 import loader.core.events.Event
 
 /** Hoelts the framework's defined general exceptions.
@@ -15,6 +15,7 @@ object exceptions {
   val includeExceptionIdx = 4
   val degenListExceptionIdx = 5
   val unexpectedExceptionIdx = 6
+  val stackExceptionIdx = 7
 
   /** A user exception that won't be caught by the framework. */
   case class UserException(val lvl:Int,val msg:String,val e:Throwable) extends Exception(msg,e) with Event {
@@ -22,11 +23,11 @@ object exceptions {
   }
 
   /** A severe error in the framework, unlikely to get caught. It will get out of the framework. */
-  class InternalLoaderException(message:String,cause:Throwable,elt:Def#Elt) extends RuntimeException(message,cause) {
-    def this(c:Throwable,elt:Def#Elt) = this(null,c,elt)
-    def this(m:String,elt:Def#Elt)    = this(m,null,elt)
-    def this(elt:Def#Elt)             = this("Illegal state",null,elt)
-    def this(m:String)                = this(m,null)
+  class InternalLoaderException(message:String,cause:Throwable,elt:Processor#Element) extends RuntimeException(message,cause) {
+    def this(c:Throwable,elt:Processor#Element) = this(null,c,elt)
+    def this(m:String,elt:Processor#Element)    = this(m,null,elt)
+    def this(elt:Processor#Element)             = this("Illegal state",null,elt)
+    def this(m:String)                          = this(m,null)
   }
   
   /** Internal, expected, framework problems; these exceptions main purpose is reporting. */
@@ -54,6 +55,8 @@ object exceptions {
   case class DegenListException(val s:String, val e:Throwable) extends LoaderException(degenListExceptionIdx)
   /** Exception thrown when an unexpected exception is processed */
   case class UnexpectedException(e:Throwable) extends LoaderException(unexpectedExceptionIdx)
+  /** Exception thrown when getting out of the stack */
+  case class StackException(e:Throwable) extends LoaderException(stackExceptionIdx)
 
   /** Exceptions used to process dynamic loading (i.e. finding the appropriate FieeltMapping for a child based on the current context) */
   final class DynamicInvocation extends Exception

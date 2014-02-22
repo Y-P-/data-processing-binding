@@ -22,14 +22,15 @@ object definition {
    *  @see ExtCore for a richer implementation where elements can contain additional data
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
-  trait Def { selfDef=>
+  trait Processor { selfDef=>
     type Kind>:Null
     type Ret
-    type Element  >: Null <: Elt
+    type Element >: Null <: Elt
     type BaseParser <: ParserBuilder
-    type Parser   = ParserBuilder#Parser[_,Ret]
-    type Status   >: Null <:definition.Status
-    type UserCtx = UserContext[Element]
+    type Status >: Null <:definition.Status
+    
+    type UserCtx = UserContext[selfDef.type]    
+    type Parser  = ParserBuilder#Parser[_,Ret]
     type Cbk     = callbacks.Callback[Element,Status,Ret,Kind]
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Kind]
     type Bld     = EltBuilder
@@ -38,8 +39,8 @@ object definition {
      *  This is used to define the builder for an implementation. 
      */
     trait Launcher {
-      type Proc    = Def.this.type
-      val proc:Def.this.type = Def.this
+      val proc:Processor.this.type = Processor.this
+      def myself:proc.Launcher = this
       def builder:Bld
               
       /** Specific factories for X instances.
@@ -61,15 +62,7 @@ object definition {
      *  them is necessary to coding complex callbacks.
      */
     trait BaseElt { self:Element=>
-      type Def      = selfDef.type
-      type Ret      = selfDef.Ret
-      type Status   = selfDef.Status
-      type Element  = selfDef.Element
-      type Bld      = selfDef.Bld
-      type Kind     = selfDef.Kind
-      type Parser   = selfDef.Parser
-      def parser : Parser
-      def definition:Def.this.type = Def.this
+      def parser:selfDef.Parser
       protected def onName(name: String): Status
       protected def onInit(): Unit                             //called on all elements on creation
       protected def onBeg(): Unit                              //called on beginning of a struct
@@ -83,23 +76,23 @@ object definition {
      *  Defines how the parser events are processed.
      *  Holds the data necessary to process these events.
      *  You probably don't want to ever override any of these methods.
+     *  Note that an Elt is also a Launcher : this property is used to spawn includes.
      */
-    trait Elt extends Traversable[Element] with BaseElt { self:Element=>
+    trait Elt extends Traversable[Element] with BaseElt with Launcher { self:Element=>
       implicit val eltCtx = userCtx(this)
-      def myself:this.type = this
       /** Context for use */
       def userCtx:UserCtx
       /** Fields */
-      def parent : Def.this.Element  //parent item
+      def parent : Element  //parent item
       def name   : String   //element name
       def parser : Parser   //parser creating that element: Beware => this can change in case of includes
-      protected[Def] def parser_=(parser:Parser):Unit //parser has write access for handling includes
+      protected[core] def parser_=(parser:Parser):Unit //parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
-      def childBuilder:Bld
+      def builder:Bld
       /** building a child spawning children of a possibly different nature */
-      def build(p:Parser, s:Status, b:Bld):Element = childBuilder(p, self, s, b)
+      def build(p:Parser, s:Status, b:Bld):Element = builder(p, self, s, b)
       /** building a child spawning children of the same nature */
-      def build(p:Parser, s:Status):Element = build(p, s, childBuilder)
+      def build(p:Parser, s:Status):Element = build(p, s, builder)
       
       /** builds the qualified name for the output */
       def qName = eltCtx.qName
@@ -114,7 +107,7 @@ object definition {
         case null =>
         case h    => h.applyOrElse((this,evt),(x:(Element,Event))=>())
       }
-      
+            
      /** Builds an include on the current element, i.e. a sub-engine that works from the current processor state.
       *  When the sub-engine exits, the processor is left in the same state as it entered (i.e. same current element.)
       *  @param K, the kind of data produced by the sub-parser
@@ -129,7 +122,8 @@ object definition {
           //create a Launcher using this processor and the current element
           //replace the current element parser with the new one
           //then start the executor and coerce the returned value to the appropriate Ret value
-          run(p)(null.asInstanceOf[Launcher])((a:Any)=>{(p:Parser)=>{parser=p; self}},mapper,_.read(load("small"), "UTF-8"))  
+   //       val f = run.apply[selfDef.type,BaseParser { type BaseProcessor>:selfDef.type; type Kind=K }](p,this)((a:Any)=>{(p:Parser)=>{parser=p; self}},mapper,null)//_.read(load("small"), "UTF-8"))
+          null.asInstanceOf[Ret]
         } finally {
           parser=old
         }        
@@ -141,7 +135,7 @@ object definition {
       
       /** The push/pull interface on the processor side
        */
-      def push(n:String):Def.this.Element = { val c=build(parser,onName(n),childBuilder); c.onInit(); c }
+      def push(n:String):Processor.this.Element = { val c=build(parser,onName(n),builder); c.onInit(); c }
       def pull()         = { doBeg(); parent.onChild(this, onEnd()) }
       def pull(v:Kind)   = {
         parent.doBeg
@@ -225,7 +219,7 @@ object definition {
      */
     trait WithCallbacks extends Elt { this: Element =>
       protected[this] def cbks: Seq[Cbks] //current callbacks trees (for children)
-      override def build(p: Parser, s: Status, b:Bld): Element = WithCallbacks(p,this,s,cbks,childBuilder,b)
+      override def build(p: Parser, s: Status, b:Bld): Element = WithCallbacks(p,this,s,cbks,builder,b)
     }
     object WithCallbacks {
       /** Analyzes a callbacks sequence to know:
@@ -265,24 +259,17 @@ object definition {
     }
   }
   
-  trait Impl extends Def { self=>
-    /** An actual implementation class should extend this trait.
-     *  All implementations based on the same core (i.e. extending this trait from the same instance)
-     *  are interoperable.
-     *  See examples for how to use this.
-     */
-    trait Impl {
-      def builder:Bld       //an associated builder
-    }
+  trait Impl extends Processor { self=>
     
     //a factory for reading textual parameters
-    def apply(pr: utils.ParamReader, userCtx:UserCtx):Impl
+    //there will be other, specific factories
+    def apply(pr: utils.ParamReader, userCtx:UserCtx):Launcher
     
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      */
-    abstract class Launcher extends super.Launcher with Impl { motor=>
+    abstract class Launcher extends super.Launcher { motor=>
       type Result
       type ElementBase<:Element
       // context fields for a motor
@@ -298,7 +285,7 @@ object definition {
       protected def onEnd(self: Element): Ret
       protected def onChild(self: Element, child: Element, r: Ret): Unit
       // Element implementation : redirect calls
-      trait Processor extends Elt { self:ElementBase=>
+      protected[this] trait Inner extends Elt { self:ElementBase=>
         def userCtx = motor.userCtx
         protected def onName(name: String): Status          = motor.onName(this,name)
         protected def onInit(): Unit                        = motor.onInit(this)
@@ -331,7 +318,7 @@ object definition {
          */
         protected[this] var parser0:Parser
         def parser = parser0
-        protected[definition] def parser_=(parser:Parser):Unit = parser0=parser
+        protected[core] def parser_=(parser:Parser):Unit = parser0=parser
       }  
     }
   }

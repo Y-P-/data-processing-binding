@@ -15,7 +15,7 @@ import loader.core.names.QName;
 public @interface TagField {
   String inName()    default "";
   String outName()   default "=";
-  Class<? extends QName.Processor> qName() default QName.NoProc.class;
+  Class<? extends QName.Builder> qName() default QName.NoProc.class;
   Class<?> loader()  default ClassContext.Unknown.class;
   int min()          default 0;
   String check()     default "";

@@ -1,6 +1,6 @@
 package loader.core.events
 
-import loader.core.definition.Def
+import loader.core.definition.Processor
 
 
 /** Events are sent by the processor used, or by any callback associated with the run.
@@ -22,18 +22,18 @@ object Event {
    * Thus, we just check a broad class of events (e.g. 'DefaultEvent' or 'Exception with Event'), then do an array dispatch.
    * This two steps dispatcher is reasonnably fast and scales well.
    */
-  abstract class Processor[-E<:Def#Elt,+Evt<:Event,+X] {
-    def apply(x:(E,Event)):X = process(x.asInstanceOf[(E,Evt)])
-    protected[this] def process(e:(E,Evt)):X
+  abstract class Dispatcher[-P<:Processor,+Evt<:Event,+X] {
+    def apply(x:(P#Element,Event)):X = process(x.asInstanceOf[(P#Element,Evt)])  //XXX justify cast
+    protected[this] def process(e:(P#Element,Evt)):X
   }
 
   /** Defines an event dispatcher partial function by matching both a super-class (Evt) and an array of Builder.
    *  This is useful for a reasonably fast dispatching of events.
    */
-  class DispatchByClassArray[-E<:Def#Elt,-Evt<:Event:Manifest,+X](a:Array[_<:Processor[E,Evt,X]]) extends PartialFunction[(E,Event),X] {
+  class DispatchByClassArray[-P<:Processor,-Evt<:Event:Manifest,+X](a:Array[_<:Dispatcher[P,Evt,X]]) extends PartialFunction[(P#Element,Event),X] {
     protected[this] val m = manifest[Evt]
-    def isDefinedAt(x:(E,Event)):Boolean = m.runtimeClass.isAssignableFrom(x._2.getClass) && x._2.idx<a.length && x._2.idx>=0
-    def apply(x:(E,Event)):X = a(x._2.idx)(x)
+    def isDefinedAt(x:(P#Element,Event)):Boolean = m.runtimeClass.isAssignableFrom(x._2.getClass) && x._2.idx<a.length && x._2.idx>=0
+    def apply(x:(P#Element,Event)):X = a(x._2.idx)(x)
   }
 
 }

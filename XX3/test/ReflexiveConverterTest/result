@@ -1,27 +1,27 @@
-Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV1(loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV1(loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked U.toV1
 Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV2(loader.reflect.ConvertData))
 invoked U.toV2
-Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV3(loader.core.definition$Def$Elt))
+Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV3(loader.core.definition$Processor$Elt))
 invoked U.toV3
 Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV4())
 invoked U.toV4
 None
-Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV6(loader.core.definition$Def$Elt,loader.reflect.ConvertData))
+Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV6(loader.core.definition$Processor$Elt,loader.reflect.ConvertData))
 invoked U.toV6
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$V$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$V$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked V.toV1
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$V$.toV2(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData))
 invoked V.toV2
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$V$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$V$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Processor$Elt))
 invoked V.toV3
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$V$.toV4(loader.test.reflect.ReflectiveConvertersTest$S))
 invoked V.toV4
 None
-Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV5(loader.core.CtxCore$Def$Elt,loader.reflect.ConvertData))
-Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV1(loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV5(loader.core.CtxCore$Processor$Elt,loader.reflect.ConvertData))
+Some(MethodConverter1 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$S.toV1(loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 ---- S to V ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked V.toV1
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV2(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData))
 invoked V.toV2
@@ -54,26 +54,26 @@ None
 None
 None
 ---- T to V ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked V.toV1
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV2(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData))
 invoked V.toV2
 None
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV4(loader.test.reflect.ReflectiveConvertersTest$S))
 invoked V.toV4
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV5(loader.test.reflect.ReflectiveConvertersTest$T,loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV5(loader.test.reflect.ReflectiveConvertersTest$T,loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked V.toV5
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV6(loader.test.reflect.ReflectiveConvertersTest$T,loader.reflect.ConvertData))
 invoked V.toV6
 None
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV8(loader.test.reflect.ReflectiveConvertersTest$T))
 invoked V.toV8
----- S to V using CtxDef#Elt ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+---- S to V using CtxProcessor#Elt ----
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked V.toV1
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV2(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData))
 invoked V.toV2
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV4(loader.test.reflect.ReflectiveConvertersTest$S))
 invoked V.toV4
@@ -81,23 +81,23 @@ None
 None
 None
 None
----- T to W using CtxDef#Elt ----
+---- T to W using CtxProcessor#Elt ----
 None
 None
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV4(loader.test.reflect.ReflectiveConvertersTest$S))
 invoked V.toV4
 None
 None
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV7(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV7(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.CtxCore$Processor$Elt))
 invoked V.toV7
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV8(loader.test.reflect.ReflectiveConvertersTest$T))
 invoked V.toV8
----- S to W using CtxDef#Elt ----
+---- S to W using CtxProcessor#Elt ----
 None
 None
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV4(loader.test.reflect.ReflectiveConvertersTest$S))
 invoked V.toV4
@@ -105,79 +105,79 @@ None
 None
 None
 None
----- T to V using CtxDef#Elt ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+---- T to V using CtxProcessor#Elt ----
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked V.toV1
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV2(loader.test.reflect.ReflectiveConvertersTest$S,loader.reflect.ConvertData))
 invoked V.toV2
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV4(loader.test.reflect.ReflectiveConvertersTest$S))
 invoked V.toV4
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV5(loader.test.reflect.ReflectiveConvertersTest$T,loader.reflect.ConvertData,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV5(loader.test.reflect.ReflectiveConvertersTest$T,loader.reflect.ConvertData,loader.core.definition$Processor$Elt))
 invoked V.toV5
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$W$.toV6(loader.test.reflect.ReflectiveConvertersTest$T,loader.reflect.ConvertData))
 invoked V.toV6
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV7(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV7(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.CtxCore$Processor$Elt))
 invoked V.toV7
 Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$W$.toV8(loader.test.reflect.ReflectiveConvertersTest$T))
 invoked V.toV8
----- S to V using CtxDef#Elt in X1 instancied with fd0 ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+---- S to V using CtxProcessor#Elt in X1 instancied with fd0 ----
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$X1.toV2(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$X1.toV2(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.CtxCore$Processor$Elt))
 invoked V.toV2
 None
----- S to V using CtxDef#Elt in X0 instancied with fd0 ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+---- S to V using CtxProcessor#Elt in X0 instancied with fd0 ----
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV3(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
 None
 None
----- S to V using Def#Elt in X1 instancied with fd0 ----
+---- S to V using Processor#Elt in X1 instancied with fd0 ----
 None
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$X1.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$X1.toV1(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Processor$Elt))
 invoked V.toV1
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Processor$Elt))
 invoked V.toV4
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Processor$Elt))
 invoked V.toV4
----- S to V using Def#Elt in X0 instancied with fd0 ----
+---- S to V using Processor#Elt in X0 instancied with fd0 ----
 None
 None
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Processor$Elt))
 invoked V.toV4
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$X0.toV4(loader.test.reflect.ReflectiveConvertersTest$T,loader.core.definition$Processor$Elt))
 invoked V.toV4
----- S to V using CtxDef#Elt in Y1 instancied with fd0 ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+---- S to V using CtxProcessor#Elt in Y1 instancied with fd0 ----
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
----- S to V using CtxDef#Elt in Y0 instancied with fd0 ----
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+---- S to V using CtxProcessor#Elt in Y0 instancied with fd0 ----
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$W loader.test.reflect.ReflectiveConvertersTest$Y0.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.CtxCore$Processor$Elt))
 invoked V.toV3
----- S to V using Def#Elt in Y1 instancied with fd0 ----
+---- S to V using Processor#Elt in Y1 instancied with fd0 ----
 None
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$Y1.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$Y1.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Processor$Elt))
 invoked V.toV1
-Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$Y1.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Def$Elt))
+Some(MethodConverter2 with public loader.test.reflect.ReflectiveConvertersTest$V loader.test.reflect.ReflectiveConvertersTest$Y1.fromX(loader.test.reflect.ReflectiveConvertersTest$S,loader.core.definition$Processor$Elt))
 invoked V.toV1
 None
----- S to V using Def#Elt in Y0 instancied with fd0 ----
+---- S to V using Processor#Elt in Y0 instancied with fd0 ----
 None
 None
 None

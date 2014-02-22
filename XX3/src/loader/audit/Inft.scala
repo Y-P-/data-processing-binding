@@ -1,7 +1,7 @@
 package loader.audit
 
 import loader.core.Locator
-import loader.core.definition.Def
+import loader.core.definition.Processor
 import loader.core.events.Event
 
 /** Used to build a log structure.
@@ -32,17 +32,17 @@ trait Recorder {
 
 /** Used to build Element identifiers
  */
-trait IdentifierScheme[-E<:loader.core.definition.Def#Elt] {
+trait IdentifierScheme[-P<:Processor] {
   //builds the name for ld
-  def apply(ld:E):String
+  def apply(ld:P#Element):String
   //builds the name for a child of ld whose simple name is known
-  def apply(ld:E,name:String):String
+  def apply(ld:P#Element,name:String):String
 }
 
 
 /** Defines some information on what to log and how.
  */
-trait AuditInfo[-E<:Def#Elt] extends PartialFunction[(E,Event),LogRecord] {
-  def id:IdentifierScheme[E]            //how names are printed
+trait AuditInfo[-P<:Processor] extends PartialFunction[(P#Element,Event),LogRecord] {
+  def id:IdentifierScheme[P]            //how names are printed
   def max:Int                           //maximal error level logged
 }

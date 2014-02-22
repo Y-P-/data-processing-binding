@@ -69,7 +69,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
     
     /** qName Builder for a TagField
      */
-    protected def qName(n:String, cz:Class[_<:QName.Processor]) = {
+    protected def qName(n:String, cz:Class[_<:QName.Builder]) = {
       if (cz==classOf[QName.NoProc])
         if      (n=="=")           QName.Const(null)
         else if (n.charAt(0)=='>') QName.Local(n.substring(1))

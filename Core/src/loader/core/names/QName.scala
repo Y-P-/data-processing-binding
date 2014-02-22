@@ -1,6 +1,6 @@
 package loader.core.names
 
-import loader.core.definition.Def
+import loader.core.definition.Processor
 import java.util.regex.Pattern
 
 /** Names often come as a pair of namespace/name (e.g. xml)
@@ -17,11 +17,6 @@ import java.util.regex.Pattern
 class QName(val local:String,val prefix:String=null,val isAttrib:Boolean=false)
 
 object QName {
-  /** A input name is a basic string.
-   *  It must be disasembled in attribute/prefix/local parts.
-   *  
-   */
-  trait Processor extends (Def#Elt => QName)  //Used to process input names (usually using ouName as parameter)
 
   /** Defines the default pattern for attrib/prefix/local, which is: &@prefix!local
    *  It can be used for interchangeable outName definitions in context
@@ -33,18 +28,20 @@ object QName {
     else             null
   }
   
+  trait Builder extends (Processor#Element=>QName)
+  
   //The following classes are defined for use in Contexts.
 
   /** the default processor for contexts */
-  final class NoProc extends Processor { def apply(e:Def#Elt):QName = null }
-  final val noProc = new NoProc
+  final class NoProc extends Builder { def apply(e:Processor#Element):QName = null }
+  final val noProc = new NoProc   //could get rid of this if I knew how to make getClass[object.type]
   /** builds a qname containing only a local part: if nom is '!' then e.name is used, otherwise nom is used */
   final object Local {
-    def apply(nom:String):Def#Elt=>QName = if (nom=="!") e=>new QName(e.name) else e=>new QName(nom)
+    def apply(nom:String):Processor#Element=>QName = if (nom=="!") e=>new QName(e.name) else e=>new QName(nom)
   }
   /** builds a qname from nom (e.name is ignored) or e.name (if nom is null); first by applying the generic pattern above, then using the parser's one */
   final object Const {
-    def apply(nom:String):Def#Elt=>QName = if (nom==null) e=>e.parser.qName(e.name) else { val q=QName(nom); if (q==null) _.parser.qName(nom) else e=>q }
+    def apply(nom:String):Processor#Element=>QName = if (nom==null) e=>e.parser.qName(e.name) else { val q=QName(nom); if (q==null) _.parser.qName(nom) else e=>q }
   }
   
   //The next methods defines the standard way to build the input QName.
@@ -55,10 +52,10 @@ object QName {
    *  this algorithm checks for a contextual processor if any to apply it.
    *  if this fails, it uses the parser's defined qname analyzer.
    */
-  def apply(e:Def#Elt):QName = {
-    val q = e match { //check for contextual processor if any; null if not found or NoProc
-      case e1:loader.core.CtxCore.Def#Elt => 
-        val f = e1.fd.annot.qName   //fetch the contextual processor if any
+  def apply(e:Processor#Element):QName = {
+    val q = e.proc match { //check for contextual processor if any; null if not found or NoProc
+      case e1:loader.core.CtxCore.Processor#Elt => //note: Element<:Elt, but Element is erased in the projection!
+        val f = e1.fd.annot.qName   //fetch the contextual processor if any; 
         if (f==null) null else f(e) //if present, use it
       case _ =>
         null

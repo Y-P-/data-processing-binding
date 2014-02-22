@@ -1,7 +1,7 @@
 package loader.reflect
 
 import java.lang.reflect.{Field,Method,Type,ParameterizedType,WildcardType,GenericArrayType,TypeVariable}
-import loader.core.definition.Def
+import loader.core.definition.Processor
 import loader.core.context.FieldAnnot
 import loader.commons._
 import scala.collection.mutable.Builder
@@ -54,7 +54,7 @@ object AutoConvertData {
  *  The top class (which cannot be instancied because the constructor is private) is used for binding to a DataActor.
  *  Derived classes (which are also hidden) are used to bind sub-collections. 
  */
-sealed class Binder[-E<:Def#Elt] private (val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
+sealed class Binder[-E<:Processor#Elt] private (val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
   protected[this] final type I = Analyze#Instance
   private[this] var cached:Analyze = null
   protected[this] def build(on:AnyRef):I = {
@@ -120,7 +120,7 @@ object Binder {
   /** Binder for a collection element. It can not be assigned until all elements have been first collected.
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
-  private class CollectionBinder[-E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
+  private class CollectionBinder[-E<:Processor#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
     private[this] val deepCache = new Array[super.Analyze](6)   //Do we expect deep collection of more than this depth ?
     
     class Analyze(val depth:Int,val parent:super.Analyze) extends super.Analyze {
@@ -143,7 +143,7 @@ object Binder {
       override def newInstance(on:AnyRef,parent:I):Instance = new Instance(on,parent)
       class Instance(on:AnyRef,parent:I) extends super.Instance(on,parent) {
         final var stack:Builder[Any,Any] = _
-        private def checkStack(e:E) = if (stack==null) stack = adapt.newBuilder(e).asInstanceOf[Builder[Any,Any]]
+        private def checkStack(e:E)                = if (stack==null) stack = adapt.newBuilder(e).asInstanceOf[Builder[Any,Any]]
         final override def close(e:E):Unit         = { checkStack(e); parent.rcv(stack.result,e) }
         final override def close(key:Any,e:E):Unit = { checkStack(e); parent.rcv(key,stack.result,e) }
         override def rcv(x:Any,e:E):Unit           = { checkStack(e); stack+=x }
@@ -170,7 +170,7 @@ object Binder {
   }
 
   /** Factory that builds a Binder with a given DataActor */
-  final def apply[E<:Def#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
+  final def apply[E<:Processor#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
     if (isCol) new CollectionBinder(what,solver,fd)
     else       new Binder(what,solver,fd)
   }
@@ -180,7 +180,7 @@ object Binder {
    *  - method o is for specifying final inputs
    *  - method u is for specifying layers
    */
-  implicit final class Helper(val x: Binder[Def#Elt]#Analyze#Instance) {
+  implicit final class Helper(val x: Binder[Processor#Elt]#Analyze#Instance) {
     @inline private def sub(f: Helper=>Unit*)                  = { val c:Helper=x.subInstance; f.foreach(_(c)); c.x }
     @inline final def u(f: Helper=>Unit*):Unit                 = sub(f:_*).close(null)
     @inline final def read                                     = x.read()

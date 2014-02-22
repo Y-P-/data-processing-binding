@@ -13,7 +13,7 @@ import loader.core.ParserBuilder
 
 object Struct extends Processor {self=>
   
-  trait DefImpl extends loader.core.ExtCore.Def {impl=>
+  trait DefImpl extends loader.core.ExtCore.Processor {impl=>
     type Kind        = String
     type Ret         = Int
     type Data        = Null
@@ -77,9 +77,10 @@ object Struct extends Processor {self=>
   
 }
 
+//XXX remove or adapt: clash of names, Motor contravariant
 abstract class Processor {
   import loader.core._
-  abstract class Motor[E<:definition.Def#Element](val userCtx:UserContext[E])
+  abstract class Motor[P<:definition.Processor](val userCtx:UserContext[P])
   val ctx:CtxCore.Impl
   val ext:ExtCore.Impl
 }

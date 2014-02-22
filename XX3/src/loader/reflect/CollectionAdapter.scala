@@ -4,7 +4,7 @@ import java.lang.reflect.{Type,GenericArrayType,ParameterizedType,Modifier}
 import scala.reflect.ClassTag
 import scala.collection.mutable.{HashMap,Builder,ArrayBuilder}
 import scala.collection.Map
-import loader.core.definition.Def
+import loader.core.definition.Processor
 import utils.Reflect._
 
 /** This defines how to to spawn a collection C in an homogeneous way.
@@ -18,7 +18,7 @@ import utils.Reflect._
  *  - the collection is not a default Java collection (which is spawned through a default constructor)
  *    and its canBuildFrom/newBuilder cannot be found (possibly because it is a user class, an inner class or whatever.)
  */
-abstract class CollectionAdapter[C:ClassTag,-E<:Def#Elt] {
+abstract class CollectionAdapter[C:ClassTag,-E<:Processor#Elt] {
   val czzCol:Class[_] = implicitly[ClassTag[C]].runtimeClass
   def apply(p:Type):BaseAdapter[_]
   
@@ -63,33 +63,33 @@ object CollectionAdapter {
     }
   }
   
-  object BitSetAdapter extends CollectionAdapter[scala.collection.immutable.BitSet,Def#Elt] {
+  object BitSetAdapter extends CollectionAdapter[scala.collection.immutable.BitSet,Processor#Elt] {
     val a = new SeqAdapter[Int](classOf[Int]) {
       val czCol = czzCol
-      def newBuilder(e:Def#Elt) = scala.collection.immutable.BitSet.newBuilder
+      def newBuilder(e:Processor#Elt) = scala.collection.immutable.BitSet.newBuilder
     }
     def apply(p:Type) = a
   }
-  object MBitSetAdapter extends CollectionAdapter[scala.collection.mutable.BitSet,Def#Elt] {
+  object MBitSetAdapter extends CollectionAdapter[scala.collection.mutable.BitSet,Processor#Elt] {
     val a = new SeqAdapter[Int](classOf[Int]) {
       val czCol = czzCol
-      def newBuilder(e:Def#Elt) = scala.collection.mutable.BitSet.newBuilder
+      def newBuilder(e:Processor#Elt) = scala.collection.mutable.BitSet.newBuilder
     }
     def apply(p:Type) = a
   }
-  object MUnrolledBuffer extends CollectionAdapter[scala.collection.mutable.UnrolledBuffer[_],Def#Elt] {
+  object MUnrolledBuffer extends CollectionAdapter[scala.collection.mutable.UnrolledBuffer[_],Processor#Elt] {
     class Inner[E](p:ParameterizedType) extends SeqAdapter(p.getActualTypeArguments()(0)) {
       val czCol = czzCol
-      def newBuilder(e:Def#Elt) = new scala.collection.mutable.UnrolledBuffer()(ClassTag(Binder.findClass(czElt)))
+      def newBuilder(e:Processor#Elt) = new scala.collection.mutable.UnrolledBuffer()(ClassTag(Binder.findClass(czElt)))
     }
     def apply(t:Type) = t match {
       case p:ParameterizedType => new Inner(p)
     }
   }
-  object JBitSetAdapter extends CollectionAdapter[java.util.BitSet,Def#Elt] {
+  object JBitSetAdapter extends CollectionAdapter[java.util.BitSet,Processor#Elt] {
     val a = new SeqAdapter[Int](classOf[Int]) {
       val czCol = czzCol
-      def newBuilder(e:Def#Elt) = new Builder[Int,java.util.BitSet] {
+      def newBuilder(e:Processor#Elt) = new Builder[Int,java.util.BitSet] {
         val tmp = new java.util.BitSet
         def +=(elem: Int):this.type = { tmp.set(elem); this }
         def clear(): Unit = tmp.clear
@@ -98,10 +98,10 @@ object CollectionAdapter {
     }
     def apply(p:Type) = a
   }
-  object JEnumSetAdapter extends CollectionAdapter[java.util.EnumSet[_],Def#Elt] {
+  object JEnumSetAdapter extends CollectionAdapter[java.util.EnumSet[_],Processor#Elt] {
     class Inner[E<:Enum[E]](p:ParameterizedType) extends SeqAdapter(p.getActualTypeArguments()(0)) {
       val czCol = p
-      def newBuilder(e:Def#Elt) = new Builder[E,java.util.EnumSet[E]] {
+      def newBuilder(e:Processor#Elt) = new Builder[E,java.util.EnumSet[E]] {
         val tmp = java.util.EnumSet.noneOf(czElt.asInstanceOf[Class[E]])
         def +=(elem: E):this.type = { tmp.add(elem); this }
         def clear(): Unit = tmp.clear
@@ -112,10 +112,10 @@ object CollectionAdapter {
       case p:ParameterizedType => new Inner(p)
     }
   }
-  object JEnumMapAdapter extends CollectionAdapter[java.util.EnumMap[_,_],Def#Elt] {
+  object JEnumMapAdapter extends CollectionAdapter[java.util.EnumMap[_,_],Processor#Elt] {
     class Inner[E<:Enum[E],X](p:ParameterizedType) extends MapAdapter(p.getActualTypeArguments()(0),p.getActualTypeArguments()(1)) {
       val czCol = p
-      def newBuilder(e:Def#Elt) = new Builder[(E,X),java.util.EnumMap[E,X]] {
+      def newBuilder(e:Processor#Elt) = new Builder[(E,X),java.util.EnumMap[E,X]] {
         val tmp = new java.util.EnumMap[E,X](czKey.asInstanceOf[Class[E]])
         def +=(elem: (E,X)):this.type = { tmp.put(elem._1,elem._2); this }
         def clear(): Unit = tmp.clear
@@ -126,10 +126,10 @@ object CollectionAdapter {
       case p:ParameterizedType => new Inner(p)
     }
   }
-  object JPropertiesAdapter extends CollectionAdapter[java.util.Properties,Def#Elt] {
+  object JPropertiesAdapter extends CollectionAdapter[java.util.Properties,Processor#Elt] {
     val a = new MapAdapter[String,String](classOf[String],classOf[String]) {
       val czCol = czzCol
-      def newBuilder(e:Def#Elt) = new Builder[(String,String),java.util.Properties] {
+      def newBuilder(e:Processor#Elt) = new Builder[(String,String),java.util.Properties] {
         val tmp = new java.util.Properties
         def +=(elem: (String,String)):this.type = { tmp.setProperty(elem._1,elem._2); this }
         def clear(): Unit = tmp.clear
@@ -138,28 +138,28 @@ object CollectionAdapter {
     }
     def apply(t:Type) = a
   }
-  object IntMapAdapter extends CollectionAdapter[scala.collection.immutable.IntMap[_],Def#Elt] {
+  object IntMapAdapter extends CollectionAdapter[scala.collection.immutable.IntMap[_],Processor#Elt] {
     class Inner[X](p:ParameterizedType) extends MapAdapter[Int,X](classOf[Int],p.getActualTypeArguments()(0)) {
       val czCol = p
-      def newBuilder(e:Def#Elt) = scala.collection.immutable.IntMap.canBuildFrom[X,X].apply
+      def newBuilder(e:Processor#Elt) = scala.collection.immutable.IntMap.canBuildFrom[X,X].apply
     }
     def apply(t:Type) = t match {
       case p:ParameterizedType => new Inner(p)
     }
   }
-  object LongMapAdapter extends CollectionAdapter[scala.collection.immutable.LongMap[_],Def#Elt] {
+  object LongMapAdapter extends CollectionAdapter[scala.collection.immutable.LongMap[_],Processor#Elt] {
     class Inner[X](p:ParameterizedType) extends MapAdapter[Long,X](classOf[Long],p.getActualTypeArguments()(0)) {
       val czCol = p
-      def newBuilder(e:Def#Elt) = scala.collection.immutable.LongMap.canBuildFrom[X,X].apply
+      def newBuilder(e:Processor#Elt) = scala.collection.immutable.LongMap.canBuildFrom[X,X].apply
     }
     def apply(t:Type) = t match {
       case p:ParameterizedType => new Inner(p)
     }
   }
-  object HistoryAdapter extends CollectionAdapter[scala.collection.mutable.History[_,_],Def#Elt] {
+  object HistoryAdapter extends CollectionAdapter[scala.collection.mutable.History[_,_],Processor#Elt] {
     class Inner[X,Y](p:ParameterizedType) extends SeqAdapter(classOf[Pair[X,Y]]) {
       val czCol = p
-      def newBuilder(e:Def#Elt) = new Builder[(X,Y),scala.collection.mutable.History[X,Y]] {
+      def newBuilder(e:Processor#Elt) = new Builder[(X,Y),scala.collection.mutable.History[X,Y]] {
         val tmp = new scala.collection.mutable.History[X,Y]
         def +=(elem: (X,Y)):this.type = { tmp.notify(elem._2,elem._1); this }
         def clear(): Unit = tmp.clear
@@ -170,10 +170,10 @@ object CollectionAdapter {
       case p:ParameterizedType => new Inner(p)
     }
   }
-  object RevertibleHistoryAdapter extends CollectionAdapter[scala.collection.mutable.RevertibleHistory[_,_],Def#Elt] {
+  object RevertibleHistoryAdapter extends CollectionAdapter[scala.collection.mutable.RevertibleHistory[_,_],Processor#Elt] {
     class Inner[X<:scala.collection.mutable.Undoable,Y](p:ParameterizedType) extends SeqAdapter(classOf[Pair[X,Y]]) {
       val czCol = p
-      def newBuilder(e:Def#Elt) = new Builder[(X,Y),scala.collection.mutable.RevertibleHistory[X,Y]] {
+      def newBuilder(e:Processor#Elt) = new Builder[(X,Y),scala.collection.mutable.RevertibleHistory[X,Y]] {
         val tmp = new scala.collection.mutable.RevertibleHistory[X,Y]
         def +=(elem: (X,Y)):this.type = { tmp.notify(elem._2,elem._1); this }
         def clear(): Unit = tmp.clear
@@ -186,7 +186,7 @@ object CollectionAdapter {
   }
     
   /** factory to fill up the Collection adapter map */
-  def apply[E<:Def#Elt](a:CollectionAdapter[_,E]*):Map[Class[_],CollectionAdapter[_,E]] = {
+  def apply[E<:Processor#Elt](a:CollectionAdapter[_,E]*):Map[Class[_],CollectionAdapter[_,E]] = {
     val self = HashMap[Class[_],CollectionAdapter[_,E]]()
     for (x<-a) self += x.czzCol -> x
     self.withDefault(cz=>new ReflexiveAdapter(cz))
@@ -200,7 +200,7 @@ object CollectionAdapter {
   /** Same as above, but defined by reflection where possible.
    *  This is the default when the collection class is not found in the map.
    */
-  protected class ReflexiveAdapter(cz:Class[_]) extends CollectionAdapter[Any,Def#Elt]()(ClassTag(cz)) { self=>
+  protected class ReflexiveAdapter(cz:Class[_]) extends CollectionAdapter[Any,Processor#Elt]()(ClassTag(cz)) { self=>
     //checks if expected is a Map
     
     def apply(t:Type):BaseAdapter[Nothing] = {
@@ -208,18 +208,18 @@ object CollectionAdapter {
         case p:ParameterizedType if p.getActualTypeArguments().length==2 =>
           new MapAdapter[Any,Nothing](p.getActualTypeArguments()(0),eltType(p)) {
             val czCol = t
-            def newBuilder(e:Def#Elt):Builder[Any,Any] = self.newBuilder(e)
+            def newBuilder(e:Processor#Elt):Builder[Any,Any] = self.newBuilder(e)
           }
         case x =>
           new SeqAdapter[Nothing](eltType(t)) {
             val czCol = t
-            def newBuilder(e:Def#Elt):Builder[Any,Any] = self.newBuilder(e)
+            def newBuilder(e:Processor#Elt):Builder[Any,Any] = self.newBuilder(e)
           }
       }
     }
 
     /** This will be used to build a collection whenever needed */
-    protected def newBuilder(e:Def#Elt):Builder[Any,Any] = {
+    protected def newBuilder(e:Processor#Elt):Builder[Any,Any] = {
       def getJInstance[X]:X = try {
         czzCol.newInstance.asInstanceOf[X]
       } catch {

@@ -5,7 +5,7 @@ package loader.core
  */
 object ExtCore {
   
-  trait Def extends Core.Def {
+  trait Processor extends Core.Processor {
     type Data
     type Element >: Null <: Elt
     
@@ -15,7 +15,7 @@ object ExtCore {
     }
   }
 
-  trait Impl extends definition.Impl with Def { self=>
+  trait Impl extends definition.Impl with Processor { self=>
     type Status = Core.Status
     type Element = Elt
     
@@ -24,17 +24,17 @@ object ExtCore {
       //implementations
       protected def onName(e:Element,name:String) = new Status(name)
       
-      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val childBuilder:Bld, val data:Data) extends Processor with Elt {
-        def this(parser:Parser,s:Status,parent:Element,childBuilder:Bld) = this(parser,s.name,parent,childBuilder,getData(parent,s))
+      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val builder:Bld, val data:Data) extends Inner with Elt {
+        def this(parser:Parser,s:Status,parent:Element,builder:Bld) = this(parser,s.name,parent,builder,getData(parent,s))
         def getData(s:Status) = Launcher.this.getData(this,s)
       }
-      class ElementCbks(parser:Parser, s:Status, parent:Element, childBuilder:Bld, val cbks:Cbks*)         extends ElementBase(parser,s,parent,childBuilder)         with WithCallbacks
-      class ElementCbk (parser:Parser, s:Status, parent:Element, childBuilder:Bld, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,s,parent,childBuilder,cbks:_*) with WithCallback
+      class ElementCbks(parser:Parser, s:Status, parent:Element, builder:Bld, val cbks:Cbks*)         extends ElementBase(parser,s,parent,builder)         with WithCallbacks
+      class ElementCbk (parser:Parser, s:Status, parent:Element, builder:Bld, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,s,parent,builder,cbks:_*) with WithCallback
     
       override val builder:Bld = new Bld {
-        def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld)                      = new ElementBase(parser,s,parent,childBuilder)
-        def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cbks: Cbks*)         = new ElementCbks(parser,s,parent,childBuilder, cbks:_*)
-        def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,s,parent,childBuilder, cb, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status, builder:Bld)                      = new ElementBase(parser,s,parent,builder)
+        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cbks: Cbks*)         = new ElementCbks(parser,s,parent,builder, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,s,parent,builder, cb, cbks:_*)
       }
     }
   }

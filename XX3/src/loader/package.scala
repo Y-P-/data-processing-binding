@@ -1,5 +1,5 @@
 package object loader {
-  type Element = core.CtxCore.Def#Elt
+  type Element = core.CtxCore.Processor#Element
   
   type Assoc[+k,+t]  = commons.Assoc[k,t]
   type Named         = commons.Named

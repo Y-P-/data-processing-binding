@@ -1,7 +1,7 @@
 package loader.core
 import java.io.Reader
 import java.net.URI
-import loader.core.definition.Def
+import loader.core.definition.Processor
 import exceptions._
 import loader.core.events.Event
 import scala.reflect.runtime.universe._
@@ -36,7 +36,7 @@ trait ParserBuilder {selfBuilder=>
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
-  type BaseProcessor <: Def { type BaseParser >: selfBuilder.type }
+  type BaseProcessor <: Processor { type BaseParser >: selfBuilder.type }
   
   /** Actual parser implementation */
   type Parser[v,r] <: Impl[v,r]
@@ -78,7 +78,7 @@ trait ParserBuilder {selfBuilder=>
     def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
     def push(name: String):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
-      try { /*cur=cur.push(name)*/ } catch {
+      try { cur=cur.push(name) } catch {
         case `skip`                 => ignore+=1
         case `skipEnd`   if canSkip => skipToEnd
         case e:Throwable if canSkip => errHandler(e); skipToEnd
@@ -121,6 +121,7 @@ trait ParserBuilder {selfBuilder=>
     // - process exception event
     // - throw exception if and only if the exception is InternalLoaderException or UserException with lvl<=1
     def errHandler:PartialFunction[Throwable,Unit] = {
+      case u:NullPointerException if current==null => try { top(StackException(u)) } finally { throw new InternalLoaderException(StackException(u),current) }
       case u:InternalLoaderException => try { current(UnexpectedException(u)) } finally { throw u }
       case u:UserException           => try { current(u) } finally { if (u.lvl<=1) throw u }
       case u:Exception with Event    => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }

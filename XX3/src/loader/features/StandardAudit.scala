@@ -4,14 +4,15 @@ import loader.core.definition._
 import loader.core.events._
 import loader.core.exceptions._
 import loader.audit.{AuditInfo,IdentifierScheme,LogRecord,AuditRecorder}
-import loader.core.events.Event.{DispatchByClassArray,Processor}
+import loader.core.events.Event.{DispatchByClassArray,Dispatcher}
 
 
-class StandardAuditLogger[-E<:Def#Elt](val id:IdentifierScheme[E], val max:Int) extends AuditInfo[E] {
+class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int) extends AuditInfo[P] {
   import Event._
-  protected[this] type Logger[+Evt<:Event] = Processor[E,Evt,(Int)=>LogRecord]
-  class Dispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((E,Event))=>Int]) extends PartialFunction[(E,Event),LogRecord] {
-    val d = new DispatchByClassArray[E,Evt,(Int)=>LogRecord](a)
+  protected[this] final type E = P#Element
+  protected[this] final type Logger[+Evt<:Event] = Dispatcher[P,Evt,(Int)=>LogRecord]
+  class LogDispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((P#Element,Event))=>Int]) extends PartialFunction[(P#Element,Event),LogRecord] {
+    val d = new DispatchByClassArray[P,Evt,(Int)=>LogRecord](a)
     def isDefinedAt(x:(E,Event))     = d.isDefinedAt(x)
     def apply(x:(E,Event)):LogRecord = { val s=severity(x._2.idx)(x); if (s<=max) d(x)(s) else null }
   }
@@ -36,32 +37,42 @@ class StandardAuditLogger[-E<:Def#Elt](val id:IdentifierScheme[E], val max:Int) 
           InvalidConversionLog,
           IncludeLog,
           DegenListLog,
-          UnexpectedExceptionLog
+          UnexpectedExceptionLog,
+          StackExceptionLog
           )
   /**
    * Severities for events. The severity serves as a filter and an event whose severity is greater than max will get past the guard
-   * (so that it won't go down the handler chain), but it won't do anything.
+   * (so that it won't go down the handler chain), but it won't do anything. Lower values are more severe.
    * Usually severities are constant, but is is perfectly possible to dynamically set the severity from either the associated element
    * or from the underlying event. This lets fine tune logging as much as may be needed.
    */
   protected[this] def baseSeverity      = Array[((E,Event))=>Int](_=>5, _=>5, _=>5, _=>4, _=>4, _=>4, _=>4, _=>4, _=>4, _=>4)
-  protected[this] def exceptionSeverity = Array[((E,Event))=>Int](_._2.asInstanceOf[UserException].lvl, _=>3, _=>3, _=>3, _=>3, _=>3, _=>2)
+  protected[this] def exceptionSeverity = Array[((E,Event))=>Int](_._2.asInstanceOf[UserException].lvl, _=>3, _=>3, _=>3, _=>3, _=>3, _=>2, _=>2)
   
-  private[this] val t1 = new Dispatcher[DefaultEvent](baseLoggers,baseSeverity)
-  private[this] val t2 = new Dispatcher[Exception with Event](exceptionLoggers,exceptionSeverity)
+  private[this] val t1 = new LogDispatcher[DefaultEvent](baseLoggers,baseSeverity)
+  private[this] val t2 = new LogDispatcher[Exception with Event](exceptionLoggers,exceptionSeverity)
   
   val log:PartialFunction[(E,Event),LogRecord] = t1 orElse t2
   
   def localisation(elt:E):String = {
     val b = new StringBuilder
-    elt.foreach { e:E#Element => if (e.isInclude) b.append(e.parent.parser.location).append("/") }
-    b.append(elt.parser.location)
+    val x = elt.foreach _     //for some reason, for (e <- elt) fails to compile...
+    x( e=>{
+      if (e.isInclude) b.append(e.parent.parser.location).append("/")
+      b.append(elt.parser.location)
+    })
     b.toString
   }
   
   abstract private class Log1(x:(E,Event),name:String,lvl:Int,v:Option[Any],exc:Throwable)
     extends StandardLogRecord(id(x._1,name),lvl, localisation(x._1),v,exc)
   
+  private object StackExceptionLog extends Logger[StackException] {
+    def process(x:(E,StackException)) = new Log1(x,null,_,None,x._2) {
+      val explain = s"parser stack underflow"
+      val cause   = "X"
+    }
+  }
   private object UnexpectedExceptionLog extends Logger[UnexpectedException] {
     def process(x:(E,UnexpectedException)) = new Log1(x,null,_,None,x._2.e) {
       val explain = s"unexpected error : ${exc.getMessage}"
@@ -186,7 +197,7 @@ class StandardAuditLogger[-E<:Def#Elt](val id:IdentifierScheme[E], val max:Int) 
 
 /** Event handler for auditing.
  */
-class DefaultAuditHandler[-E<:Def#Elt](a:AuditInfo[E],ar:AuditRecorder) extends EventHandler[E] {
-  def isDefinedAt(x:(E,Event)) = a.isDefinedAt(x)
-  def apply(x:(E,Event)):Unit = ar.log(a(x))
+class DefaultAuditHandler[-P<:Processor](a:AuditInfo[P],ar:AuditRecorder) extends EventHandler[P] {
+  def isDefinedAt(x:(P#Element,Event)) = a.isDefinedAt(x)
+  def apply(x:(P#Element,Event)):Unit = ar.log(a(x))
 }

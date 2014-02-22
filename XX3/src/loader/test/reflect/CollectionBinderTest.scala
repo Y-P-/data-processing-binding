@@ -19,7 +19,7 @@ import loader.reflect.Converters
 
 /*
 
-object TestBinder {
+object TestBinder { //XXX check all is now done
     
   class U(val x:Int=0, val y:String=null, val z:Date=null, val a:Array[Int]=null, val b:Array[List[Array[Int]]]=null, val u:U=null, val v:Ex.Val, val w:MyEnum) {
     override def toString:String = s"U = ($x, $y, $z, [${if (a!=null) a.mkString(",") else ""}], $u, $v, $w)"

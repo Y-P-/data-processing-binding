@@ -27,13 +27,13 @@ case class IncludeSuccessEvt[K>:Null](info:K)                        extends Def
  *  the processing state. In particular, it uses the Context#FieldMapping definition
  *  in order to check the validity of read fields.
  */
-class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
+class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,R0,K] {
   /** Note that to avoid useless calls, we break down the Default event generator into three pieces,
    *  one for each kind of element. There is scarce common code between them.
    */
-  override def apply(e0:Def#Elt):Inner = e0 match {
+  override def apply(e0:Processor#Element):Inner = e0 match {
     //Struct events
-    case stc: Def#Struct => new Inner(e0) {
+    case stc: Processor#Struct => new Inner(e0) {
       override def onName[S<:Status](name:String, f: (String)=>S):S = {
         import ParserBuilder._
         val s = try { f(name) } catch {
@@ -75,7 +75,7 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Def#Elt,Status,R0,K] {
       }
     }
     //Lists events
-    case lst: Def#List => new Inner(e0) {
+    case lst: Processor#List => new Inner(e0) {
       override def onVal[R<:R0](s:K, f: (K)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
@@ -115,9 +115,9 @@ object DefaultCtxEventsCbk {
   import scala.language.implicitConversions
   import loader.core.callbacks.Callbacks
   //a builder for Callbacks
-  def builder[R,K>:Null] = new CallbacksBuilder[loader.motors.Struct.ctx.Elt,loader.core.CtxCore.Status,R,K]
+  def builder[P<:Processor] = new CallbacksBuilder[P#Element,P#Status,P#Ret,P#Kind]
   //converting DefaultCtxEventsCbk into a Callbacks recursive tree
-  implicit def cbks[R,K>:Null](cbk:DefaultCtxEventsCbk[R,K]):Callbacks[loader.motors.Struct.ctx.Elt,loader.core.CtxCore.Status,R,K] = builder(cbk)
+  implicit def cbks[P<:Processor](cbk:DefaultCtxEventsCbk[P#Ret,P#Kind]):Callbacks[P#Element,P#Status,P#Ret,P#Kind] = builder(cbk)
   
   val readTagIdx = 0
   val fastWarnIdx = 1

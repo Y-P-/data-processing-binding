@@ -14,7 +14,7 @@ object CtxCore {
    *  This also assumes that any Element is somehow declared (Context#FieldMapping) so that we know
    *  at any time what to expect by simply watching the name.
    */
-  trait Def extends ExtCore.Def {
+  trait Processor extends ExtCore.Processor {
     override type Status = CtxCore.Status
     type Element >: Null <: Elt
 
@@ -93,7 +93,7 @@ object CtxCore {
    *  o write the builder mostly as below
    *  This would only be usefull in a handful of cases, after it is proved that this generic processor is the cause of inefficiency...
    */
-  trait Impl extends definition.Impl with Def {
+  trait Impl extends definition.Impl with Processor {
     type Element = Elt
     
     abstract class Launcher extends super.Launcher { impl=>
@@ -107,33 +107,33 @@ object CtxCore {
       protected def onName(e:Element,name:String): Status  = null
       
       //concrete definitions
-      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val childBuilder:Bld, val data:Data) extends Processor with Elt {
-        def this(parser:Parser, s:Status, parent:Element, childBuilder:Bld) = this(parser,s.name,parent,s.fd,s.idx,childBuilder,impl.getData(parent, s))
+      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val builder:Bld, val data:Data) extends Inner with Elt {
+        def this(parser:Parser, s:Status, parent:Element, builder:Bld) = this(parser,s.name,parent,s.fd,s.idx,builder,impl.getData(parent, s))
         def getData(s: Status) = Launcher.this.getData(this,s)
       }
-      class Struct(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                             extends ElementBase(parser,s,parent,childBuilder) with Impl.this.Struct
-      class List(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                               extends ElementBase(parser,s,parent,childBuilder) with Impl.this.List
-      class Terminal(parser:Parser,s:Status,parent:Element,childBuilder:Bld)                           extends ElementBase(parser,s,parent,childBuilder) with Impl.this.Terminal
-      class StructCbks(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cbks:Cbks*)          extends Struct(parser,s,parent,childBuilder) with WithCallbacks
-      class ListCbks(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cbks:Cbks*)            extends List(parser,s,parent,childBuilder) with WithCallbacks
-      class TerminalCbks(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cbks:Cbks*)        extends Terminal(parser,s,parent,childBuilder) with WithCallbacks
-      class StructCbk(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cb:Cbk,cbks:Cbks*)    extends StructCbks(parser,s,parent,childBuilder,cbks:_*) with WithCallback
-      class ListCbk(parser:Parser,s:Status,parent:Element,childBuilder:Bld,val cb:Cbk,cbks:Cbks*)      extends ListCbks(parser,s,parent,childBuilder,cbks:_*) with WithCallback
-      class TerminalCbk(parser:Parser,s:Status, parent:Element,childBuilder:Bld,val cb:Cbk,cbks:Cbks*) extends TerminalCbks(parser,s,parent,childBuilder,cbks:_*) with WithCallback
+      class Struct(parser:Parser,s:Status,parent:Element,builder:Bld)                             extends ElementBase(parser,s,parent,builder) with Impl.this.Struct
+      class List(parser:Parser,s:Status,parent:Element,builder:Bld)                               extends ElementBase(parser,s,parent,builder) with Impl.this.List
+      class Terminal(parser:Parser,s:Status,parent:Element,builder:Bld)                           extends ElementBase(parser,s,parent,builder) with Impl.this.Terminal
+      class StructCbks(parser:Parser,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)          extends Struct(parser,s,parent,builder) with WithCallbacks
+      class ListCbks(parser:Parser,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)            extends List(parser,s,parent,builder) with WithCallbacks
+      class TerminalCbks(parser:Parser,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)        extends Terminal(parser,s,parent,builder) with WithCallbacks
+      class StructCbk(parser:Parser,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)    extends StructCbks(parser,s,parent,builder,cbks:_*) with WithCallback
+      class ListCbk(parser:Parser,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)      extends ListCbks(parser,s,parent,builder,cbks:_*) with WithCallback
+      class TerminalCbk(parser:Parser,s:Status, parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*) extends TerminalCbks(parser,s,parent,builder,cbks:_*) with WithCallback
       
       override val builder:Bld = new Bld {
-        def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld) =
-          if      (s.fd.isList)   new List(parser, s, parent, childBuilder)
-          else if (s.fd.isStruct) new Struct(parser, s, parent, childBuilder)
-          else                    new Terminal(parser, s, parent, childBuilder)
-        def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cbks: Cbks*) =
-          if      (s.fd.isList)   new ListCbks(parser, s, parent, childBuilder, cbks:_*)
-          else if (s.fd.isStruct) new StructCbks(parser, s, parent, childBuilder, cbks:_*)
-          else                    new TerminalCbks(parser, s, parent, childBuilder, cbks:_*)
-        def apply(parser:Parser, parent: Element, s: Status, childBuilder:Bld, cb:Cbk, cbks: Cbks*) =
-          if      (s.fd.isList)   new ListCbk(parser, s, parent, childBuilder, cb, cbks:_*)
-          else if (s.fd.isStruct) new StructCbk(parser, s, parent, childBuilder, cb, cbks:_*)
-          else                    new TerminalCbk(parser, s, parent, childBuilder, cb, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status, builder:Bld) =
+          if      (s.fd.isList)   new List(parser, s, parent, builder)
+          else if (s.fd.isStruct) new Struct(parser, s, parent, builder)
+          else                    new Terminal(parser, s, parent, builder)
+        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cbks: Cbks*) =
+          if      (s.fd.isList)   new ListCbks(parser, s, parent, builder, cbks:_*)
+          else if (s.fd.isStruct) new StructCbks(parser, s, parent, builder, cbks:_*)
+          else                    new TerminalCbks(parser, s, parent, builder, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cb:Cbk, cbks: Cbks*) =
+          if      (s.fd.isList)   new ListCbk(parser, s, parent, builder, cb, cbks:_*)
+          else if (s.fd.isStruct) new StructCbk(parser, s, parent, builder, cb, cbks:_*)
+          else                    new TerminalCbk(parser, s, parent, builder, cb, cbks:_*)
       }
       
       //XXX for fun...
