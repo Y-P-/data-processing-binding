@@ -52,7 +52,7 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onInclude[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+      override def onSolver[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
@@ -81,7 +81,7 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onInclude[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+      override def onSolver[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
@@ -102,7 +102,7 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onInclude[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+      override def onSolver[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))

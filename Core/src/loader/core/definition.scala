@@ -35,50 +35,27 @@ object definition {
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Kind]
     type Bld     = EltBuilder
     
-    /** Used to define an implementation.
-     *  This is used to define the builder for an implementation. 
+    /** This is used to define the builder for an implementation.
+     *  It is used to start a processor. 
      */
     trait Launcher {
       val proc:Processor.this.type = Processor.this
-      def myself:proc.Launcher = this
+      def myself:proc.Launcher = this  //prevents some non necessary casts
       def builder:Bld
               
-      /** Specific factories for X instances.
+      /** Specific factories.
+       *  A Parser=>Element function is expected: it spawns the Top element for a given Parser.
        */
       def apply(s:Status,cbks:Cbks*):Parser=>Element = p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*)
       def apply(s:Status):Parser=>Element            = builder(_,s)
     }
-    
-    /** The standard, elementary methods dealing with parser events ; a subclass will usually refine this
-     *  The order in which these methods are executed is:
-     *  - parent executes onName ; child doesn't yet exist
-     *  - child is created by the appropriate motor : onBeg is invoked
-     *  - child may either be a terminal ; onVal is invoked when the value is received
-     *  - or it maybe a container, in which case it will receive parents events (onName,onChild),
-     *    until it is finished and onEnd is invoked.
-     *  - parent executes onChild.
-     *  They are protected because users have little reason to invoke these directly! See below onName0/onEnd0.
-     *  However, these methods are important because they provide the entries for callbacks and understanding
-     *  them is necessary to coding complex callbacks.
+        
+    /** An object that is attached to a parser object (that has been pushed, to the contrary of
+     *  values that are pulled.) One such object is spawned for each parser object, to process
+     *  it accordingly to the processor's requirements.
      */
-    trait BaseElt { self:Element=>
-      def parser:selfDef.Parser
-      protected def onName(name: String): Status
-      protected def onInit(): Unit                             //called on all elements on creation
-      protected def onBeg(): Unit                              //called on beginning of a struct
-      protected def onVal(v: Kind): Ret                        //called when receiving a value
-      protected def onInclude(v: Kind, e: ()=>Ret): Ret        //called when receiving an include (as defined by the EltCtx solveInclude)
-      protected def onEnd(): Ret                               //called at the end of a struct
-      protected def onChild(child: Element, r: Ret): Unit      //called when a struct is receiving a child value
-    }
-    
-    /** Reason for which Impl exists.
-     *  Defines how the parser events are processed.
-     *  Holds the data necessary to process these events.
-     *  You probably don't want to ever override any of these methods.
-     *  Note that an Elt is also a Launcher : this property is used to spawn includes.
-     */
-    trait Elt extends Traversable[Element] with BaseElt with Launcher { self:Element=>
+    trait Elt extends Launcher with Traversable[Element] { self:Element=>
+      override def myself:proc.Element = this  //prevents some non necessary casts
       implicit val eltCtx = userCtx(this)
       /** Context for use */
       def userCtx:UserCtx
@@ -93,6 +70,26 @@ object definition {
       def build(p:Parser, s:Status, b:Bld):Element = builder(p, self, s, b)
       /** building a child spawning children of the same nature */
       def build(p:Parser, s:Status):Element = build(p, s, builder)
+      
+      /** The standard, elementary methods dealing with parser events.
+       *  The order in which these methods are executed is:
+       *  - parent executes onName ; child doesn't yet exist
+       *  - child is created by the appropriate builder : onBeg is invoked
+       *  - child may either be a terminal ; onSolver is checked. If not null, it is invoked, otherwise onVal is invoked.
+       *  - or it maybe a container, in which case it will receive parents events (onName,onChild),
+       *    until it is finished and onEnd is invoked.
+       *  - parent executes onChild.
+       *  They are protected because users have little reason to invoke these directly! See below onName0/onEnd0.
+       *  However, these methods are important because they provide the entries for callbacks and understanding
+       *  them is necessary to coding complex callbacks.
+       */
+      protected def onName(name: String): Status
+      protected def onInit(): Unit                           //called on all elements on creation
+      protected def onBeg(): Unit                            //called once only, before any other call within struct, as late as possible (i.e. only when receiving the first child, or when closing the struct)
+      protected def onVal(v: Kind): Ret                      //called when receiving a value
+      protected def onEnd(): Ret                             //called at the end of a struct
+      protected def onChild(child: Element, r: Ret): Unit    //called when a struct is receiving a child value
+      protected def onSolver(v: Kind, e: ()=>Ret): Ret = e() //called when resolving a value (as defined by the EltCtx solver) ; you had better know what you do if you override this
       
       /** builds the qualified name for the output */
       def qName = eltCtx.qName
@@ -116,21 +113,21 @@ object definition {
       *  @param exc, an executor that contains the data to include
       *  @param retMapper, a method to coerce return data
       */
-      def incl[K](p:BaseParser { type BaseProcessor>:selfDef.type; type Kind=K }, mapper:(Element,K)=>Kind):Ret = {
+      def incl[K,BP<:BaseParser { type BaseProcessor>:Processor.this.type }](p:BP, mapper:(Element,K)=>Kind):Ret = {
         val old = parser
         try {
           //create a Launcher using this processor and the current element
           //replace the current element parser with the new one
           //then start the executor and coerce the returned value to the appropriate Ret value
-   //       val f = run.apply[selfDef.type,BaseParser { type BaseProcessor>:selfDef.type; type Kind=K }](p,this)((a:Any)=>{(p:Parser)=>{parser=p; self}},mapper,null)//_.read(load("small"), "UTF-8"))
+          //val f = run(p,Processor.this) _ //((p:Parser)=>{parser=p; self},mapper,null)//_.read(load("small"), "UTF-8"))
           null.asInstanceOf[Ret]
         } finally {
           parser=old
         }        
       }
       
-      /** Ensure the call to doBeg is done as late as possible, but in time. begDone ~ lazy val */
-      private var begDone=false
+      /** Ensure the call to doBeg is done as late as possible, but in time. */
+      private[this] var begDone=false
       private def doBeg():Unit = if (!begDone) { begDone=true; if (parent!=null) parent.doBeg; onBeg; }
       
       /** The push/pull interface on the processor side
@@ -142,7 +139,7 @@ object definition {
         parent.onChild(this,
           eltCtx.solver(v) match {
             case null => onVal(v)
-            case i    => onInclude(v,i)
+            case i    => onSolver(v,i)
           })
       }
       
@@ -152,9 +149,6 @@ object definition {
         f
         onEnd() //note that for included elements, the onBeg was called using the top parser when the onEnd is called using the bottom one.
       }
-      
-      /** the standard processing for includes. This likely should not be altered. */
-      protected def onInclude(v: Kind, e: ()=>Ret): Ret = e()
             
       /** Some convenient methods.
        *  Methods prefixed by g are general and use up the full parent chain.
@@ -182,9 +176,9 @@ object definition {
       override def toString = { val s=new java.io.StringWriter; print(s); s.toString }      
     }
           
-    /** Defines how Element are built.
-     *  - apply(bp:BaseParser) contains top builders for the root element (no parent)
-     *  Other methods apply to children building
+    /** Defines how Element are built in various contexts.
+     *  - the first four methods define Top builders
+     *  - the other define child builders within an already existing processor
      */
     abstract class EltBuilder {
       def apply(p: Parser, s: Status): Element                                      = apply(p,null,s,this)
@@ -202,12 +196,12 @@ object definition {
       /** When handling Callbacks, we will want to reach the parent behaviour. */
       val cb: callbacks.Callback[Element,Status,Ret,Kind] //the callback for the current element
       val cbx = cb(this)
-      abstract override protected def onName(name: String): Status               = if (cbx==null) super.onName(name) else cbx.onName(name, super.onName)
-      abstract override protected def onBeg(): Unit                              = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
-      abstract override protected def onVal(v: Kind): Ret                        = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
-      abstract override protected def onInclude(v: Kind, x: ()=>Ret): Ret        = if (cbx==null) super.onInclude(v,x) else cbx.onInclude(v, x, super.onInclude)
-      abstract override protected def onEnd(): Ret                               = if (cbx==null) super.onEnd() else cbx.onEnd(super.onEnd)
-      abstract override protected def onChild(child: Element, r: Ret): Unit      = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
+      abstract override protected def onName(name: String): Status          = if (cbx==null) super.onName(name) else cbx.onName(name, super.onName)
+      abstract override protected def onBeg(): Unit                         = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
+      abstract override protected def onVal(v: Kind): Ret                   = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
+      abstract override protected def onSolver(v: Kind, x: ()=>Ret): Ret    = if (cbx==null) super.onSolver(v,x) else cbx.onSolver(v, x, super.onSolver)
+      abstract override protected def onEnd(): Ret                          = if (cbx==null) super.onEnd() else cbx.onEnd(super.onEnd)
+      abstract override protected def onChild(child: Element, r: Ret): Unit = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
     }
     /** Modifies the current element to manage a callback tree
      *  Children are built according to the following rules:

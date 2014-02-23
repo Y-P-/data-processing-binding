@@ -46,8 +46,9 @@ trait ParserBuilder {selfBuilder=>
   
   /** This class glues together a given parser and a given processor.
    *  It requires:
-   *  @param init, the method that will create the initial (top) element for the processor and a parser instance
-   *  @param mapper, the method that lets translate the parser's Kind to the processor's Kind
+   *  @param init, the function that will create the initial (top) element for the processor
+   *               and a parser instance; the Launcher class in Processor provides such function.
+   *  @param mapper, the function that lets translate the parser's Kind to the processor's Kind
    */
   class Binder[V,R](val init:Parser[V,R]=>Elt[V,R], val mapper:(Elt[V,R],Kind)=>V)
   def binder[V,R](init:Parser[V,R]=>Elt[V,R], mapper:(Elt[V,R],Kind)=>V) =
