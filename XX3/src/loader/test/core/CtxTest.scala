@@ -23,7 +23,7 @@ import loader.core.events.EventHandler
 object CtxTest {
   def load(rsc:String) = getClass.getResource(rsc) match {
     case null => throw new java.io.IOException(s"resource $rsc could not be found")
-    case url  => url.toURI
+    case url  => url
   }
   val p = new parsers.Struct(256,40,false)
   val userCtx = new loader.core.UserContext[Processor { type BaseParser>:parsers.Struct; type Kind=String }] {

@@ -92,16 +92,6 @@ trait ParserBuilder {selfBuilder=>
       onEnd()
       r
     }
-    /** Read data from an URI.
-     */
-    def read(uri:URI,encoding:String):Unit = {
-      val e = if (encoding==null) "ISO-8859-15" else encoding
-      val in = new java.io.InputStreamReader(uri.toURL.openStream,e)
-      try { read(in) } finally { in.close }
-    }
-    /** Read data from an input stream.
-     */
-    def read(in: Reader): Unit
     
     /** when the processor rejects the current elemnt (push returns false), the parser is assumed to get to the
      *  next element at the same level, ignoring the current element and sub-structure.
@@ -135,6 +125,31 @@ object ParserBuilder {
   class SkipException extends Exception
   val skipEnd = new SkipException { override def fillInStackTrace() = this }
   val skip    = new SkipException { override def fillInStackTrace() = this }
+  
+  /** This provides a standard API for these parser that read Characters, such as files.
+   */
+  trait URLParser { this:ParserBuilder#Impl[_,_]=>
+    def defaultEncoding = "ISO-8859-15"
+
+    /** Reader from a CharReader. It is usually sufficient to fill this up. */
+    def apply(d:utils.CharReader):Unit
+      
+    /** Read data from an URL. */
+    def read(url:java.net.URL,encoding:String):Unit = {
+      val e = if (encoding==null) defaultEncoding else encoding
+      val in = new java.io.InputStreamReader(url.openStream,e)
+      try { read(in) } finally { in.close }
+    }
+    
+    /** Read data from an URL with prefetch in an array. */
+    def readPrefetch(url:java.net.URL,encoding:String):Unit = {
+      val e = if (encoding==null) defaultEncoding else encoding
+      apply(utils.CharReader(utils.ByteArrayReader(url),e))
+    }
+    
+    /** Read data from an input stream. */
+    def read(in: Reader): Unit = apply(in)
+  }
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
