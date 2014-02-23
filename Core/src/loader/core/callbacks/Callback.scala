@@ -44,29 +44,29 @@ import loader.core.ParserBuilder
  *           use that mask in WithCallback to prevent going inside a callback that does nothing (default implementation)
  *        Usure whether any of this has any significant impact.
  */
-abstract class Callback[-E0,-S0,-R0,K>:Null] { self=>
+abstract class Callback[-E0,-S0,-R0,K,V>:Null] { self=>
   protected class Inner(protected[this] val elt:E0) {
-    def onName[S<:S0](name:String, f: (String)=>S):S           = f(name)
+    def onName[S<:S0](key:K, f: (K)=>S):S                      = f(key)
     def onInit(f: =>Unit):Unit                                 = f
     def onBeg(f: =>Unit):Unit                                  = f
-    def onVal[R<:R0](s:K,f: (K) =>R):R                         = f(s)
-    def onSolver[R<:R0](s:K, r: ()=>R, f: (K,()=>R) =>R):R     = f(s,r)
+    def onVal[R<:R0](s:V,f: (V) =>R):R                         = f(s)
+    def onSolver[R<:R0](s:V, r: ()=>R, f: (V,()=>R) =>R):R     = f(s,r)
     def onEnd[R<:R0](f: =>R):R                                 = f
     def onChild[E<:E0,R<:R0](child:E,r:R,f: (E,R) =>Unit):Unit = f(child,r)  
   }
-  def apply(elt:E0):Callback[E0,S0,R0,K]#Inner = new Inner(elt)
+  def apply(elt:E0):Callback[E0,S0,R0,K,V]#Inner = new Inner(elt)
   
-  def apply[E1<:E0,S1<:S0,R1<:R0](c: Callback[E1,S1,R1,K]): Callback[E1,S1,R1,K] = new Callback[E1,S1,R1,K] {
+  def apply[E1<:E0,S1<:S0,R1<:R0](c: Callback[E1,S1,R1,K,V]): Callback[E1,S1,R1,K,V] = new Callback[E1,S1,R1,K,V] {
     override def apply(elt:E1) = {
       val cbIn = self(elt) //executed inside cbOut
       val cbOut = c(elt)   //executed as outer context
       if (cbIn == null)     cbOut
       else if (cbOut==null) cbIn
       else                  new Inner(elt) {
-        override def onName[S<:S1](name:String, f: (String)=>S):S           = cbOut.onName(name,cbIn.onName(_,f))
+        override def onName[S<:S1](key:K, f: (K)=>S):S                      = cbOut.onName(key,cbIn.onName(_,f))
         override def onBeg(f: =>Unit):Unit                                  = cbOut.onBeg(cbIn.onBeg(f))
-        override def onVal[R<:R1](s:K,f: (K)=>R):R                          = cbOut.onVal(s,cbIn.onVal(_,f))
-        override def onSolver[R<:R1](s:K, r: ()=>R, f: (K,()=>R)=>R):R      = cbOut.onSolver(s,r,cbIn.onSolver(_:K,_:()=>R,f))
+        override def onVal[R<:R1](s:V,f: (V)=>R):R                          = cbOut.onVal(s,cbIn.onVal(_,f))
+        override def onSolver[R<:R1](s:V, r: ()=>R, f: (V,()=>R)=>R):R      = cbOut.onSolver(s,r,cbIn.onSolver(_:V,_:()=>R,f))
         override def onEnd[R<:R1](f: =>R):R                                 = cbOut.onEnd(cbIn.onEnd(f))
         override def onChild[E<:E1,R<:R1](child:E,r:R,f: (E,R)=>Unit):Unit  = cbOut.onChild(child,r,cbIn.onChild(_:E,_:R,f))
       }

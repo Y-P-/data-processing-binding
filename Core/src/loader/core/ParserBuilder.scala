@@ -32,17 +32,19 @@ trait Locator {
 trait ParserBuilder {selfBuilder=>
 
   /** Element type produced by this parser */
-  type Kind
+  type Value
+  /** Key types produced by this parser */
+  type Key
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
   type BaseProcessor <: Processor { type BaseParser >: selfBuilder.type }
   
   /** Actual parser implementation */
-  type Parser[v,r] <: Impl[v,r]
-  type Proc[v,r]   = BaseProcessor { type Kind=v; type Ret=r }
-  type Elt[v,r]    = Proc[v,r]#Element
-  type Launch[v,r] = Proc[v,r]#Launcher
+  type Parser[k,v,r] <: Impl[k,v,r]
+  type Proc[k,v,r]   = BaseProcessor { type Kind=v; type Key=k; type Ret=r }
+  type Elt[k,v,r]    = Proc[k,v,r]#Element
+  type Launch[k,v,r] = Proc[k,v,r]#Launcher
   
   /** This class glues together a given parser and a given processor.
    *  It requires:
@@ -50,13 +52,15 @@ trait ParserBuilder {selfBuilder=>
    *               and a parser instance; the Launcher class in Processor provides such function.
    *  @param mapper, the function that lets translate the parser's Kind to the processor's Kind
    */
-  class Binder[V,R](val init:Parser[V,R]=>Elt[V,R], val mapper:(Elt[V,R],Kind)=>V)
-  def binder[V,R](init:Parser[V,R]=>Elt[V,R], mapper:(Elt[V,R],Kind)=>V) =
-    if (mapper==null) new Binder[V,R](init,(e,s)=>s.asInstanceOf[V])
-    else              new Binder[V,R](init,mapper)
+  class Binder[K,V,R](val init:Parser[K,V,R]=>Elt[K,V,R], val mapper:(Elt[K,V,R],Value)=>V, val keyMapper:(Elt[K,V,R],Key)=>K)
+  def binder[K,V,R](init:Parser[K,V,R]=>Elt[K,V,R], mapper:(Elt[K,V,R],Value)=>V, keyMapper:(Elt[K,V,R],Key)=>K) = {
+    val mv:(Elt[K,V,R],Value)=>V = if (mapper==null)    (e,s)=>s.asInstanceOf[V] else mapper
+    val mk:(Elt[K,V,R],Key)=>K   = if (keyMapper==null) (e,s)=>s.asInstanceOf[K] else keyMapper
+    new Binder[K,V,R](init,mv,mk)
+  }
   
   /** factory for Parser */
-  def apply[V,R](bd:Binder[V,R]):Parser[V,R]
+  def apply[K,V,R](bd:Binder[K,V,R]):Parser[K,V,R]
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -67,19 +71,19 @@ trait ParserBuilder {selfBuilder=>
    *  @param launcher, the launcher used for the processor
    *  @param exec, the executor (launcher.X) for the launcher
    */
-  trait Impl[V,R] extends Locator { this:Parser[V,R]=>
+  trait Impl[K,V,R] extends Locator { this:Parser[K,V,R]=>
     final val builder:selfBuilder.type = selfBuilder
-    val binder:Binder[V,R]
-    val top:Elt[V,R] = binder.init(this) //creating the parser associates the top element for the bound processor.
+    val binder:Binder[K,V,R]
+    val top:Elt[K,V,R] = binder.init(this) //creating the parser associates the top element for the bound processor.
     private[this] var cur = top
     private[this] var ignore:Int = 0
     def current = cur
     def userCtx = top.userCtx
-    def pull():Unit        = if (ignore>0) ignore-=1 else try { cur.pull()                     } catch errHandler finally { cur=cur.parent }
-    def pull(v: Kind):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
-    def push(name: String):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
+    def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                     } catch errHandler finally { cur=cur.parent }
+    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
+    def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
-      try { cur=cur.push(name) } catch {
+      try { cur=cur.push(binder.keyMapper(cur,key)) } catch {
         case `skip`                 => ignore+=1
         case `skipEnd`   if canSkip => skipToEnd
         case e:Throwable if canSkip => errHandler(e); skipToEnd
@@ -128,7 +132,7 @@ object ParserBuilder {
   
   /** This provides a standard API for these parser that read Characters, such as files.
    */
-  trait URLParser { this:ParserBuilder#Impl[_,_]=>
+  trait URLParser { this:ParserBuilder#Impl[_,_,_]=>
     def defaultEncoding = "ISO-8859-15"
 
     /** Reader from a CharReader. It is usually sufficient to fill this up. */
@@ -153,5 +157,5 @@ object ParserBuilder {
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl[V,R] extends super.Impl[V,R] { this:Parser[V,R]=> }
+  abstract class AbstractImpl[K,V,R] extends super.Impl[K,V,R] { this:Parser[K,V,R]=> }
 }

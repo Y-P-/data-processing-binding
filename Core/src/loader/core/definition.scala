@@ -11,8 +11,8 @@ object definition {
   /** This serves as a base for Status.
    *  In turn, Status is a class that serves as intermediary to build a child item from a parent item.
    */
-  trait Status {
-    def name:String
+  trait Status[+K>:Null] {
+    def key:K
   }
 
   /** Defines the pattern through which we turn the sequence of parsed items into a structure with depth.
@@ -23,17 +23,20 @@ object definition {
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
   trait Processor { selfDef=>
-    type Kind>:Null
+    type Kind>:Null    //the kind of data processed by this processor
+    type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
     type Element >: Null <: Elt
     type BaseParser <: ParserBuilder
-    type Status >: Null <:definition.Status
+    type Status >: Null <:definition.Status[Key]
     
     type UserCtx = UserContext[selfDef.type]    
-    type Parser  = ParserBuilder#Parser[_,Ret]
-    type Cbk     = callbacks.Callback[Element,Status,Ret,Kind]
-    type Cbks    = callbacks.Callbacks[Element,Status,Ret,Kind]
+    type Parser  = ParserBuilder#Parser[_,_,Ret]
+    type Cbk     = callbacks.Callback[Element,Status,Ret,Key,Kind]
+    type Cbks    = callbacks.Callbacks[Element,Status,Ret,Key,Kind]
     type Bld     = EltBuilder
+    
+    val noKey:Key
     
     /** This is used to define the builder for an implementation.
      *  It is used to start a processor. 
@@ -61,7 +64,8 @@ object definition {
       def userCtx:UserCtx
       /** Fields */
       def parent : Element  //parent item
-      def name   : String   //element name
+      def key    : Key      //element key
+      def name   : String  = key.toString  //element name; provided for simplicity
       def parser : Parser   //parser creating that element: Beware => this can change in case of includes
       protected[core] def parser_=(parser:Parser):Unit //parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
@@ -83,7 +87,7 @@ object definition {
        *  However, these methods are important because they provide the entries for callbacks and understanding
        *  them is necessary to coding complex callbacks.
        */
-      protected def onName(name: String): Status
+      protected def onName(key: Key): Status
       protected def onInit(): Unit                           //called on all elements on creation
       protected def onBeg(): Unit                            //called once only, before any other call within struct, as late as possible (i.e. only when receiving the first child, or when closing the struct)
       protected def onVal(v: Kind): Ret                      //called when receiving a value
@@ -104,27 +108,6 @@ object definition {
         case null =>
         case h    => h.applyOrElse((this,evt),(x:(Element,Event))=>())
       }
-            
-     /** Builds an include on the current element, i.e. a sub-engine that works from the current processor state.
-      *  When the sub-engine exits, the processor is left in the same state as it entered (i.e. same current element.)
-      *  @param K, the kind of data produced by the sub-parser
-      *  @param R, the kind of result produced by the sub-engine
-      *  @param mapper, a method to coerce K to Kind (expected by the current engine)
-      *  @param exc, an executor that contains the data to include
-      *  @param retMapper, a method to coerce return data
-      */
-      def incl[K,BP<:BaseParser { type BaseProcessor>:Processor.this.type }](p:BP, mapper:(Element,K)=>Kind):Ret = {
-        val old = parser
-        try {
-          //create a Launcher using this processor and the current element
-          //replace the current element parser with the new one
-          //then start the executor and coerce the returned value to the appropriate Ret value
-          //val f = run(p,Processor.this) _ //((p:Parser)=>{parser=p; self},mapper,null)//_.read(load("small"), "UTF-8"))
-          null.asInstanceOf[Ret]
-        } finally {
-          parser=old
-        }        
-      }
       
       /** Ensure the call to doBeg is done as late as possible, but in time. */
       private[this] var begDone=false
@@ -132,7 +115,7 @@ object definition {
       
       /** The push/pull interface on the processor side
        */
-      def push(n:String):Processor.this.Element = { val c=build(parser,onName(n),builder); c.onInit(); c }
+      def push(n:Key):Processor.this.Element = { val c=build(parser,onName(n),builder); c.onInit(); c }
       def pull()         = { doBeg(); parent.onChild(this, onEnd()) }
       def pull(v:Kind)   = {
         parent.doBeg
@@ -194,9 +177,9 @@ object definition {
      */
     trait WithCallback extends WithCallbacks { this: Element =>
       /** When handling Callbacks, we will want to reach the parent behaviour. */
-      val cb: callbacks.Callback[Element,Status,Ret,Kind] //the callback for the current element
+      val cb: callbacks.Callback[Element,Status,Ret,Key,Kind] //the callback for the current element
       val cbx = cb(this)
-      abstract override protected def onName(name: String): Status          = if (cbx==null) super.onName(name) else cbx.onName(name, super.onName)
+      abstract override protected def onName(key: Key): Status              = if (cbx==null) super.onName(key) else cbx.onName(key, super.onName)
       abstract override protected def onBeg(): Unit                         = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
       abstract override protected def onVal(v: Kind): Ret                   = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
       abstract override protected def onSolver(v: Kind, x: ()=>Ret): Ret    = if (cbx==null) super.onSolver(v,x) else cbx.onSolver(v, x, super.onSolver)
@@ -224,7 +207,7 @@ object definition {
         if (cbks.length == 1) {
           //first, the case where the sequence is one element only.
           //it's very common, and should be optimized! it's furthermore much easier to read!
-          cbks.head.get(s.name) match {
+          cbks.head.get(s.key.toString) match {
             case None => builder(p,parent,s,childBuilder) //no subtree ? get rid of the extra callback data and associated code
             case Some(c) => c.cur match {
               case None => builder(p,parent,s,childBuilder,cbks:_*)
@@ -233,7 +216,7 @@ object definition {
           }
         } else {
           //that one is a little tricky; first build the next sequence of callback trees, extracted from cbks
-          val r = for (x <- cbks; y <- x.get(s.name)) yield y
+          val r = for (x <- cbks; y <- x.get(s.key.toString)) yield y
           //if empty, return to the no callback version
           if (r.isEmpty) builder(p,parent,s,childBuilder)
           else {
@@ -272,7 +255,7 @@ object definition {
       protected def onInit():Unit
       protected def onExit():Result
       // Forwarded methods
-      protected def onName(self: Element, name: String): Status
+      protected def onName(self: Element, key: Key): Status
       protected def onInit(self: Element):Unit
       protected def onBeg(self: Element): Unit
       protected def onVal(self: Element, v: Kind): Ret
@@ -281,7 +264,7 @@ object definition {
       // Element implementation : redirect calls
       protected[this] trait Inner extends Elt { self:ElementBase=>
         def userCtx = motor.userCtx
-        protected def onName(name: String): Status          = motor.onName(this,name)
+        protected def onName(key: Key): Status              = motor.onName(this,key)
         protected def onInit(): Unit                        = motor.onInit(this)
         protected def onBeg(): Unit                         = motor.onBeg(this)
         protected def onVal(v: Kind): Ret                   = motor.onVal(this,v)

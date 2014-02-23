@@ -16,16 +16,16 @@ object ExtCore {
   }
 
   trait Impl extends definition.Impl with Processor { self=>
-    type Status = Core.Status
     type Element = Elt
+    type Status = Core.Status[Key]
     
     abstract class Launcher extends super.Launcher {
       protected def getData(parent:Element,s:Status):Data
       //implementations
-      protected def onName(e:Element,name:String) = new Status(name)
+      protected def onName(e:Element,key:Key) = new Status(key)
       
-      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val builder:Bld, val data:Data) extends Inner with Elt {
-        def this(parser:Parser,s:Status,parent:Element,builder:Bld) = this(parser,s.name,parent,builder,getData(parent,s))
+      class ElementBase(protected var parser0:Parser, val key:Key, val parent:Element, val builder:Bld, val data:Data) extends Inner with Elt {
+        def this(parser:Parser,s:Status,parent:Element,builder:Bld) = this(parser,s.key,parent,builder,getData(parent,s))
         def getData(s:Status) = Launcher.this.getData(this,s)
       }
       class ElementCbks(parser:Parser, s:Status, parent:Element, builder:Bld, val cbks:Cbks*)         extends ElementBase(parser,s,parent,builder)         with WithCallbacks

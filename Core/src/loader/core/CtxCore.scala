@@ -5,7 +5,7 @@ import context.Context
 
 object CtxCore {
   
-  class Status(name:String, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends Core.Status(name)
+  class Status[+K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends Core.Status(key)
 
   /** A quite complex implementation for core, where Element is broken down in three possible states:
    *  - Struct   (containing any kind of sub-Element),
@@ -15,7 +15,7 @@ object CtxCore {
    *  at any time what to expect by simply watching the name.
    */
   trait Processor extends ExtCore.Processor {
-    override type Status = CtxCore.Status
+    override type Status = CtxCore.Status[Key]
     type Element >: Null <: Elt
 
     sealed trait Elt extends super.Elt { this:Elt with Element=>
@@ -47,35 +47,39 @@ object CtxCore {
       val canFast = userCtx.fast && fd.loader.annot.fast
       val doFast  = canFast && !tags.hasNonContig
     
-      override protected def onName(name: String) = tags.fetch(name) match {
-        case None     =>
-          if (seen.size == tags.size && doFast) throw ParserBuilder.skipEnd
-          else                                  throw ParserBuilder.skip
-        case Some(fd) =>
-          val fd1 = if (fd.annot.loader==null || fd.annot.loader.length>0) fd else null //XXX userCtx.solveDynamic(this,fd)
-          val idx = seen.getOrElse(name, 0) + 1
-          seen.update(name, idx)
-          var broken: Boolean = idx != 1 //for non seq, idx!=1 indicates a multiple occurence ; for a seq, the possibility that the seq is broken
-          if (fd1.isSeq) broken &&= fd1.isSeq && previous != null && previous != fd1 //check last fd to see if the current seq has been broken
-          previous = fd1
-          //XXX manage broken data (keep it ? discard it ?)
-          new CtxCore.Status(name, idx, fd1, broken) //XXX see pushAttr to set this boolean to true
+      override protected def onName(key: Key):CtxCore.Status[Key] = {
+        val name = key.toString
+        tags.fetch(name) match {
+          case None     =>
+            if (seen.size == tags.size && doFast) throw ParserBuilder.skipEnd
+            else                                  throw ParserBuilder.skip
+          case Some(fd) =>
+            val fd1 = if (fd.annot.loader==null || fd.annot.loader.length>0) fd else null //XXX userCtx.solveDynamic(this,fd)
+            val idx = seen.getOrElse(name, 0) + 1
+            seen.update(name, idx)
+            var broken: Boolean = idx != 1 //for non seq, idx!=1 indicates a multiple occurence ; for a seq, the possibility that the seq is broken
+            if (fd1.isSeq) broken &&= fd1.isSeq && previous != null && previous != fd1 //check last fd to see if the current seq has been broken
+            previous = fd1
+            //XXX manage broken data (keep it ? discard it ?)
+            new CtxCore.Status(key, idx, fd1, broken) //XXX see pushAttr to set this boolean to true
+        }
       }
     }
     //parent is undefined here
     trait List extends Elt { this:Element=>
       private val innerFd: Context#FieldMapping = fd.asSeq
       var index: Int = 0
-      override protected def onName(name: String):CtxCore.Status = {
+      override protected def onName(key: Key):CtxCore.Status[Key] = {
+        val name = key.toString
         if (!name.isEmpty) throw new IllegalStateException(s"illegal field $name in a list")
         index += 1
-        new CtxCore.Status(name, index, innerFd, false)
+        new CtxCore.Status(key, index, innerFd, false)
       }
     }
     //parent is undefined here
     trait Terminal extends Elt { this:Element=>
-      override protected def onName(name: String): Status = throw new IllegalStateException(s"illegal field $name in a terminal field")
-      override protected def onEnd():Ret                  = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
+      override protected def onName(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
+      override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
     }
   }
 
@@ -98,17 +102,18 @@ object CtxCore {
     
     abstract class Launcher extends super.Launcher { impl=>
       protected def getData(parent:Element,s:Status):Data
+      protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
       
       //implementations : top builders
-      def apply(fd:Context#FieldMapping,cbks:Cbks*):Parser=>Element = apply(new Status("",1,fd,false), cbks:_*)
-      def apply(fd:Context#FieldMapping):Parser=>Element            = apply(new Status("",1,fd,false))
+      def apply(fd:Context#FieldMapping,cbks:Cbks*):Parser=>Element = apply(noStatus(fd), cbks:_*)
+      def apply(fd:Context#FieldMapping):Parser=>Element            = apply(noStatus(fd))
       
       //a default stub ; it will be overriden by the Struct/List/Terminal implementation
-      protected def onName(e:Element,name:String): Status  = null
+      protected def onName(e:Element,key:Key): Status  = null
       
       //concrete definitions
-      class ElementBase(protected var parser0:Parser, val name:String, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val builder:Bld, val data:Data) extends Inner with Elt {
-        def this(parser:Parser, s:Status, parent:Element, builder:Bld) = this(parser,s.name,parent,s.fd,s.idx,builder,impl.getData(parent, s))
+      class ElementBase(protected var parser0:Parser, val key:Key, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val builder:Bld, val data:Data) extends Inner with Elt {
+        def this(parser:Parser, s:Status, parent:Element, builder:Bld) = this(parser,s.key,parent,s.fd,s.idx,builder,impl.getData(parent, s))
         def getData(s: Status) = Launcher.this.getData(this,s)
       }
       class Struct(parser:Parser,s:Status,parent:Element,builder:Bld)                             extends ElementBase(parser,s,parent,builder) with Impl.this.Struct
@@ -134,20 +139,6 @@ object CtxCore {
           if      (s.fd.isList)   new ListCbk(parser, s, parent, builder, cb, cbks:_*)
           else if (s.fd.isStruct) new StructCbk(parser, s, parent, builder, cb, cbks:_*)
           else                    new TerminalCbk(parser, s, parent, builder, cb, cbks:_*)
-      }
-      
-      //XXX for fun...
-      def copy[T<:ElementBase:scala.reflect.ClassTag](b:T,p1: String):T = {
-        import scala.reflect.runtime.{ currentMirror => cm }
-        import scala.reflect.runtime.universe._
-        val im = cm.reflect(b)
-        val ts = im.symbol.typeSignature
-        val copySym = ts.member(newTermName("copy")).asMethod
-        def element(p: Symbol): Any = (im reflectMethod ts.member(p.name).asMethod)()
-        val args = for (ps <- copySym.paramss; p <- ps) yield {
-          if (p.name.toString == "p1") p1 else element(p)
-        }
-        (im reflectMethod copySym)(args: _*).asInstanceOf[T]
       }
     }
   }

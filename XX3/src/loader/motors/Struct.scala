@@ -14,10 +14,13 @@ import loader.core.ParserBuilder
 object Struct extends Processor {self=>
   
   trait DefImpl extends loader.core.ExtCore.Processor {impl=>
-    type Kind        = String
-    type Ret         = Int
-    type Data        = Null
-    type BaseParser  = ParserBuilder //any parser
+    type Kind       = String
+    type Key        = String
+    type Ret        = Int
+    type Data       = Null
+    type BaseParser = ParserBuilder //any parser
+    
+    val noKey = ""
     
     /**
      * @param out, where to write to

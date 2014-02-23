@@ -33,7 +33,7 @@ object CtxTest {
     class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
       override def solver(s:Proc#Kind):()=>Proc#Ret = {
         if (!s.asInstanceOf[String].startsWith("@include:")) return null
-        ()=>run.include(p,e)((u,s)=>s+"*",_.read(load("verysmall1"), "UTF-8"))
+        ()=>run.include(p,e)((u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
       }
       override def qName = {
         val q=super.qName
@@ -47,7 +47,7 @@ object CtxTest {
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Int = {
       val m = motors.Struct.ctx(out,2,userCtx)
-      run(p,m)(_(ClassContext(classOf[Data.Top])),null,_.read(load("small"), "UTF-8"))
+      run(p,m)(_(ClassContext(classOf[Data.Top])),null,null,_.read(load("small"), "UTF-8"))
     }
   }
   @Test class CtxCbkTest extends StandardTester {
@@ -56,7 +56,7 @@ object CtxTest {
       val m = motors.Struct.ctx(out,2,userCtx)
       //XXX was implicit to cast callback to callbacks
       try {
-        val r:Int = run(p,m)(_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk.cbks[motors.Struct.ctx.type](new DefaultCtxEventsCbk[Int,String])),null,_.read(load("small"), "UTF-8"))
+        val r:Int = run(p,m)(_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk.cbks[motors.Struct.ctx.type](new DefaultCtxEventsCbk[Int,String,String])),null,null,_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
       }

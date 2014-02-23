@@ -4,8 +4,8 @@ import loader.core.definition.Processor
 object run {
   /** The nominal runner from scratch */
   def apply[P<:ParserBuilder { type BaseProcessor>:M },M<:Processor { type BaseParser>:P }]
-        (p:P,m:M)(init:p.Parser[m.Kind,m.Ret]=>m.Element, mapper:(p.Elt[m.Kind,m.Ret],p.Kind)=>m.Kind, run:p.Parser[m.Kind,m.Ret]=>Unit):m.Ret = {
-    p(p.binder[m.Kind,m.Ret](init,mapper)).invoke(run)
+        (p:P,m:M)(init:p.Parser[m.Key,m.Kind,m.Ret]=>m.Element, mapper:(p.Elt[m.Key,m.Kind,m.Ret],p.Value)=>m.Kind, keyMapper:(p.Elt[m.Key,m.Kind,m.Ret],p.Key)=>m.Key, run:p.Parser[m.Key,m.Kind,m.Ret]=>Unit):m.Ret = {
+    p(p.binder[m.Key,m.Kind,m.Ret](init,mapper,keyMapper)).invoke(run)
   }
   
   /** The most standard way to launch a pair of Parser/Processor.
@@ -18,22 +18,23 @@ object run {
    */
   def apply[P<:ParserBuilder { type BaseProcessor>:M },M<:Processor { type BaseParser>:P }](p:P, l:M#Launcher)                                                        //the parser and processor launcher
         (
-            init:l.type => (p.Parser[l.proc.Kind,l.proc.Ret] => l.proc.Element),   //the parser initializer
-            mapper:(p.Elt[l.proc.Kind,l.proc.Ret],p.Kind)=>l.proc.Kind,            //the mapper from the parser Kind to the processor Kind
-            run:p.Parser[l.proc.Kind,l.proc.Ret]=>Unit                             //the parser runner
+            init:l.type => (p.Parser[l.proc.Key,l.proc.Kind,l.proc.Ret] => l.proc.Element),   //the parser initializer
+            mapper:(p.Elt[l.proc.Key,l.proc.Kind,l.proc.Ret],p.Value)=>l.proc.Kind,           //the mapper from the parser Kind to the processor Kind
+            keyMapper:(p.Elt[l.proc.Key,l.proc.Kind,l.proc.Ret],p.Key)=>l.proc.Key,           //the mapper from the parser Kind to the processor Kind
+            run:p.Parser[l.proc.Key,l.proc.Kind,l.proc.Ret]=>Unit                             //the parser runner
         ):
         l.proc.Ret
-     = apply(p,l.proc)(init(l),mapper,run)
+     = apply(p,l.proc)(init(l),mapper,keyMapper,run)
 
   /** The nominal runner on an existing element, i.e. this includes the new parser in the current processor */
   def include[P<:ParserBuilder { type BaseProcessor>:M },M<:Processor { type BaseParser>:P }]
-        (p:P,m:M)(e:m.Element, mapper:(p.Elt[m.Kind,m.Ret],p.Kind)=>m.Kind, run:p.Parser[m.Kind,m.Ret]=>Unit):m.Ret
-    = p(p.binder[m.Kind,m.Ret](p=>{e.parser=p; e},mapper)).invoke(run)
+        (p:P,m:M)(e:m.Element, mapper:(p.Elt[m.Key,m.Kind,m.Ret],p.Value)=>m.Kind, keyMapper:(p.Elt[m.Key,m.Kind,m.Ret],p.Key)=>m.Key, run:p.Parser[m.Key,m.Kind,m.Ret]=>Unit):m.Ret
+    = p(p.binder[m.Key,m.Kind,m.Ret](p=>{e.parser=p; e},mapper,keyMapper)).invoke(run)
 
   
   /** The nominal runner on an existing element, i.e. this includes the new parser in the current processor */
   def include[M<:Processor { type BaseParser>:P }, P<:ParserBuilder { type BaseProcessor>:M }]
-        (p:P,e:M#Element)(mapper:(p.Elt[e.proc.Kind,e.proc.Ret],p.Kind)=>e.proc.Kind, run:p.Parser[e.proc.Kind,e.proc.Ret]=>Unit):e.proc.Ret
-    = include(p,e.proc)(e.myself,mapper,run)
+        (p:P,e:M#Element)(mapper:(p.Elt[e.proc.Key,e.proc.Kind,e.proc.Ret],p.Value)=>e.proc.Kind, keyMapper:(p.Elt[e.proc.Key,e.proc.Kind,e.proc.Ret],p.Key)=>e.proc.Key, run:p.Parser[e.proc.Key,e.proc.Kind,e.proc.Ret]=>Unit):e.proc.Ret
+    = include(p,e.proc)(e.myself,mapper,keyMapper,run)
 
 }

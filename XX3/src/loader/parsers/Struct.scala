@@ -6,9 +6,9 @@ import utils.parsers.StructParser
 
 class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends HandlerBridge {self=>
     
-  def apply[K,R](b:Binder[K,R]):Parser[K,R] = new Parser(b)
+  def apply[K,V,R](b:Binder[K,V,R]):Parser[K,V,R] = new Parser(b)
   
-  class Parser[K,R](val binder:Binder[K,R]) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.Impl[K,R] {
+  class Parser[K,V,R](val binder:Binder[K,V,R]) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.Impl[K,V,R] {
     override final val canSkip:Boolean = true
     override def skipToEnd():Nothing = abort(0)  //this parser can skip to the end of the current data structure
   }

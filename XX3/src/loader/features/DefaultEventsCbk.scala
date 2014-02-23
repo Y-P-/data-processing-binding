@@ -11,7 +11,7 @@ trait DefaultEvent extends Event
 
 /** Events defined for DefaultCtxEventsCbk
  */
-case class ReadTagEvt[K>:Null](v:Any,s:K)                            extends DefaultEvent { val idx=DefaultCtxEventsCbk.readTagIdx }
+case class ReadTagEvt[V>:Null](v:Any,s:V)                            extends DefaultEvent { val idx=DefaultCtxEventsCbk.readTagIdx }
 case class FastWarnEvt()                                             extends DefaultEvent { val idx=DefaultCtxEventsCbk.fastWarnIdx }
 case class FastDisabledEvt()                                         extends DefaultEvent { val idx=DefaultCtxEventsCbk.fastDisabledIdx }
 case class DefaultValueEvt(name:String)                              extends DefaultEvent { val idx=DefaultCtxEventsCbk.defaultValueIdx }
@@ -20,26 +20,26 @@ case class OutOfSeqEvt(name:String)                                  extends Def
 case class IllegalRepetitionEvt(name:String)                         extends DefaultEvent { val idx=DefaultCtxEventsCbk.illegalRepetitionIdx }
 case class TagNotFoundEvt(name:String,min:Int)                       extends DefaultEvent { val idx=DefaultCtxEventsCbk.tagNotFoundIdx }
 case class IgnoredTagEvt(name:String)                                extends DefaultEvent { val idx=DefaultCtxEventsCbk.ignoredTagIdx }
-case class IncludeSuccessEvt[K>:Null](info:K)                        extends DefaultEvent { val idx=DefaultCtxEventsCbk.includeSuccessIdx }
+case class IncludeSuccessEvt[V>:Null](info:V)                        extends DefaultEvent { val idx=DefaultCtxEventsCbk.includeSuccessIdx }
 
 
 /** A callback that does some internal analysis in order to send some events about
  *  the processing state. In particular, it uses the Context#FieldMapping definition
  *  in order to check the validity of read fields.
  */
-class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,R0,K] {
+class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[Processor#Element,Status[K],R0,K,V] {
   /** Note that to avoid useless calls, we break down the Default event generator into three pieces,
    *  one for each kind of element. There is scarce common code between them.
    */
   override def apply(e0:Processor#Element):Inner = e0 match {
     //Struct events
     case stc: Processor#Struct => new Inner(e0) {
-      override def onName[S<:Status](name:String, f: (String)=>S):S = {
+      override def onName[S<:Status[K]](key:K, f: (K)=>S):S = {
         import ParserBuilder._
-        val s = try { f(name) } catch {
-          case x:SkipException => elt(IgnoredTagEvt(name)); throw x
+        val s = try { f(key) } catch {
+          case x:SkipException => elt(IgnoredTagEvt(key.toString)); throw x
         }
-        if (s.broken) if (elt.fd.isSeq) elt(OutOfSeqEvt(name)) else elt(IllegalRepetitionEvt(name))
+        if (s.broken) if (elt.fd.isSeq) elt(OutOfSeqEvt(key.toString)) else elt(IllegalRepetitionEvt(key.toString))
         s
       }
       override def onBeg(f: => Unit):Unit = {
@@ -47,12 +47,12 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,
           if (stc.doFast) stc(FastWarnEvt()) else stc(FastDisabledEvt())
         f
       }
-      override def onVal[R<:R0](s:K, f: (K)=>R):R = {
+      override def onVal[R<:R0](s:V, f: (V)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onSolver[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+      override def onSolver[R<:R0](s:V, r0:()=>R, f: (V,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
@@ -76,12 +76,12 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,
     }
     //Lists events
     case lst: Processor#List => new Inner(e0) {
-      override def onVal[R<:R0](s:K, f: (K)=>R):R = {
+      override def onVal[R<:R0](s:V, f: (V)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onSolver[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+      override def onSolver[R<:R0](s:V, r0:()=>R, f: (V,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
@@ -97,12 +97,12 @@ class DefaultCtxEventsCbk[R0,K>:Null] extends Callback[Processor#Element,Status,
     }
     //Terminal events
     case _ => new Inner(e0) {
-      override def onVal[R<:R0](s:K, f: (K)=>R):R = {
+      override def onVal[R<:R0](s:V, f: (V)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onSolver[R<:R0](s:K, r0:()=>R, f: (K,()=>R)=>R):R = {
+      override def onSolver[R<:R0](s:V, r0:()=>R, f: (V,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
@@ -115,9 +115,9 @@ object DefaultCtxEventsCbk {
   import scala.language.implicitConversions
   import loader.core.callbacks.Callbacks
   //a builder for Callbacks
-  def builder[P<:Processor] = new CallbacksBuilder[P#Element,P#Status,P#Ret,P#Kind]
+  def builder[P<:Processor] = new CallbacksBuilder[P#Element,P#Status,P#Ret,P#Key,P#Kind]
   //converting DefaultCtxEventsCbk into a Callbacks recursive tree
-  implicit def cbks[P<:Processor](cbk:DefaultCtxEventsCbk[P#Ret,P#Kind]):Callbacks[P#Element,P#Status,P#Ret,P#Kind] = builder(cbk)
+  implicit def cbks[P<:Processor](cbk:DefaultCtxEventsCbk[P#Ret,P#Key,P#Kind]):Callbacks[P#Element,P#Status,P#Ret,P#Key,P#Kind] = builder(cbk)
   
   val readTagIdx = 0
   val fastWarnIdx = 1
