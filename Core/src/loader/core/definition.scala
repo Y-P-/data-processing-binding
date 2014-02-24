@@ -44,7 +44,7 @@ object definition {
     trait Launcher {
       val proc:Processor.this.type = Processor.this
       def myself:proc.Launcher = this  //prevents some non necessary casts
-      def builder:Bld
+      protected[this] def builder:Bld
               
       /** Specific factories.
        *  A Parser=>Element function is expected: it spawns the Top element for a given Parser.
@@ -69,11 +69,11 @@ object definition {
       def parser : Parser   //parser creating that element: Beware => this can change in case of includes
       protected[core] def parser_=(parser:Parser):Unit //parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
-      def builder:Bld
+      protected[this] def builder:Bld
       /** building a child spawning children of a possibly different nature */
-      def build(p:Parser, s:Status, b:Bld):Element = builder(p, self, s, b)
-      /** building a child spawning children of the same nature */
-      def build(p:Parser, s:Status):Element = build(p, s, builder)
+      //def build(p:Parser, s:Status, b:Bld):Element = builder(p, self, s, b)
+      /** building a child spawning children of the same nature; you must call this method because it can be overriden (callbacks) */
+      def build(p:Parser, s:Status):Element = build(p, s)
       
       /** The standard, elementary methods dealing with parser events.
        *  The order in which these methods are executed is:
@@ -115,7 +115,7 @@ object definition {
       
       /** The push/pull interface on the processor side
        */
-      def push(n:Key):Processor.this.Element = { val c=build(parser,onName(n),builder); c.onInit(); c }
+      def push(n:Key):Processor.this.Element = { val c=build(parser,onName(n)); c.onInit(); c }
       def pull()         = { doBeg(); parent.onChild(this, onEnd()) }
       def pull(v:Kind)   = {
         parent.doBeg
@@ -164,13 +164,11 @@ object definition {
      *  - the other define child builders within an already existing processor
      */
     abstract class EltBuilder {
-      def apply(p: Parser, s: Status): Element                                      = apply(p,null,s,this)
-      def apply(p: Parser, s: Status, childBuilder: Bld): Element                   = apply(p,null,s,childBuilder)
-      def apply(p: Parser, s: Status, cbks: Cbks*): Element                         = apply(p,s,this,cbks:_*)
-      def apply(p: Parser, s: Status, childBuilder: Bld, cbks: Cbks*): Element      = WithCallbacks(p,null,s,cbks,childBuilder,childBuilder)
-      def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld): Element
-      def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld, cbks: Cbks*): Element with WithCallbacks
-      def apply(p: Parser, parent: Element, s: Status, childBuilder: Bld, cb: Cbk, cbks: Cbks*): Element with WithCallback
+      def apply(p: Parser, s: Status): Element                = apply(p,null,s)
+      def apply(p: Parser, s: Status, cbks: Cbks*): Element   = apply(p,null,s,cbks:_*)
+      def apply(p: Parser, parent: Element, s: Status): Element
+      def apply(p: Parser, parent: Element, s: Status, cbks: Cbks*): Element with WithCallbacks
+      def apply(p: Parser, parent: Element, s: Status, cb: Cbk, cbks: Cbks*): Element with WithCallback
     }
 
     /** Modifies the current element behavior by using a callback
@@ -196,36 +194,36 @@ object definition {
      */
     trait WithCallbacks extends Elt { this: Element =>
       protected[this] def cbks: Seq[Cbks] //current callbacks trees (for children)
-      override def build(p: Parser, s: Status, b:Bld): Element = WithCallbacks(p,this,s,cbks,builder,b)
+      override def build(p: Parser, s: Status): Element = WithCallbacks(p,this,s,cbks,builder)
     }
     object WithCallbacks {
       /** Analyzes a callbacks sequence to know:
        *  1) whether it applies to the current item
        *  2) what sub sequence may apply to children
        */
-      def apply(p: Parser, parent:Element, s:Status, cbks:Seq[Cbks], builder:EltBuilder, childBuilder:Bld): Element = {
+      def apply(p: Parser, parent:Element, s:Status, cbks:Seq[Cbks], builder:EltBuilder): Element = {
         if (cbks.length == 1) {
           //first, the case where the sequence is one element only.
           //it's very common, and should be optimized! it's furthermore much easier to read!
           cbks.head.get(s.key.toString) match {
-            case None => builder(p,parent,s,childBuilder) //no subtree ? get rid of the extra callback data and associated code
+            case None => builder(p,parent,s) //no subtree ? get rid of the extra callback data and associated code
             case Some(c) => c.cur match {
-              case None => builder(p,parent,s,childBuilder,cbks:_*)
-              case Some(cb) => builder(p,parent,s,childBuilder,cb,cbks:_*)
+              case None => builder(p,parent,s,cbks:_*)
+              case Some(cb) => builder(p,parent,s,cb,cbks:_*)
             }
           }
         } else {
           //that one is a little tricky; first build the next sequence of callback trees, extracted from cbks
           val r = for (x <- cbks; y <- x.get(s.key.toString)) yield y
           //if empty, return to the no callback version
-          if (r.isEmpty) builder(p,parent,s,childBuilder)
+          if (r.isEmpty) builder(p,parent,s)
           else {
             //otherwise, create the sequence of actual callbacks for this element
             val c = (for (x <- r; y <- x.cur) yield y)
             //if empty, proceed with the builder with non local callback
-            if (c.isEmpty) builder(p,parent,s,childBuilder,r:_*)
+            if (c.isEmpty) builder(p,parent,s,r:_*)
             //otherwise, proceed by combining the local callbacks together to compute the final callback to apply
-            else builder(p,parent,s,childBuilder,c.reduce(_(_)),r:_*)
+            else builder(p,parent,s,c.reduce(_(_)),r:_*)
           }
         }
       }

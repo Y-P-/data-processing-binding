@@ -109,33 +109,33 @@ object CtxCore {
       def onName(e:Element,key:Key): Status  = null
       
       override val builder:Bld = new Bld {
-        def apply(parser:Parser, parent: Element, s: Status, builder:Bld) =
-          if      (s.fd.isList)   new List(parser, motor, s, parent, builder)
-          else if (s.fd.isStruct) new Struct(parser, motor, s, parent, builder)
-          else                    new Terminal(parser, motor, s, parent, builder)
-        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cbks: Cbks*) =
-          if      (s.fd.isList)   new ListCbks(parser, motor, s, parent, builder, cbks:_*)
-          else if (s.fd.isStruct) new StructCbks(parser, motor, s, parent, builder, cbks:_*)
-          else                    new TerminalCbks(parser, motor, s, parent, builder, cbks:_*)
-        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cb:Cbk, cbks: Cbks*) =
-          if      (s.fd.isList)   new ListCbk(parser, motor, s, parent, builder, cb, cbks:_*)
-          else if (s.fd.isStruct) new StructCbk(parser, motor, s, parent, builder, cb, cbks:_*)
-          else                    new TerminalCbk(parser, motor, s, parent, builder, cb, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status) =
+          if      (s.fd.isList)   new List(parser, motor, s, parent)
+          else if (s.fd.isStruct) new Struct(parser, motor, s, parent)
+          else                    new Terminal(parser, motor, s, parent)
+        def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*) =
+          if      (s.fd.isList)   new ListCbks(parser, motor, s, parent, cbks:_*)
+          else if (s.fd.isStruct) new StructCbks(parser, motor, s, parent, cbks:_*)
+          else                    new TerminalCbks(parser, motor, s, parent, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) =
+          if      (s.fd.isList)   new ListCbk(parser, motor, s, parent, cb, cbks:_*)
+          else if (s.fd.isStruct) new StructCbk(parser, motor, s, parent, cb, cbks:_*)
+          else                    new TerminalCbk(parser, motor, s, parent, cb, cbks:_*)
       }
     }
     
     //concrete definitions
-    class Element(parser0:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, builder:Bld, data:Data) extends super.Element(parser0,motor,key,parent,builder,data) with Elt {
-      def this(parser:Parser, motor:Motor, s:Status, parent:Element, builder:Bld) = this(parser,motor,s.key,parent,s.fd,s.idx,builder,getData(parent, s))
+    class Element(parser0:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, data:Data) extends super.Element(parser0,motor,key,parent,data) with Elt {
+      def this(parser:Parser, motor:Motor, s:Status, parent:Element) = this(parser,motor,s.key,parent,s.fd,s.idx,getData(parent, s))
     }
-    protected class Struct(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld)                             extends Element(parser,motor,s,parent,builder) with super[Processor].Struct
-    protected class List(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld)                               extends Element(parser,motor,s,parent,builder) with super[Processor].List
-    protected class Terminal(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld)                           extends Element(parser,motor,s,parent,builder) with super[Processor].Terminal
-    protected class StructCbks(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)          extends Struct(parser,motor,s,parent,builder) with WithCallbacks
-    protected class ListCbks(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)            extends List(parser,motor,s,parent,builder) with WithCallbacks
-    protected class TerminalCbks(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)        extends Terminal(parser,motor,s,parent,builder) with WithCallbacks
-    protected class StructCbk(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)    extends StructCbks(parser,motor,s,parent,builder,cbks:_*) with WithCallback
-    protected class ListCbk(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)      extends ListCbks(parser,motor,s,parent,builder,cbks:_*) with WithCallback
-    protected class TerminalCbk(parser:Parser,motor:Motor,s:Status, parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*) extends TerminalCbks(parser,motor,s,parent,builder,cbks:_*) with WithCallback        
+    protected class Struct(parser:Parser,motor:Motor,s:Status,parent:Element)                             extends Element(parser,motor,s,parent) with super[Processor].Struct
+    protected class List(parser:Parser,motor:Motor,s:Status,parent:Element)                               extends Element(parser,motor,s,parent) with super[Processor].List
+    protected class Terminal(parser:Parser,motor:Motor,s:Status,parent:Element)                           extends Element(parser,motor,s,parent) with super[Processor].Terminal
+    protected class StructCbks(parser:Parser,motor:Motor,s:Status,parent:Element,val cbks:Cbks*)          extends Struct(parser,motor,s,parent) with WithCallbacks
+    protected class ListCbks(parser:Parser,motor:Motor,s:Status,parent:Element,val cbks:Cbks*)            extends List(parser,motor,s,parent) with WithCallbacks
+    protected class TerminalCbks(parser:Parser,motor:Motor,s:Status,parent:Element,val cbks:Cbks*)        extends Terminal(parser,motor,s,parent) with WithCallbacks
+    protected class StructCbk(parser:Parser,motor:Motor,s:Status,parent:Element,val cb:Cbk,cbks:Cbks*)    extends StructCbks(parser,motor,s,parent,cbks:_*) with WithCallback
+    protected class ListCbk(parser:Parser,motor:Motor,s:Status,parent:Element,val cb:Cbk,cbks:Cbks*)      extends ListCbks(parser,motor,s,parent,cbks:_*) with WithCallback
+    protected class TerminalCbk(parser:Parser,motor:Motor,s:Status, parent:Element,val cb:Cbk,cbks:Cbks*) extends TerminalCbks(parser,motor,s,parent,cbks:_*) with WithCallback        
   }
 }

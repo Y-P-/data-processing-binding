@@ -22,16 +22,16 @@ object ExtCore {
       def onName(e:Element,key:Key) = new Status(key)
       
       override val builder:Bld = new Bld {
-        def apply(parser:Parser, parent: Element, s: Status, builder:Bld)                      = new Element(parser,motor,s,parent,builder)
-        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cbks: Cbks*)         = new ElementCbks(parser,motor,s,parent,builder, cbks:_*)
-        def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,motor,s,parent,builder, cb, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status)                      = new Element(parser,motor,s,parent)
+        def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*)         = new ElementCbks(parser,motor,s,parent, cbks:_*)
+        def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,motor,s,parent, cb, cbks:_*)
       }
     }
 
-    class Element(parser0:Parser, motor:Motor, key:Key, parent:Element, builder:Bld, val data:Data) extends super.Element(parser0,motor,key,parent,builder) with Elt {
-      def this(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld) = this(parser,motor,s.key,parent,builder,getData(parent,s))
+    class Element(parser0:Parser, motor:Motor, key:Key, parent:Element, val data:Data) extends super.Element(parser0,motor,key,parent) with Elt {
+      def this(parser:Parser,motor:Motor,s:Status,parent:Element) = this(parser,motor,s.key,parent,getData(parent,s))
     }
-    protected class ElementCbks(parser:Parser, motor:Motor, s:Status, parent:Element, builder:Bld, val cbks:Cbks*)         extends Element(parser,motor,s,parent,builder)             with WithCallbacks
-    protected class ElementCbk (parser:Parser, motor:Motor, s:Status, parent:Element, builder:Bld, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,motor,s,parent,builder,cbks:_*) with WithCallback
+    protected class ElementCbks(parser:Parser, motor:Motor, s:Status, parent:Element, val cbks:Cbks*)         extends Element(parser,motor,s,parent)             with WithCallbacks
+    protected class ElementCbk (parser:Parser, motor:Motor, s:Status, parent:Element, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,motor,s,parent,cbks:_*) with WithCallback
   }
 }

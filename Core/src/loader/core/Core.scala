@@ -29,16 +29,16 @@ object Core {
       def apply():Parser=>Element           = apply(null)
       
       val builder:Bld = new Bld {
-        def apply(parser:Parser, parent: Element, c: Status, builder: Bld)                      = new Element(parser,motor,c.key,parent,builder)
-        def apply(parser:Parser, parent: Element, c: Status, builder: Bld, cbks: Cbks*)         = new ElementCbks(parser,motor,c.key,parent,builder,cbks:_*)
-        def apply(parser:Parser, parent: Element, c: Status, builder: Bld, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,motor,c.key,parent,builder,cb,cbks:_*)
+        def apply(parser:Parser, parent: Element, c: Status)                      = new Element(parser,motor,c.key,parent)
+        def apply(parser:Parser, parent: Element, c: Status, cbks: Cbks*)         = new ElementCbks(parser,motor,c.key,parent,cbks:_*)
+        def apply(parser:Parser, parent: Element, c: Status, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,motor,c.key,parent,cb,cbks:_*)
       }
     }
     
     // Element implementation : redirect calls
-    class Element(protected[this] var parser0:Parser, val motor:Motor, val key: Key, val parent: Element, val builder: Bld)     extends Elt
-    protected class ElementCbks(parser:Parser, motor:Motor, key: Key, parent: Element, builder: Bld, val cbks: Cbks*)           extends Element(parser,motor,key,parent,builder)             with WithCallbacks
-    protected class ElementCbk (parser:Parser, motor:Motor, key: Key, parent: Element, builder: Bld, val cb: Cbk, cbks: Cbks*)  extends ElementCbks(parser,motor,key,parent,builder,cbks:_*) with WithCallback {
+    class Element(protected[this] var parser0:Parser, val motor:Motor, val key: Key, val parent: Element)         extends Elt { protected[this] def builder=motor.builder }
+    protected class ElementCbks(parser:Parser, motor:Motor, key: Key, parent: Element, val cbks: Cbks*)           extends Element(parser,motor,key,parent)             with WithCallbacks
+    protected class ElementCbk (parser:Parser, motor:Motor, key: Key, parent: Element, val cb: Cbk, cbks: Cbks*)  extends ElementCbks(parser,motor,key,parent,cbks:_*) with WithCallback {
       override def onChild(child:Element,r:Ret):Unit = super[WithCallback].onChild(child,r)
     }
     
