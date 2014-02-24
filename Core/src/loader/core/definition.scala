@@ -236,67 +236,52 @@ object definition {
     }
   }
   
+  /** A possible implementation for the framework.
+   *  It redirects the element calls to the launcher class, which contains the processor logic.
+   *  This lets define standard Element classes.
+   */
   trait Impl extends Processor { self=>
-    
+    //FIXME:This should appear only in ExtCore, but a compiler bug forces the declaration here
+    type Data
+    def getData(parent:Element,s:Status):Data
+
     //a factory for reading textual parameters
     //there will be other, specific factories
-    def apply(pr: utils.ParamReader, userCtx:UserCtx):Launcher
+    def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor
     
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
+     *  It also makes it possible to easily subclass an implementation.
      */
-    abstract class Launcher extends super.Launcher { motor=>
+    abstract class Motor extends super.Launcher { motor=>
       type Result
-      type ElementBase<:Element
-      // context fields for a motor
       def userCtx:UserCtx
       
-      protected def onInit():Unit
-      protected def onExit():Result
+      def onInit():Unit
+      def onExit():Result
       // Forwarded methods
-      protected def onName(self: Element, key: Key): Status
-      protected def onInit(self: Element):Unit
-      protected def onBeg(self: Element): Unit
-      protected def onVal(self: Element, v: Kind): Ret
-      protected def onEnd(self: Element): Ret
-      protected def onChild(self: Element, child: Element, r: Ret): Unit
-      // Element implementation : redirect calls
-      protected[this] trait Inner extends Elt { self:ElementBase=>
-        def userCtx = motor.userCtx
-        protected def onName(key: Key): Status              = motor.onName(this,key)
-        protected def onInit(): Unit                        = motor.onInit(this)
-        protected def onBeg(): Unit                         = motor.onBeg(this)
-        protected def onVal(v: Kind): Ret                   = motor.onVal(this,v)
-        protected def onEnd(): Ret                          = motor.onEnd(this)
-        protected def onChild(child: Element, r: Ret): Unit = motor.onChild(this,child,r)
-        /*
-         * We have to manage the copy required when we have an include: the current element must be attached to
-         * the upper parser, but also to the lower one! Thus, we must copy the current element be change the parser.
-         * Several methods are possible to do this.
-         * - creating the appropriate method for each implementing class; extremely tedious and not scalable
-         * - clone + java reflexion : fails (these objects are too complex to locate the parser field!)
-         * - clone + scala reflexion : works (snipet below), but awful perfs at 'cm.reflect(r)'
-         * - clone + inner mutable (parser0) that shadows parser
-         * However problems arise with other fields that depend on the current element but still refer to the old
-         * one, for example cb (callback.) ; the proper solution for this would be to rebuild a new object from
-         * scratch with the appropriate parser ; but this has its own drawbacks in case some of the methods invoked
-         * have side effects (such as getData.)
-         * Finally, is seems safer to make Elt mutable on parser as this is the solution that seems to be the less
-         * restrictive and the most efficient. One must not forget to restore the old parser!
-         * 
-         * Snipet for scala reflexion:
-         *   import scala.reflect.runtime.{ currentMirror => cm }
-         *   import scala.reflect.runtime.universe._
-         *   val im = cm.reflect(r)
-         *   val termSymb = typeOf[ElementBase].declaration(newTermName("parser")).asTerm
-         *   val fm = im.reflectField(termSymb)
-         *   fm.set(parser)
-         */
-        protected[this] var parser0:Parser
-        def parser = parser0
-        protected[core] def parser_=(parser:Parser):Unit = parser0=parser
-      }  
+      def onName(self: Element, key: Key): Status
+      def onInit(self: Element):Unit
+      def onBeg(self: Element): Unit
+      def onVal(self: Element, v: Kind): Ret
+      def onEnd(self: Element): Ret
+      def onChild(self: Element, child: Element, r: Ret): Unit
     }
+    
+    // Element implementation : redirect calls
+    trait Elt extends super.Elt { this:Element=>
+      val motor:Motor
+      protected[this] var parser0:Parser
+      def parser = parser0  //we would rather not have this var, but the alternative is not good either.
+      protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
+      def userCtx = motor.userCtx
+      protected def onName(key: Key): Status              = motor.onName(this,key)
+      protected def onInit(): Unit                        = motor.onInit(this)
+      protected def onBeg(): Unit                         = motor.onBeg(this)
+      protected def onVal(v: Kind): Ret                   = motor.onVal(this,v)
+      protected def onEnd(): Ret                          = motor.onEnd(this)
+      protected def onChild(child: Element, r: Ret): Unit = motor.onChild(this,child,r)
+    }      
   }
 }

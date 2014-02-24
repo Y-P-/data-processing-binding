@@ -27,14 +27,14 @@ case class IncludeSuccessEvt[V>:Null](info:V)                        extends Def
  *  the processing state. In particular, it uses the Context#FieldMapping definition
  *  in order to check the validity of read fields.
  */
-class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[Processor#Element,Status[K],R0,K,V] {
+class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[Processor#Element,Processor#Status,R0,K,V] {
   /** Note that to avoid useless calls, we break down the Default event generator into three pieces,
    *  one for each kind of element. There is scarce common code between them.
    */
   override def apply(e0:Processor#Element):Inner = e0 match {
     //Struct events
     case stc: Processor#Struct => new Inner(e0) {
-      override def onName[S<:Status[K]](key:K, f: (K)=>S):S = {
+      override def onName[S<:Processor#Status](key:K, f: (K)=>S):S = {
         import ParserBuilder._
         val s = try { f(key) } catch {
           case x:SkipException => elt(IgnoredTagEvt(key.toString)); throw x

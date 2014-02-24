@@ -20,14 +20,13 @@ object Struct extends Processor {self=>
     type Data       = Null
     type BaseParser = ParserBuilder //any parser
     
+    def getData(parent:Element,s:Status):Data = null
     val noKey = ""
     
     /**
      * @param out, where to write to
      * @param indent, indent value as space number ; 0 means all output on one line
-     */
-    abstract class Inner(bp: BaseParser, val out:Writer, val indent:Int=0, userCtx:UserCtx) extends self.Motor(userCtx)
-    
+     */    
     trait MotorImpl {
       val userCtx:UserCtx
       val out:Writer  //where to write to
@@ -35,20 +34,18 @@ object Struct extends Processor {self=>
     
       type Result = Unit
  
-      protected def getData(parent:Element,s:Status):Data = null
-
       private def newLine(e:Element):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
       private def quote(s:String):Unit      = out.write(if(parser.px.Data.isChar(s)) s else s""""$s"""")
       private def tag(e:Element):Unit       = { newLine(e); if (!e.name.isEmpty) { quote(e.localName); out.write(s" = ") } }
   
-      protected def onInit(e:Element):Unit          = {}
-      protected def onBeg(e:Element): Unit          = if (e.parent!=null) { tag(e); out.write("{") }
-      protected def onVal(e:Element,v: String): Ret = { tag(e); quote(v); out.flush; 1 }
-      protected def onEnd(e:Element): Ret           = if (e.parent!=null) { newLine(e); out.write("}"); out.flush; 1 } else 0
-      protected def onChild(e:Element,child: Element, r: Ret): Unit = {}
+      def onInit(e:Element):Unit          = {}
+      def onBeg(e:Element): Unit          = if (e.parent!=null) { tag(e); out.write("{") }
+      def onVal(e:Element,v: String): Ret = { tag(e); quote(v); out.flush; 1 }
+      def onEnd(e:Element): Ret           = if (e.parent!=null) { newLine(e); out.write("}"); out.flush; 1 } else 0
+      def onChild(e:Element,child: Element, r: Ret): Unit = {}
 
-      protected def onInit():Unit = {}
-      protected def onExit():Unit = out.flush
+      def onInit():Unit = {}
+      def onExit():Unit = out.flush
     }
   }
   
@@ -62,7 +59,8 @@ object Struct extends Processor {self=>
   }
   
   object ctx extends loader.core.CtxCore.Impl with DefImpl {
-    class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher with MotorImpl
+    def getData(parent:Element,s:Status):Data = null  //FIXME: we have an interesting compiler bug around here
+    class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Motor with MotorImpl
     def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor = {
       val p = readParams(pr)
       new Motor(p._1,p._2,userCtx)
@@ -70,7 +68,7 @@ object Struct extends Processor {self=>
     def apply(out:Writer, indent:Int=0, userCtx:UserCtx) = new Motor(out,indent,userCtx)
   }
   object ext extends loader.core.ExtCore.Impl with DefImpl {
-    class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Launcher with MotorImpl
+    class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Motor with MotorImpl
     def apply(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
       new Motor(p._1,p._2,userCtx)

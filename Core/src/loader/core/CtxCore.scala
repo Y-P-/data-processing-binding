@@ -5,7 +5,6 @@ import context.Context
 
 object CtxCore {
   
-  class Status[+K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends Core.Status(key)
 
   /** A quite complex implementation for core, where Element is broken down in three possible states:
    *  - Struct   (containing any kind of sub-Element),
@@ -15,9 +14,9 @@ object CtxCore {
    *  at any time what to expect by simply watching the name.
    */
   trait Processor extends ExtCore.Processor {
-    override type Status = CtxCore.Status[Key]
+    class Status(key:Key, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends Core.Status(key)
     type Element >: Null <: Elt
-
+    
     sealed trait Elt extends super.Elt { this:Elt with Element=>
       def idx: Int
       def fd: Context#FieldMapping
@@ -47,7 +46,7 @@ object CtxCore {
       val canFast = userCtx.fast && fd.loader.annot.fast
       val doFast  = canFast && !tags.hasNonContig
     
-      override protected def onName(key: Key):CtxCore.Status[Key] = {
+      override protected def onName(key: Key):Status = {
         val name = key.toString
         tags.fetch(name) match {
           case None     =>
@@ -61,7 +60,7 @@ object CtxCore {
             if (fd1.isSeq) broken &&= fd1.isSeq && previous != null && previous != fd1 //check last fd to see if the current seq has been broken
             previous = fd1
             //XXX manage broken data (keep it ? discard it ?)
-            new CtxCore.Status(key, idx, fd1, broken) //XXX see pushAttr to set this boolean to true
+            new Status(key, idx, fd1, broken)
         }
       }
     }
@@ -69,11 +68,11 @@ object CtxCore {
     trait List extends Elt { this:Element=>
       private val innerFd: Context#FieldMapping = fd.asSeq
       var index: Int = 0
-      override protected def onName(key: Key):CtxCore.Status[Key] = {
+      override protected def onName(key: Key):Status = {
         val name = key.toString
         if (!name.isEmpty) throw new IllegalStateException(s"illegal field $name in a list")
         index += 1
-        new CtxCore.Status(key, index, innerFd, false)
+        new Status(key, index, innerFd, false)
       }
     }
     //parent is undefined here
@@ -97,49 +96,46 @@ object CtxCore {
    *  o write the builder mostly as below
    *  This would only be usefull in a handful of cases, after it is proved that this generic processor is the cause of inefficiency...
    */
-  trait Impl extends definition.Impl with Processor {
-    type Element = Elt
+  trait Impl extends ExtCore.Impl with Processor {
+    protected def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
     
-    abstract class Launcher extends super.Launcher { impl=>
-      protected def getData(parent:Element,s:Status):Data
-      protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
+    abstract class Motor extends super.Motor with super.Launcher { motor=>
       
       //implementations : top builders
-      def apply(fd:Context#FieldMapping,cbks:Cbks*):Parser=>Element = apply(noStatus(fd), cbks:_*)
-      def apply(fd:Context#FieldMapping):Parser=>Element            = apply(noStatus(fd))
+      def apply(fd:Context#FieldMapping,cbks:Cbks*):Parser=>Element = apply(Impl.this.noStatus(fd), cbks:_*)
+      def apply(fd:Context#FieldMapping):Parser=>Element            = apply(Impl.this.noStatus(fd))
       
       //a default stub ; it will be overriden by the Struct/List/Terminal implementation
-      protected def onName(e:Element,key:Key): Status  = null
-      
-      //concrete definitions
-      class ElementBase(protected var parser0:Parser, val key:Key, val parent:Element, val fd:Context#FieldMapping, val idx:Int, val builder:Bld, val data:Data) extends Inner with Elt {
-        def this(parser:Parser, s:Status, parent:Element, builder:Bld) = this(parser,s.key,parent,s.fd,s.idx,builder,impl.getData(parent, s))
-        def getData(s: Status) = Launcher.this.getData(this,s)
-      }
-      class Struct(parser:Parser,s:Status,parent:Element,builder:Bld)                             extends ElementBase(parser,s,parent,builder) with Impl.this.Struct
-      class List(parser:Parser,s:Status,parent:Element,builder:Bld)                               extends ElementBase(parser,s,parent,builder) with Impl.this.List
-      class Terminal(parser:Parser,s:Status,parent:Element,builder:Bld)                           extends ElementBase(parser,s,parent,builder) with Impl.this.Terminal
-      class StructCbks(parser:Parser,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)          extends Struct(parser,s,parent,builder) with WithCallbacks
-      class ListCbks(parser:Parser,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)            extends List(parser,s,parent,builder) with WithCallbacks
-      class TerminalCbks(parser:Parser,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)        extends Terminal(parser,s,parent,builder) with WithCallbacks
-      class StructCbk(parser:Parser,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)    extends StructCbks(parser,s,parent,builder,cbks:_*) with WithCallback
-      class ListCbk(parser:Parser,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)      extends ListCbks(parser,s,parent,builder,cbks:_*) with WithCallback
-      class TerminalCbk(parser:Parser,s:Status, parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*) extends TerminalCbks(parser,s,parent,builder,cbks:_*) with WithCallback
+      def onName(e:Element,key:Key): Status  = null
       
       override val builder:Bld = new Bld {
         def apply(parser:Parser, parent: Element, s: Status, builder:Bld) =
-          if      (s.fd.isList)   new List(parser, s, parent, builder)
-          else if (s.fd.isStruct) new Struct(parser, s, parent, builder)
-          else                    new Terminal(parser, s, parent, builder)
+          if      (s.fd.isList)   new List(parser, motor, s, parent, builder)
+          else if (s.fd.isStruct) new Struct(parser, motor, s, parent, builder)
+          else                    new Terminal(parser, motor, s, parent, builder)
         def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cbks: Cbks*) =
-          if      (s.fd.isList)   new ListCbks(parser, s, parent, builder, cbks:_*)
-          else if (s.fd.isStruct) new StructCbks(parser, s, parent, builder, cbks:_*)
-          else                    new TerminalCbks(parser, s, parent, builder, cbks:_*)
+          if      (s.fd.isList)   new ListCbks(parser, motor, s, parent, builder, cbks:_*)
+          else if (s.fd.isStruct) new StructCbks(parser, motor, s, parent, builder, cbks:_*)
+          else                    new TerminalCbks(parser, motor, s, parent, builder, cbks:_*)
         def apply(parser:Parser, parent: Element, s: Status, builder:Bld, cb:Cbk, cbks: Cbks*) =
-          if      (s.fd.isList)   new ListCbk(parser, s, parent, builder, cb, cbks:_*)
-          else if (s.fd.isStruct) new StructCbk(parser, s, parent, builder, cb, cbks:_*)
-          else                    new TerminalCbk(parser, s, parent, builder, cb, cbks:_*)
+          if      (s.fd.isList)   new ListCbk(parser, motor, s, parent, builder, cb, cbks:_*)
+          else if (s.fd.isStruct) new StructCbk(parser, motor, s, parent, builder, cb, cbks:_*)
+          else                    new TerminalCbk(parser, motor, s, parent, builder, cb, cbks:_*)
       }
     }
+    
+    //concrete definitions
+    class Element(parser0:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, builder:Bld, data:Data) extends super.Element(parser0,motor,key,parent,builder,data) with Elt {
+      def this(parser:Parser, motor:Motor, s:Status, parent:Element, builder:Bld) = this(parser,motor,s.key,parent,s.fd,s.idx,builder,getData(parent, s))
+    }
+    protected class Struct(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld)                             extends Element(parser,motor,s,parent,builder) with super[Processor].Struct
+    protected class List(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld)                               extends Element(parser,motor,s,parent,builder) with super[Processor].List
+    protected class Terminal(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld)                           extends Element(parser,motor,s,parent,builder) with super[Processor].Terminal
+    protected class StructCbks(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)          extends Struct(parser,motor,s,parent,builder) with WithCallbacks
+    protected class ListCbks(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)            extends List(parser,motor,s,parent,builder) with WithCallbacks
+    protected class TerminalCbks(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cbks:Cbks*)        extends Terminal(parser,motor,s,parent,builder) with WithCallbacks
+    protected class StructCbk(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)    extends StructCbks(parser,motor,s,parent,builder,cbks:_*) with WithCallback
+    protected class ListCbk(parser:Parser,motor:Motor,s:Status,parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*)      extends ListCbks(parser,motor,s,parent,builder,cbks:_*) with WithCallback
+    protected class TerminalCbk(parser:Parser,motor:Motor,s:Status, parent:Element,builder:Bld,val cb:Cbk,cbks:Cbks*) extends TerminalCbks(parser,motor,s,parent,builder,cbks:_*) with WithCallback        
   }
 }
