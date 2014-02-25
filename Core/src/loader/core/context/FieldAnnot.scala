@@ -1,7 +1,5 @@
 package loader.core.context
 
-import loader.core.names.QName
-import loader.core.definition.Processor
 
 /** A type that describes our field transformation.
  *  Each context must provide a way to recover this info.
@@ -23,7 +21,6 @@ import loader.core.definition.Processor
  */
 abstract class FieldAnnot {
   def inName:String        //the name for the field in the parser (it is meaningful for the TagMap to recognized which entry names match this Field)
-  def qName:Processor#Element=>QName //Name Transformer (see description above.)
   def loader:String        //the id to a StructAnnot ; null if not mapped to a structure ; "" if the structure is unknown (dynamic)
   def isList:Boolean       //indicates that the fields is a list: it contains a unique field sequence
   def isSeq:Boolean        //indicates that the field can be repeated

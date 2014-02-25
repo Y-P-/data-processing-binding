@@ -1,7 +1,5 @@
 package loader.core.context
 
-import loader.core.names.QName
-
 
 /** This class lists all relevant information pertaining to a given 'structure'.
  *  It provides support for reading 'structure' information from varied sources.
@@ -22,7 +20,6 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     val inName     = name0
     val loader     = id
     def rank       = 0
-    def qName      = QName.noProc
     def isSeq      = false
     def isList     = false
     def isFld      = false
@@ -105,7 +102,6 @@ abstract class Context(tagMapBuilder: =>TagMap) {
       if (!annot.isList) throw new IllegalStateException
       new FieldMapping(new FieldAnnot {
         def inName:String  = ""
-        def qName          = QName.noProc
         def min:Int        = annot.min
         def max:Int        = annot.max
         def check:String   = annot.check

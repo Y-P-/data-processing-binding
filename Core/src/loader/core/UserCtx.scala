@@ -3,7 +3,6 @@ package loader.core
 import definition._
 import events.EventHandler
 import context.Context
-import loader.core.names.QName
 import loader.core.context.FieldAnnot
 
 
@@ -18,8 +17,6 @@ abstract class UserContext[-P<:Processor] {
   def apply(e:Elt):EltContext
   
   protected[this] class EltContext(protected[this] val elt:Elt) {
-    /** qName for the element */
-    def qName = QName(elt)
     /** Solving an include for e with data K */
     def solver(s:P#Kind):()=>P#Ret = null
     /** Solving dynamic mappings */

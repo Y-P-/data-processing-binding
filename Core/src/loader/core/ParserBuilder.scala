@@ -7,7 +7,6 @@ import loader.core.events.Event
 import scala.reflect.runtime.universe._
 import ParserBuilder.skip
 import ParserBuilder.skipEnd
-import loader.core.names.QName
 
 trait Locator {
   /** A string that explicits where the parser is */
@@ -106,10 +105,6 @@ trait ParserBuilder {selfBuilder=>
      *  do nothing if not possible.
      */
     def skipToEnd(): Unit = ()
-    /** build a QName from a string input.
-     *  The default returns null and is handled as a QName that is not an attribute and has no namespace.
-     */
-    def qName(s:String):QName = new QName(s)
 
         
     //All exceptions handled in the same way:

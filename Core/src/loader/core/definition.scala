@@ -95,10 +95,6 @@ object definition {
       protected def onChild(child: Element, r: Ret): Unit    //called when a struct is receiving a child value
       protected def onSolver(v: Kind, e: ()=>Ret): Ret = e() //called when resolving a value (as defined by the EltCtx solver) ; you had better know what you do if you override this
       
-      /** builds the qualified name for the output */
-      def qName = eltCtx.qName
-      /** builds the local name for the output */
-      def localName = qName.local
       /** current depth in the hierarchy; 0 is top */
       def depth:Int = if (parent==null) 0 else parent.depth+1
       //handle an event:
