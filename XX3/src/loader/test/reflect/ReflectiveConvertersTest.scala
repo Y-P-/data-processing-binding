@@ -4,7 +4,6 @@ import java.util.Date
 import loader.reflect.Binder
 import loader.reflect.StandardSolver
 import loader.core.context.FieldAnnot
-import loader.core.names.QName
 import loader.reflect.AutoConvertData
 import loader.reflect.DataActor
 import utils.ByteArrayReader

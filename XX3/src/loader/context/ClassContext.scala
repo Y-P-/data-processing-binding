@@ -4,7 +4,6 @@ import java.lang.reflect.{Method,Field,Modifier,Member,AnnotatedElement}
 import scala.collection.mutable.{ListBuffer,HashMap}
 import loader.core.context._
 import loader.core.exceptions.DynamicInvocation
-import loader.core.names.QName
 import loader.annotations.{TagField,TagStruct,TagSeq,TagList}
 import loader.core.context.RegexTagMap
 //XXX import loader.reflect.Analyze
@@ -67,16 +66,6 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       }
     }
     
-    /** qName Builder for a TagField
-     */
-    protected def qName(n:String, cz:Class[_<:QName.Builder]) = {
-      if (cz==classOf[QName.NoProc])
-        if      (n=="=")           QName.Const(null)
-        else if (n.charAt(0)=='>') QName.Local(n.substring(1))
-        else                       QName.Const(n)
-      else
-        cz.getConstructor(classOf[String]).newInstance(n);
-    }
     /** Translate TagField into something usable.
      *  Rules for QName with the default (NoProc) processor:
      *  - outName = '>...'  => Local(...)   (note that outName='>!' means Local(inName)
@@ -86,7 +75,6 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
     final private class TagFieldHelper(f:TagField,i:Info) extends FieldAnnot {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
-      def qName              = tagManager.qName(f.outName(),f.qName());
       def min:Int            = f.min()
       def max:Int            = 1
       def check:String       = f.check()
@@ -104,7 +92,6 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
     final private class TagSeqHelper(f:TagSeq,i:Info) extends FieldAnnot {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
-      def qName              = tagManager.qName(f.outName(),f.qName());
       def outName:String     = if (f.outName().isEmpty) inName else f.outName()
       def min:Int            = f.min()
       def max:Int            = f.max()
@@ -123,7 +110,6 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
     final private class TagListHelper(f:TagList,i:Info) extends FieldAnnot {
       val inName:String      = i.name
       val loader:String      = i.loader(this,f.loader())
-      def qName              = tagManager.qName(f.outName(),f.qName());
       def min:Int            = f.min()
       def max:Int            = f.max()
       def check:String       = f.check()

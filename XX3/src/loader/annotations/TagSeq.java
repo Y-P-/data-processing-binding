@@ -7,7 +7,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 import loader.context.ClassContext;
-import loader.core.names.QName;
 
 @Inherited
 @Target({ElementType.FIELD, ElementType.METHOD})
@@ -15,7 +14,6 @@ import loader.core.names.QName;
 public @interface TagSeq {
   String inName()      default "";
   String outName()     default "=";
-  Class<? extends QName.Builder> qName() default QName.NoProc.class;
   Class<?> loader()    default ClassContext.Unknown.class;
   int min()            default 0;
   int max()            default 0;

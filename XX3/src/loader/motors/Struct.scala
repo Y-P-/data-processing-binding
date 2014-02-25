@@ -36,7 +36,7 @@ object Struct extends Processor {self=>
  
       private def newLine(e:Element):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
       private def quote(s:String):Unit      = out.write(if(parser.px.Data.isChar(s)) s else s""""$s"""")
-      private def tag(e:Element):Unit       = { newLine(e); if (!e.name.isEmpty) { quote(e.localName); out.write(s" = ") } }
+      private def tag(e:Element):Unit       = { newLine(e); if (!e.name.isEmpty) { quote(e.name); out.write(s" = ") } }
   
       def onInit(e:Element):Unit          = {}
       def onBeg(e:Element): Unit          = if (e.parent!=null) { tag(e); out.write("{") }

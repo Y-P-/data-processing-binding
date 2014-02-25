@@ -8,7 +8,6 @@ import loader.context.ClassContext
 import loader.core.CtxCore.Processor
 import loader.core.definition.Status
 import loader.core.callbacks.CallbacksBuilder
-import loader.core.names.QName
 import loader.core.ParserBuilder
 import loader.features.{DefaultAuditHandler,DefaultCtxEventsCbk,StandardAuditLogger}
 import loader.audit.{AuditRecorder,IdScheme}
@@ -34,11 +33,6 @@ object CtxTest {
       override def solver(s:Proc#Kind):()=>Proc#Ret = {
         if (!s.asInstanceOf[String].startsWith("@include:")) return null
         ()=>run.include(p,e)((u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
-      }
-      override def qName = {
-        val q=super.qName
-        if (q!=null) new QName(e.name.capitalize,q.prefix,q.isAttrib)
-        else         new QName(e.name.capitalize)
       }
     }
   }
