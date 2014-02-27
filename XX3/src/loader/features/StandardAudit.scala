@@ -65,7 +65,9 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
   }
   
   abstract private class Log1(x:(E,Event),name:String,lvl:Int,v:Option[Any],exc:Throwable)
-    extends StandardLogRecord(id(x._1,name),lvl, localisation(x._1),v,exc)
+    extends StandardLogRecord(id(x._1,name),lvl, localisation(x._1),v,exc) {
+    override def printExc = lvl<=2
+  }
   
   private object StackExceptionLog extends Logger[StackException] {
     def process(x:(E,StackException)) = new Log1(x,null,_,None,x._2) {
@@ -75,7 +77,7 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
   }
   private object UnexpectedExceptionLog extends Logger[UnexpectedException] {
     def process(x:(E,UnexpectedException)) = new Log1(x,null,_,None,x._2.e) {
-      val explain = s"unexpected error : ${exc.getMessage}"
+      val explain = s"unexpected error : ${exc.getClass}${if (exc.getMessage!=null) s" (${exc.getMessage})" else ""}"
       val cause   = "X"
     }
   }

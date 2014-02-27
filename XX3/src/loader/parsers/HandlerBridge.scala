@@ -10,6 +10,7 @@ import loader.core.definition.Processor
  *  You only have to :
  *  - call push/pull as needed (provided by Handler)
  *  - care for the behavior with abort
+ *  It works extremely well with parsers that already use the push/pull mecanism...
  */
 abstract class HandlerBridge extends AbstractParserBuilder {self=>
   import ParserBuilder._

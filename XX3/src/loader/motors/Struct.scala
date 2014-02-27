@@ -13,7 +13,7 @@ import loader.core.ParserBuilder
 
 object Struct extends Processor {self=>
   
-  trait DefImpl extends loader.core.ExtCore.Processor {impl=>
+  trait DefImpl extends loader.core.Core.Processor {impl=>
     type Kind       = String
     type Key        = String
     type Ret        = Int
@@ -75,6 +75,14 @@ object Struct extends Processor {self=>
     }
     def apply(out:Writer, indent:Int=0, userCtx:UserCtx) = new Motor(out,indent,userCtx)
   }
+  object cre extends loader.core.Core.Impl with DefImpl {
+    class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Motor with MotorImpl
+    def apply(pr: utils.ParamReader, userCtx:UserCtx) = {
+      val p = readParams(pr)
+      new Motor(p._1,p._2,userCtx)
+    }
+    def apply(out:Writer, indent:Int=0, userCtx:UserCtx) = new Motor(out,indent,userCtx)
+  }
   
 }
 
@@ -84,5 +92,6 @@ abstract class Processor {
   abstract class Motor[P<:definition.Processor](val userCtx:UserContext[P])
   val ctx:CtxCore.Impl
   val ext:ExtCore.Impl
+  val cre:Core.Impl
 }
 

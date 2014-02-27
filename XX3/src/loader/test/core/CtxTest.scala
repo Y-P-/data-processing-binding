@@ -41,19 +41,24 @@ object CtxTest {
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Int = {
       val m = motors.Struct.ctx(out,2,userCtx)
-      run(p,m)(_(ClassContext(classOf[Data.Top])),null,null,_.read(load("small"), "UTF-8"))
+      try {
+        run(p,m)(_(ClassContext(classOf[Data.Top])),null,null,_.read(load("small"), "UTF-8"))
+      } finally {
+        out.print(userCtx.buf)
+        userCtx.buf.getBuffer.setLength(0)
+      }
     }
   }
   @Test class CtxCbkTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter) = {
-      userCtx.buf.getBuffer.setLength(0) //reset buffer
+    def apply(file:Solver,out:PrintWriter) = {/*
       val m = motors.Struct.ctx(out,2,userCtx)
       //XXX was implicit to cast callback to callbacks
       try {
         val r:Int = run(p,m)(_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk.cbks[motors.Struct.ctx.type](new DefaultCtxEventsCbk[Int,String,String])),null,null,_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
-      }
+        userCtx.buf.getBuffer.setLength(0)
+      }*/
     }
   }
 }

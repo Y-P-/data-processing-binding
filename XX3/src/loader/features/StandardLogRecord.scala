@@ -7,7 +7,7 @@ import loader.audit.LogRecord
 abstract class StandardLogRecord(val name:String,val level:Int,val localisation:String,val value:Option[Any],val exc:Throwable) extends LogRecord {
   def cause:String
   def explain:String
-  def printExc  = false
+  def printExc = false
   def excTrace  = if (exc!=null && printExc) { val b = new ByteArrayOutputStream; val p = new PrintWriter(b,true); exc.printStackTrace(p); b.toString } else ""
   override def toString = {
     val v1 = s"$cause $level [$localisation] $name"
