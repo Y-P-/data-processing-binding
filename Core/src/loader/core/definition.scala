@@ -31,7 +31,7 @@ object definition {
     type Status >: Null <:definition.Status[Key]
     
     type UserCtx = UserContext[selfDef.type]    
-    type Parser  = ParserBuilder#Parser[_,_,Ret]
+    type Parser  = BaseParser#Parser[_,_,Ret]
     type Cbk     = callbacks.Callback[Element,Status,Ret,Key,Kind]
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Key,Kind]
     type Bld     = EltBuilder
@@ -44,7 +44,7 @@ object definition {
     trait Launcher {
       val proc:Processor.this.type = Processor.this
       def myself:proc.Launcher = this  //prevents some non necessary casts
-      protected[this] def builder:Bld
+      def builder:Bld
               
       /** Specific factories.
        *  A Parser=>Element function is expected: it spawns the Top element for a given Parser.
@@ -69,11 +69,9 @@ object definition {
       def parser : Parser   //parser creating that element: Beware => this can change in case of includes
       protected[core] def parser_=(parser:Parser):Unit //parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
-      protected[this] def builder:Bld
-      /** building a child spawning children of a possibly different nature */
-      //def build(p:Parser, s:Status, b:Bld):Element = builder(p, self, s, b)
+      def builder:Bld
       /** building a child spawning children of the same nature; you must call this method because it can be overriden (callbacks) */
-      def build(p:Parser, s:Status):Element = build(p, s)
+      def build(p:Parser, s:Status):Element = builder(p, this, s)
       
       /** The standard, elementary methods dealing with parser events.
        *  The order in which these methods are executed is:
@@ -235,10 +233,6 @@ object definition {
    *  This lets define standard Element classes.
    */
   trait Impl extends Processor { self=>
-    //FIXME:This should appear only in ExtCore, but a compiler bug forces the declaration here
-    type Data
-    def getData(parent:Element,s:Status):Data
-
     //a factory for reading textual parameters
     //there will be other, specific factories
     def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor
@@ -270,6 +264,7 @@ object definition {
       def parser = parser0  //we would rather not have this var, but the alternative is not good either.
       protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
       def userCtx = motor.userCtx
+      def builder = motor.builder
       protected def onName(key: Key): Status              = motor.onName(this,key)
       protected def onInit(): Unit                        = motor.onInit(this)
       protected def onBeg(): Unit                         = motor.onBeg(this)

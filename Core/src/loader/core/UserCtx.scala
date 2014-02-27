@@ -6,11 +6,11 @@ import context.Context
 import loader.core.context.FieldAnnot
 
 
-abstract class UserContext[-P<:Processor] {
-  protected[this] type Proc = P
-  protected[this] type Elt = P#Element
+abstract class UserContext[-M<:Processor] {
+  protected[this] type Proc = M
+  protected[this] type Elt = M#Element
   //the handler for generated events 
-  def eventHandler:EventHandler[P] = null
+  def eventHandler:EventHandler[M] = null
   //parameter that asks the parser to accelerate where it can (i.e. skip unecessary data)
   val fast = true
   /** build an element context */
@@ -18,7 +18,7 @@ abstract class UserContext[-P<:Processor] {
   
   protected[this] class EltContext(protected[this] val elt:Elt) {
     /** Solving an include for e with data K */
-    def solver(s:P#Kind):()=>P#Ret = null
+    def solver(s:M#Kind):()=>M#Ret = null
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
   }
@@ -28,3 +28,26 @@ object UserContext {
 }
 
 
+//Note: while type M#BaseParser>:P and M<:P#BaseProcessor are required in the
+//      context of the framework, it is of no importance here.
+//      of course, contexts built with no regards with these constraint
+//      won't be of any real use...
+class UsrCtx[-P<:ParserBuilder { type BaseProcessor >: M},-M<:Processor { type BaseParser >: P}] {
+  def eventHandler:EventHandler[M] = null
+  val fast = true
+
+  def apply(e:M#Element):EltCtx = null
+    
+  protected[this] class EltCtx(protected[this] val elt:M#Element) {
+    /** Solving an include for e with data K */
+    def solver(s:M#Kind):()=>M#Ret = null
+    /** Solving an include for e with data K */
+    def keyMap(s:P#Key):M#Key = null
+    /** Solving an include for e with data K */
+    def valMap(s:P#Value):M#Kind = null
+    /** Solving dynamic mappings */
+    def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
+    /** maps the context in case of an include (different methods may be required) */
+    def map[P1<:ParserBuilder { type BaseProcessor >: M1}, M1<:Processor { type BaseParser >: P1}](q:P1):UsrCtx[P1,M1] = null
+  }
+}

@@ -15,9 +15,11 @@ object CtxCore {
    */
   trait Processor extends ExtCore.Processor {
     class Status(key:Key, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends Core.Status(key)
+    def getData(parent:Element,s:Status):Data
+    
     type Element >: Null <: Elt
     
-    sealed trait Elt extends super.Elt { this:Elt with Element=>
+    trait Elt extends super.Elt { this:Elt with Element=>
       def idx: Int
       def fd: Context#FieldMapping
       /** gets the previous Struct layer */
@@ -105,8 +107,8 @@ object CtxCore {
       def apply(fd:Context#FieldMapping,cbks:Cbks*):Parser=>Element = apply(Impl.this.noStatus(fd), cbks:_*)
       def apply(fd:Context#FieldMapping):Parser=>Element            = apply(Impl.this.noStatus(fd))
       
-      //a default stub ; it will be overriden by the Struct/List/Terminal implementation
-      def onName(e:Element,key:Key): Status  = null
+      //a default stub ; it has to be overriden by the Struct/List/Terminal implementation
+      def onName(e:Element,key:Key): Status  = ???
       
       override val builder:Bld = new Bld {
         def apply(parser:Parser, parent: Element, s: Status) =

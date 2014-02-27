@@ -20,7 +20,6 @@ object ExtCore {
     
     abstract class Motor extends super.Motor { motor=>
       def onName(e:Element,key:Key) = new Status(key)
-      
       override val builder:Bld = new Bld {
         def apply(parser:Parser, parent: Element, s: Status)                      = new Element(parser,motor,s,parent)
         def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*)         = new ElementCbks(parser,motor,s,parent, cbks:_*)
