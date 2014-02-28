@@ -12,7 +12,7 @@ object IdScheme {
       b
     }
   }
-  val ctx = new BaseScheme[loader.core.CtxCore.Processor] {
+  val ctx = new BaseScheme[loader.core.CtxCore] {
     protected def build(ld:Elt):StringBuffer = {
       val b = new StringBuffer
       ld.foreach { x:Elt=>

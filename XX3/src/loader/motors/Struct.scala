@@ -11,9 +11,12 @@ import java.io.OutputStreamWriter
 import loader.core.ParserBuilder
 
 
-object Struct extends Processor {self=>
+object Struct {self=>
   
-  trait DefImpl extends loader.core.Core.Processor {impl=>
+  trait DefImpl {
+    type Element <: loader.core.definition.Processor#Element
+    type Status
+    type UserCtx
     type Kind       = String
     type Key        = String
     type Ret        = Int
@@ -58,8 +61,8 @@ object Struct extends Processor {self=>
     (out,indent)
   }
   
-  object ctx extends loader.core.CtxCore.Impl with DefImpl {
-    def getData(parent:Element,s:Status):Data = null  //FIXME: we have an interesting compiler bug around here
+  object ctx extends loader.core.CtxCore.Abstract[Null] with DefImpl {
+    override type Data = Null
     class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Motor with MotorImpl
     def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor = {
       val p = readParams(pr)
@@ -67,7 +70,8 @@ object Struct extends Processor {self=>
     }
     def apply(out:Writer, indent:Int=0, userCtx:UserCtx) = new Motor(out,indent,userCtx)
   }
-  object ext extends loader.core.ExtCore.Impl with DefImpl {
+  object ext extends loader.core.ExtCore.Abstract[Null] with DefImpl {
+    override type Data = Null
     class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Motor with MotorImpl
     def apply(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
@@ -75,7 +79,7 @@ object Struct extends Processor {self=>
     }
     def apply(out:Writer, indent:Int=0, userCtx:UserCtx) = new Motor(out,indent,userCtx)
   }
-  object cre extends loader.core.Core.Impl with DefImpl {
+  object cre extends loader.core.Core.Abstract with DefImpl {
     class Motor(val out:Writer, val indent:Int=0, val userCtx:UserCtx) extends super.Motor with MotorImpl
     def apply(pr: utils.ParamReader, userCtx:UserCtx) = {
       val p = readParams(pr)
@@ -90,8 +94,8 @@ object Struct extends Processor {self=>
 abstract class Processor {
   import loader.core._
   abstract class Motor[P<:definition.Processor](val userCtx:UserContext[P])
-  val ctx:CtxCore.Impl
-  val ext:ExtCore.Impl
-  val cre:Core.Impl
+  val ctx:CtxCore
+  val ext:ExtCore
+  val cre:Core
 }
 

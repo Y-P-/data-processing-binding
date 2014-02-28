@@ -8,7 +8,7 @@ import loader.core.context.FieldAnnot
 
 abstract class UserContext[-M<:Processor] {
   protected[this] type Proc = M
-  protected[this] type Elt = M#Element
+  protected[this] type Elt = M#Elt
   //the handler for generated events 
   def eventHandler:EventHandler[M] = null
   //parameter that asks the parser to accelerate where it can (i.e. skip unecessary data)

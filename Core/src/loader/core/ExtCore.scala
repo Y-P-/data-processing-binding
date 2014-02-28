@@ -3,34 +3,34 @@ package loader.core
 /** A more complex implementation for core, where Element is extended through composition with
  *  an arbitrary Data object which can be built from the parent and Status object.
  */
-object ExtCore {
-  
-  trait Processor extends Core.Processor {
-    type Element >: Null <: Elt
-    type Data
-    def getData(parent:Element,s:Status):Data
-        
-    trait Elt extends super.Elt { this:Element=>
-      def data:Data                //a specific associated data class
-    }
+trait ExtCore extends definition.Impl {
+  type Status = ExtCore.Status[Key]
+  protected[this] val noStatus = new Status(noKey)
     
+  type Data  //some data used in association to the element
+  def getData(parent:Element,s:Status):Data
+      
+  abstract class Motor extends super.Motor {
+    def onName(e:Element,key:Key) = new Status(key)
+    //top factories
+    def apply(cbks:Cbks*):Parser=>Element = apply(noStatus, cbks:_*)
+    def apply():Parser=>Element           = apply(noStatus)
+    
+    override protected def getBld:Bld = new Bld {
+      def apply(parser:Parser, parent: Element, s: Status)                      = new Elt(parser,Motor.this,s,parent)
+      def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*)         = new ElementCbks(parser,Motor.this,s,parent, cbks:_*)
+      def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,Motor.this,s,parent, cb, cbks:_*)
+    }
   }
-  
-  trait Impl extends Core.Impl with Processor {
-    
-    abstract class Motor extends super.Motor { motor=>
-      def onName(e:Element,key:Key) = new Status(key)
-      override val builder:Bld = new Bld {
-        def apply(parser:Parser, parent: Element, s: Status)                      = new Element(parser,motor,s,parent)
-        def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*)         = new ElementCbks(parser,motor,s,parent, cbks:_*)
-        def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,motor,s,parent, cb, cbks:_*)
-      }
-    }
 
-    class Element(parser0:Parser, motor:Motor, key:Key, parent:Element, val data:Data) extends super.Element(parser0,motor,key,parent) with Elt {
-      def this(parser:Parser,motor:Motor,s:Status,parent:Element) = this(parser,motor,s.key,parent,getData(parent,s))
-    }
-    protected class ElementCbks(parser:Parser, motor:Motor, s:Status, parent:Element, val cbks:Cbks*)         extends Element(parser,motor,s,parent)             with WithCallbacks
-    protected class ElementCbk (parser:Parser, motor:Motor, s:Status, parent:Element, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,motor,s,parent,cbks:_*) with WithCallback
+  type Element = Elt
+  protected class Elt(parser:Parser, motor:Motor, key:Key, parent:Element, val data:Data) extends super.Elt(parser,motor,key,parent) {
+    def this(parser:Parser,motor:Motor,s:Status,parent:Element) = this(parser,motor,s.key,parent,getData(parent,s))
   }
+  protected class ElementCbks(parser:Parser, motor:Motor, s:Status, parent:Element, val cbks:Cbks*)         extends Elt(parser,motor,s,parent)                 with WithCallbacks
+  protected class ElementCbk (parser:Parser, motor:Motor, s:Status, parent:Element, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,motor,s,parent,cbks:_*) with WithCallback
+}
+object ExtCore {
+  class Status[K>:Null](key:K) extends Core.Status(key)
+  abstract class Abstract[D] extends ExtCore { type Data=D }
 }

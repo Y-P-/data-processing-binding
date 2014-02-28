@@ -26,9 +26,9 @@ object definition {
     type Kind>:Null    //the kind of data processed by this processor
     type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
-    type Element >: Null <: Elt
     type BaseParser <: ParserBuilder
     type Status >: Null <:definition.Status[Key]
+    type Element >: Null <: Elt  //the base implementation
     
     type UserCtx = UserContext[selfDef.type]    
     type Parser  = BaseParser#Parser[_,_,Ret]
@@ -232,19 +232,21 @@ object definition {
    *  It redirects the element calls to the launcher class, which contains the processor logic.
    *  This lets define standard Element classes.
    */
-  trait Impl extends Processor { self=>
+  trait Impl extends Processor {
     //a factory for reading textual parameters
     //there will be other, specific factories
     def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor
-    
+        
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      *  It also makes it possible to easily subclass an implementation.
      */
-    abstract class Motor extends super.Launcher { motor=>
+    abstract class Motor extends super.Launcher {
       type Result
+      val builder = getBld
       def userCtx:UserCtx
+      protected def getBld:Bld
       
       def onInit():Unit
       def onExit():Result
@@ -258,9 +260,7 @@ object definition {
     }
     
     // Element implementation : redirect calls
-    trait Elt extends super.Elt { this:Element=>
-      val motor:Motor
-      protected[this] var parser0:Parser
+    abstract class Elt(protected[this] var parser0:Parser,val motor:Motor,val key:Key,val parent:Element) extends super.Elt { this:Element=>
       def parser = parser0  //we would rather not have this var, but the alternative is not good either.
       protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
       def userCtx = motor.userCtx

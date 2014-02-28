@@ -2,7 +2,7 @@ package loader.features
 
 import loader.core.callbacks.Callback
 import loader.core.callbacks.CallbacksBuilder
-import loader.core.CtxCore._
+import loader.core.CtxCore
 import loader.core.ParserBuilder
 import loader.core.events.Event
 
@@ -27,14 +27,14 @@ case class IncludeSuccessEvt[V>:Null](info:V)                        extends Def
  *  the processing state. In particular, it uses the Context#FieldMapping definition
  *  in order to check the validity of read fields.
  */
-class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[Processor#Element,Processor#Status,R0,K,V] {
+class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[CtxCore#Element,CtxCore#Status,R0,K,V] {
   /** Note that to avoid useless calls, we break down the Default event generator into three pieces,
    *  one for each kind of element. There is scarce common code between them.
    */
-  override def apply(e0:Processor#Element):Inner = e0 match {
+  override def apply(e0:CtxCore#Element):Inner = e0 match {
     //Struct events
-    case stc: Processor#Struct => new Inner(e0) {
-      override def onName[S<:Processor#Status](key:K, f: (K)=>S):S = {
+    case stc: CtxCore#Struct => new Inner(e0) {
+      override def onName[S<:CtxCore#Status](key:K, f: (K)=>S):S = {
         import ParserBuilder._
         val s = try { f(key) } catch {
           case x:SkipException => elt(IgnoredTagEvt(key.toString)); throw x
@@ -75,7 +75,7 @@ class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[Processor#Element
       }
     }
     //Lists events
-    case lst: Processor#List => new Inner(e0) {
+    case lst: CtxCore#List => new Inner(e0) {
       override def onVal[R<:R0](s:V, f: (V)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
@@ -115,9 +115,9 @@ object DefaultCtxEventsCbk {
   import scala.language.implicitConversions
   import loader.core.callbacks.Callbacks
   //a builder for Callbacks
-  def builder[P<:Processor] = new CallbacksBuilder[P#Element,P#Status,P#Ret,P#Key,P#Kind]
+  def builder[P<:CtxCore] = new CallbacksBuilder[P#Element,P#Status,P#Ret,P#Key,P#Kind]
   //converting DefaultCtxEventsCbk into a Callbacks recursive tree
-  implicit def cbks[P<:Processor](cbk:DefaultCtxEventsCbk[P#Ret,P#Key,P#Kind]):Callbacks[P#Element,P#Status,P#Ret,P#Key,P#Kind] = builder(cbk)
+  implicit def cbks[P<:CtxCore](cbk:DefaultCtxEventsCbk[P#Ret,P#Key,P#Kind]):Callbacks[P#Element,P#Status,P#Ret,P#Key,P#Kind] = builder(cbk)
   
   val readTagIdx = 0
   val fastWarnIdx = 1

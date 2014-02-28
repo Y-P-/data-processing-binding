@@ -1,9 +1,11 @@
 package loader.features
 
 import scala.collection.Map
-import loader.Element
 
 trait SubstBuilder {
+  
+  type Element = loader.core.definition.Processor#Element
+  
   /**
    * Builds a variable substituter.
    * Note: a naming scheme is assumed, that lets easily identify variables.

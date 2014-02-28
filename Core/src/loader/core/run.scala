@@ -35,8 +35,8 @@ object run {
 
   
   /** The nominal runner on an existing element, i.e. this includes the new parser in the current processor */
-  def include[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor { type BaseParser>:P }]
-        (p:P,e:M#Element)(mapper:(p.Elt[e.proc.Key,e.proc.Kind,e.proc.Ret],p.Value)=>e.proc.Kind, keyMapper:(p.Elt[e.proc.Key,e.proc.Kind,e.proc.Ret],p.Key)=>e.proc.Key, run:p.Parser[e.proc.Key,e.proc.Kind,e.proc.Ret]=>Unit):e.proc.Ret
+  def include1[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor { type BaseParser>:P }]
+        (p:P,e:M#Elt)(mapper:(p.Elt[e.proc.Key,e.proc.Kind,e.proc.Ret],p.Value)=>e.proc.Kind, keyMapper:(p.Elt[e.proc.Key,e.proc.Kind,e.proc.Ret],p.Key)=>e.proc.Key, run:p.Parser[e.proc.Key,e.proc.Kind,e.proc.Ret]=>Unit):e.proc.Ret
     = include(p,e.proc)(e.myself,mapper,keyMapper,run)
 
 }

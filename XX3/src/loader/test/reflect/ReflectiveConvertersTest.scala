@@ -27,7 +27,7 @@ import loader.reflect.Converters
  */
 object ReflectiveConvertersTest {
   import loader.core.definition.Processor
-  import loader.core.CtxCore.{ Processor => CtxProcessor }
+  import loader.core.CtxCore
 
   abstract class WithCheck {
     def n:Int
@@ -102,11 +102,11 @@ object ReflectiveConvertersTest {
     def invoke(out:PrintWriter, n:Int):W = { out.println(s"invoked V.toV$n"); new W(out) }
     def toV1(u:S,fd:ConvertData,e:Processor#Elt):V = invoke(u.out,1)
     def toV2(u:S,fd:ConvertData):V = invoke(u.out,2)
-    def toV3(u:S,e:CtxProcessor#Elt):W = invoke(u.out,3)
+    def toV3(u:S,e:CtxCore#Elt):W = invoke(u.out,3)
     def toV4(u:S):W = invoke(u.out,4)
     def toV5(u:T,fd:ConvertData,e:Processor#Elt):V = invoke(u.out,5)
     def toV6(u:T,fd:ConvertData):V = invoke(u.out,6)
-    def toV7(u:T,e:CtxProcessor#Elt):W = invoke(u.out,7)
+    def toV7(u:T,e:CtxCore#Elt):W = invoke(u.out,7)
     def toV8(u:T):W = invoke(u.out,8)
   }
   
@@ -117,7 +117,7 @@ object ReflectiveConvertersTest {
     def toV2(fd:ConvertData):V = invoke(2)
     def toV3(e:Processor#Elt):V = invoke(3)
     def toV4():V = invoke(4)
-    def toV5(e:loader.core.CtxCore.Processor#Elt,fd:ConvertData):V = invoke(5) //this also check that order is not important
+    def toV5(e:loader.core.CtxCore#Elt,fd:ConvertData):V = invoke(5) //this also check that order is not important
     def toV6(e:Processor#Elt,fd:ConvertData):V = invoke(6)
   }
   
@@ -126,22 +126,22 @@ object ReflectiveConvertersTest {
   
   class X0(fd:ConvertData) {
     def invoke(out:PrintWriter, n:Int):W = { out.println(s"invoked V.toV$n"); new W(out) }
-    def toV3(u:S,e:CtxProcessor#Elt):W = invoke(u.out,3)
+    def toV3(u:S,e:CtxCore#Elt):W = invoke(u.out,3)
     def toV4(u:T,e:Processor#Elt):W    = invoke(u.out,4)
   }
   class X1(fd:ConvertData) extends X0(fd) {
     def toV1(u:S,e:Processor#Elt):V    = invoke(u.out,1)
-    def toV2(u:T,e:CtxProcessor#Elt):V = invoke(u.out,2)
+    def toV2(u:T,e:CtxCore#Elt):V = invoke(u.out,2)
   }
 
   class Y0(fd:ConvertData) {
     def invoke(out:PrintWriter, n:Int):W = { out.println(s"invoked V.toV$n"); new W(out) }
-    def fromX(u:S,e:CtxProcessor#Elt):W = invoke(u.out,3)
+    def fromX(u:S,e:CtxCore#Elt):W = invoke(u.out,3)
     def fromY(u:T,e:Processor#Elt):W    = invoke(u.out,4)
   }
   class Y1(fd:ConvertData) extends Y0(fd) {
     def fromX(u:S,e:Processor#Elt):V    = invoke(u.out,1)
-    def fromY(u:T,e:CtxProcessor#Elt):V = invoke(u.out,2)
+    def fromY(u:T,e:CtxCore#Elt):V = invoke(u.out,2)
   }
   
   /** Test to verify that DataActors are correctly found */
@@ -169,8 +169,8 @@ object ReflectiveConvertersTest {
       
       //checking sub-classes for Def#Elt
       out0.println(Converters(cS, cS, cV, "toV5"))  //None: CtxCore.Def#Elt cannot accept definition.Def#Elt
-      out0.println(Converters(cS, cS, cV, "toV5")(ClassTag(classOf[loader.core.CtxCore.Processor#Elt])))
-      out0.println(Converters(cS, cS, cV, "toV1")(ClassTag(classOf[loader.core.CtxCore.Processor#Elt])))
+      out0.println(Converters(cS, cS, cV, "toV5")(ClassTag(classOf[loader.core.CtxCore#Elt])))
+      out0.println(Converters(cS, cS, cV, "toV1")(ClassTag(classOf[loader.core.CtxCore#Elt])))
       
       //checking that all converters are found properly when using derived classes in various places
       out0.println ("---- S to V ----")
@@ -182,26 +182,26 @@ object ReflectiveConvertersTest {
       out0.println ("---- T to V ----")
       for (i <- 1 to 8) check0[Processor#Elt](W.getClass,classOf[T],classOf[V],i)     //1,2,4,5,6,8
       out0.println ("---- S to V using CtxProcessor#Elt ----")
-      for (i <- 1 to 8) check0[CtxProcessor#Elt](W.getClass,classOf[S],classOf[V],i)  //1,2,3,4
+      for (i <- 1 to 8) check0[CtxCore#Elt](W.getClass,classOf[S],classOf[V],i)  //1,2,3,4
       out0.println ("---- T to W using CtxProcessor#Elt ----")
-      for (i <- 1 to 8) check0[CtxProcessor#Elt](W.getClass,classOf[T],classOf[W],i)  //3,4,7,8
+      for (i <- 1 to 8) check0[CtxCore#Elt](W.getClass,classOf[T],classOf[W],i)  //3,4,7,8
       out0.println ("---- S to W using CtxProcessor#Elt ----")
-      for (i <- 1 to 8) check0[CtxProcessor#Elt](W.getClass,classOf[S],classOf[W],i)  //3,4
+      for (i <- 1 to 8) check0[CtxCore#Elt](W.getClass,classOf[S],classOf[W],i)  //3,4
       out0.println ("---- T to V using CtxProcessor#Elt ----")
-      for (i <- 1 to 8) check0[CtxProcessor#Elt](W.getClass,classOf[T],classOf[V],i)  //1,2,3,4,5,6,7,8
+      for (i <- 1 to 8) check0[CtxCore#Elt](W.getClass,classOf[T],classOf[V],i)  //1,2,3,4,5,6,7,8
       
       //checking that we can find an appropriate converter when not giving a name
       //also used to check how the Reflect framework behaves given inheritance
       out0.println ("---- S to V using CtxProcessor#Elt in X1 instancied with fd0 ----")
-      checkBase[CtxProcessor#Elt](classOf[X1], cS, cW, null) //OK, can find only V3
-      checkBase[CtxProcessor#Elt](classOf[X1], cS, cV, null) //more than one: V1,V3 (min = V3)
-      checkBase[CtxProcessor#Elt](classOf[X1], cT, cV, null) //more than one: V1,V2,V3,V4 (min = V2)
-      checkBase[CtxProcessor#Elt](classOf[X1], cT, cW, null) //no, more than one: V3,V4 (no min)
+      checkBase[CtxCore#Elt](classOf[X1], cS, cW, null) //OK, can find only V3
+      checkBase[CtxCore#Elt](classOf[X1], cS, cV, null) //more than one: V1,V3 (min = V3)
+      checkBase[CtxCore#Elt](classOf[X1], cT, cV, null) //more than one: V1,V2,V3,V4 (min = V2)
+      checkBase[CtxCore#Elt](classOf[X1], cT, cW, null) //no, more than one: V3,V4 (no min)
       out0.println ("---- S to V using CtxProcessor#Elt in X0 instancied with fd0 ----")
-      checkBase[CtxProcessor#Elt](classOf[X0], cS, cW, null) //OK, can find only V3
-      checkBase[CtxProcessor#Elt](classOf[X0], cS, cV, null) //OK, can find only V3
-      checkBase[CtxProcessor#Elt](classOf[X0], cT, cV, null) //no, more than one: V3,V4 (no min)
-      checkBase[CtxProcessor#Elt](classOf[X0], cT, cW, null) //no, more than one: V3,V4 (no min)
+      checkBase[CtxCore#Elt](classOf[X0], cS, cW, null) //OK, can find only V3
+      checkBase[CtxCore#Elt](classOf[X0], cS, cV, null) //OK, can find only V3
+      checkBase[CtxCore#Elt](classOf[X0], cT, cV, null) //no, more than one: V3,V4 (no min)
+      checkBase[CtxCore#Elt](classOf[X0], cT, cW, null) //no, more than one: V3,V4 (no min)
       out0.println ("---- S to V using Processor#Elt in X1 instancied with fd0 ----")
       checkBase[Processor#Elt](classOf[X1], cS, cW, null) //no
       checkBase[Processor#Elt](classOf[X1], cS, cV, null) //OK, can find only V1
@@ -217,15 +217,15 @@ object ReflectiveConvertersTest {
       //this is broadly a copy of the previous test series, with minor adaptations
       //some tests are likely redundant ; it doesn't really matter
       out0.println ("---- S to V using CtxProcessor#Elt in Y1 instancied with fd0 ----")
-      checkBase[CtxProcessor#Elt](classOf[Y1], cS, cW, "fromX") //OK, can find only 3
-      checkBase[CtxProcessor#Elt](classOf[Y1], cS, cV, "fromX") //more than one: 1,3 (min = 3)
-      checkBase[CtxProcessor#Elt](classOf[Y1], cT, cV, "fromX") //more than one: 1,3 (min = 3)
-      checkBase[CtxProcessor#Elt](classOf[Y1], cT, cW, "fromX") //OK, can find only 3
+      checkBase[CtxCore#Elt](classOf[Y1], cS, cW, "fromX") //OK, can find only 3
+      checkBase[CtxCore#Elt](classOf[Y1], cS, cV, "fromX") //more than one: 1,3 (min = 3)
+      checkBase[CtxCore#Elt](classOf[Y1], cT, cV, "fromX") //more than one: 1,3 (min = 3)
+      checkBase[CtxCore#Elt](classOf[Y1], cT, cW, "fromX") //OK, can find only 3
       out0.println ("---- S to V using CtxProcessor#Elt in Y0 instancied with fd0 ----")
-      checkBase[CtxProcessor#Elt](classOf[Y0], cS, cW, "fromX") //OK, can find only 3
-      checkBase[CtxProcessor#Elt](classOf[Y0], cS, cV, "fromX") //OK, can find only 3
-      checkBase[CtxProcessor#Elt](classOf[Y0], cT, cV, "fromX") //OK, can find only 3
-      checkBase[CtxProcessor#Elt](classOf[Y0], cT, cW, "fromX") //OK, can find only 3
+      checkBase[CtxCore#Elt](classOf[Y0], cS, cW, "fromX") //OK, can find only 3
+      checkBase[CtxCore#Elt](classOf[Y0], cS, cV, "fromX") //OK, can find only 3
+      checkBase[CtxCore#Elt](classOf[Y0], cT, cV, "fromX") //OK, can find only 3
+      checkBase[CtxCore#Elt](classOf[Y0], cT, cW, "fromX") //OK, can find only 3
       out0.println ("---- S to V using Processor#Elt in Y1 instancied with fd0 ----")
       checkBase[Processor#Elt](classOf[Y1], cS, cW, "fromX") //no
       checkBase[Processor#Elt](classOf[Y1], cS, cV, "fromX") //OK, can find only 1
