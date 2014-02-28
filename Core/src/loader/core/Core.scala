@@ -20,10 +20,16 @@ trait Core extends definition.Impl {
       def apply(parser:Parser, parent: Element, c: Status, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,motor,c.key,parent,cb,cbks:_*)
     }
   }
-    
+  /*
+  val builder = new EltBuilder {
+    def apply(parser:Parser, parent: Element, c: Status)                      = new Elt(parser,motor,c.key,parent)
+    def apply(parser:Parser, parent: Element, c: Status, cbks: Cbks*)         = new ElementCbks(parser,motor,c.key,parent,cbks:_*)
+    def apply(parser:Parser, parent: Element, c: Status, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,motor,c.key,parent,cb,cbks:_*)    
+  }
+  */
   type Element = Elt
   // Element implementation : redirect calls
-  protected class Elt(parser:Parser, motor:Motor, key: Key, parent: Element)                                    extends super.Elt(parser,motor,key,parent)
+  protected class Elt(parser:Parser, motor:Motor, key: Key, parent: Element)                                    extends super.Elt(parser,motor,motor.delegate,key,parent)
   protected class ElementCbks(parser:Parser, motor:Motor, key: Key, parent: Element, val cbks: Cbks*)           extends Elt(parser,motor,key,parent)                 with WithCallbacks
   protected class ElementCbk (parser:Parser, motor:Motor, key: Key, parent: Element, val cb: Cbk, cbks: Cbks*)  extends ElementCbks(parser,motor,key,parent,cbks:_*) with WithCallback {
     override def onChild(child:Element,r:Ret):Unit = super[WithCallback].onChild(child,r)

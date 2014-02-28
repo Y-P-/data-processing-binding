@@ -24,7 +24,7 @@ trait ExtCore extends definition.Impl {
   }
 
   type Element = Elt
-  protected class Elt(parser:Parser, motor:Motor, key:Key, parent:Element, val data:Data) extends super.Elt(parser,motor,key,parent) {
+  protected class Elt(parser:Parser, motor:Motor, key:Key, parent:Element, val data:Data) extends super.Elt(parser,motor,motor.delegate,key,parent) {
     def this(parser:Parser,motor:Motor,s:Status,parent:Element) = this(parser,motor,s.key,parent,getData(parent,s))
   }
   protected class ElementCbks(parser:Parser, motor:Motor, s:Status, parent:Element, val cbks:Cbks*)         extends Elt(parser,motor,s,parent)                 with WithCallbacks

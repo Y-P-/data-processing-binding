@@ -114,7 +114,7 @@ trait CtxCore extends definition.Impl {
   
   type Element = Elt
   //concrete class definitions
-  protected abstract class EltBase(parser:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends super.Elt(parser,motor,key,parent) with Elt {
+  protected abstract class EltBase(parser:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends super.Elt(parser,motor,motor.delegate,key,parent) with Elt {
     def this(parser:Parser, motor:Motor, s:Status, parent:Element) = this(parser,motor,s.key,parent,s.fd,s.idx,getData(parent, s))
   }
   protected class XStruct(parser:Parser,motor:Motor,s:Status,parent:Element)                             extends EltBase(parser,motor,s,parent) with Struct

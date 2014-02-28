@@ -37,7 +37,11 @@ object definition {
     type Bld     = EltBuilder
     
     val noKey:Key
-    
+    /*
+    def builder:Bld
+    def apply(s:Status,cbks:Cbks*):Parser=>Element = p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*)
+    def apply(s:Status):Parser=>Element            = builder(_,s)
+    */
     /** This is used to define the builder for an implementation.
      *  It is used to start a processor. 
      */
@@ -232,7 +236,7 @@ object definition {
    *  It redirects the element calls to the launcher class, which contains the processor logic.
    *  This lets define standard Element classes.
    */
-  trait Impl extends Processor {
+  trait Impl extends Processor {self=>
     //a factory for reading textual parameters
     //there will be other, specific factories
     def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor
@@ -243,34 +247,53 @@ object definition {
      *  It also makes it possible to easily subclass an implementation.
      */
     abstract class Motor extends super.Launcher {
-      type Result
       val builder = getBld
-      def userCtx:UserCtx
+      def delegate:Dlg[self.type,UserCtx]
+      def onName(e:Element, key: Key): Status
       protected def getBld:Bld
-      
-      def onInit():Unit
-      def onExit():Result
-      // Forwarded methods
-      def onName(self: Element, key: Key): Status
-      def onInit(self: Element):Unit
-      def onBeg(self: Element): Unit
-      def onVal(self: Element, v: Kind): Ret
-      def onEnd(self: Element): Ret
-      def onChild(self: Element, child: Element, r: Ret): Unit
+    }
+    
+    /** Forwards the base methods to a companion object.
+     *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
+     *  defining all behaviours. Using Delegates makes it easier to define processors, all using a common element base.
+     *  It also makes it possible to easily subclass an implementation.
+     */
+    trait DelegElt { this:Element=>
+      def motor:Motor
+      protected[this] val delegate:Dlg[self.type,UserCtx]
+      protected def onName(key: Key)                      = motor.onName(this,key)
+      protected def onInit(): Unit                        = delegate.onInit(this)
+      protected def onBeg(): Unit                         = delegate.onBeg(this)
+      protected def onVal(v: Kind): Ret                   = delegate.onVal(this,v)
+      protected def onEnd(): Ret                          = delegate.onEnd(this)
+      protected def onChild(child: Element, r: Ret): Unit = delegate.onChild(this,child,r)      
     }
     
     // Element implementation : redirect calls
-    abstract class Elt(protected[this] var parser0:Parser,val motor:Motor,val key:Key,val parent:Element) extends super.Elt { this:Element=>
+    abstract class Elt(protected[this] var parser0:Parser,val motor:Motor,val delegate:Dlg[self.type,UserCtx],val key:Key,val parent:Element) extends super.Elt with DelegElt { this:Element=>
       def parser = parser0  //we would rather not have this var, but the alternative is not good either.
       protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
-      def userCtx = motor.userCtx
+      def userCtx = delegate.userCtx
       def builder = motor.builder
-      protected def onName(key: Key): Status              = motor.onName(this,key)
-      protected def onInit(): Unit                        = motor.onInit(this)
-      protected def onBeg(): Unit                         = motor.onBeg(this)
-      protected def onVal(v: Kind): Ret                   = motor.onVal(this,v)
-      protected def onEnd(): Ret                          = motor.onEnd(this)
-      protected def onChild(child: Element, r: Ret): Unit = motor.onChild(this,child,r)
-    }      
+    }
   }
+  
+  /** The delegate executes the required calls for an element.
+   */
+  trait Delegate[-E,-K,-V,+S,+U,R] {
+    protected[this] type Elt=E  //for easy method definitions
+    type Result
+    def userCtx:U
+      
+    def onInit():Unit
+    def onExit():Result
+    // Forwarded methods
+    def onInit(self: E):Unit
+    def onBeg(self: E): Unit
+    def onVal(self: E, v: V): R
+    def onEnd(self: E): R
+    def onChild(self: E, child: E, r: R): Unit
+  }
+  type Dlg[P<:Processor,U<:P#UserCtx] = Delegate[P#Element,P#Key,P#Kind,P#Status,U,P#Ret]
+  
 }
