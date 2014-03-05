@@ -23,30 +23,30 @@ object definition {
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
   trait Processor { selfDef=>
-    type Kind>:Null    //the kind of data processed by this processor
+    type Value>:Null   //the Value type of data processed by this processor
     type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
     type BaseParser <: ParserBuilder
     type Status >: Null <:definition.Status[Key]
     type Element >: Null <: Elt  //the base implementation
     
+    //useful type shortcuts
     type UserCtx = UserContext[selfDef.type]    
     type Parser  = BaseParser#Parser[_,_,Ret]
-    type Cbk     = callbacks.Callback[Element,Status,Ret,Key,Kind]
-    type Cbks    = callbacks.Callbacks[Element,Status,Ret,Key,Kind]
+    type Cbk     = callbacks.Callback[Element,Status,Ret,Key,Value]
+    type Cbks    = callbacks.Callbacks[Element,Status,Ret,Key,Value]
+    type CbksBld = callbacks.CallbacksBuilder[Element,Status,Ret,Key,Value]
     type Bld     = EltBuilder
+    type Dlg     = Delegate[Element,Key,Value,Status,UserCtx,Ret]
     
     val noKey:Key
-    /*
-    def builder:Bld
-    def apply(s:Status,cbks:Cbks*):Parser=>Element = p=>if (cbks.isEmpty) builder(p,s) else builder(p,s,cbks:_*)
-    def apply(s:Status):Parser=>Element            = builder(_,s)
-    */
+    
     /** This is used to define the builder for an implementation.
      *  It is used to start a processor. 
      */
     trait Launcher {
-      val proc:Processor.this.type = Processor.this
+      type Proc = Processor.this.type
+      val proc:Proc = Processor.this
       def myself:proc.Launcher = this  //prevents some non necessary casts
       def builder:Bld
               
@@ -92,10 +92,10 @@ object definition {
       protected def onName(key: Key): Status
       protected def onInit(): Unit                           //called on all elements on creation
       protected def onBeg(): Unit                            //called once only, before any other call within struct, as late as possible (i.e. only when receiving the first child, or when closing the struct)
-      protected def onVal(v: Kind): Ret                      //called when receiving a value
+      protected def onVal(v: Value): Ret                      //called when receiving a value
       protected def onEnd(): Ret                             //called at the end of a struct
       protected def onChild(child: Element, r: Ret): Unit    //called when a struct is receiving a child value
-      protected def onSolver(v: Kind, e: ()=>Ret): Ret = e() //called when resolving a value (as defined by the EltCtx solver) ; you had better know what you do if you override this
+      protected def onSolver(v: Value, e: ()=>Ret): Ret = e() //called when resolving a value (as defined by the EltCtx solver) ; you had better know what you do if you override this
       
       /** current depth in the hierarchy; 0 is top */
       def depth:Int = if (parent==null) 0 else parent.depth+1
@@ -115,7 +115,7 @@ object definition {
        */
       def push(n:Key):Processor.this.Element = { val c=build(parser,onName(n)); c.onInit(); c }
       def pull()         = { doBeg(); parent.onChild(this, onEnd()) }
-      def pull(v:Kind)   = {
+      def pull(v:Value)   = {
         parent.doBeg
         parent.onChild(this,
           eltCtx.solver(v) match {
@@ -134,7 +134,7 @@ object definition {
       /** Some convenient methods.
        *  Methods prefixed by g are general and use up the full parent chain.
        *  By contrast, the non preficed method only use the chain with items of the same
-       *  kind ; this is the most common occurence.
+       *  Value ; this is the most common occurence.
        */
       def isRoot: Boolean = parent==null        //head of stack
       def isInclude: Boolean = parent match {   //head of sub-stack (i.e. include)
@@ -173,12 +173,12 @@ object definition {
      */
     trait WithCallback extends WithCallbacks { this: Element =>
       /** When handling Callbacks, we will want to reach the parent behaviour. */
-      val cb: callbacks.Callback[Element,Status,Ret,Key,Kind] //the callback for the current element
+      val cb: callbacks.Callback[Element,Status,Ret,Key,Value] //the callback for the current element
       val cbx = cb(this)
       abstract override protected def onName(key: Key): Status              = if (cbx==null) super.onName(key) else cbx.onName(key, super.onName)
       abstract override protected def onBeg(): Unit                         = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
-      abstract override protected def onVal(v: Kind): Ret                   = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
-      abstract override protected def onSolver(v: Kind, x: ()=>Ret): Ret    = if (cbx==null) super.onSolver(v,x) else cbx.onSolver(v, x, super.onSolver)
+      abstract override protected def onVal(v: Value): Ret                   = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
+      abstract override protected def onSolver(v: Value, x: ()=>Ret): Ret    = if (cbx==null) super.onSolver(v,x) else cbx.onSolver(v, x, super.onSolver)
       abstract override protected def onEnd(): Ret                          = if (cbx==null) super.onEnd() else cbx.onEnd(super.onEnd)
       abstract override protected def onChild(child: Element, r: Ret): Unit = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
     }
@@ -246,35 +246,28 @@ object definition {
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      *  It also makes it possible to easily subclass an implementation.
      */
-    abstract class Motor extends super.Launcher {
-      val builder = getBld
-      def delegate:Dlg[self.type,UserCtx]
-      def onName(e:Element, key: Key): Status
-      protected def getBld:Bld
+    type Motor<:Launcher
+    trait Launcher extends super.Launcher with Dlg { this:Motor=>
+      final val builder:Bld = Impl.this.builder(this)
     }
-    
+    def builder(m:Motor):Bld
+        
     /** Forwards the base methods to a companion object.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Delegates makes it easier to define processors, all using a common element base.
      *  It also makes it possible to easily subclass an implementation.
      */
-    trait DelegElt { this:Element=>
-      def motor:Motor
-      protected[this] val delegate:Dlg[self.type,UserCtx]
-      protected def onName(key: Key)                      = motor.onName(this,key)
-      protected def onInit(): Unit                        = delegate.onInit(this)
-      protected def onBeg(): Unit                         = delegate.onBeg(this)
-      protected def onVal(v: Kind): Ret                   = delegate.onVal(this,v)
-      protected def onEnd(): Ret                          = delegate.onEnd(this)
-      protected def onChild(child: Element, r: Ret): Unit = delegate.onChild(this,child,r)      
-    }
-    
-    // Element implementation : redirect calls
-    abstract class Elt(protected[this] var parser0:Parser,val motor:Motor,val delegate:Dlg[self.type,UserCtx],val key:Key,val parent:Element) extends super.Elt with DelegElt { this:Element=>
+    abstract class Elt(protected[this] var parser0:Parser,val motor:Motor,val key:Key,val parent:Element) extends super.Elt { this:Element=>
       def parser = parser0  //we would rather not have this var, but the alternative is not good either.
       protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
-      def userCtx = delegate.userCtx
+      def userCtx = motor.userCtx
       def builder = motor.builder
+      protected def onName(key: Key)                      = motor.onName(this,key)
+      protected def onInit(): Unit                        = motor.onInit(this)
+      protected def onBeg(): Unit                         = motor.onBeg(this)
+      protected def onVal(v: Value): Ret                   = motor.onVal(this,v)
+      protected def onEnd(): Ret                          = motor.onEnd(this)
+      protected def onChild(child: Element, r: Ret): Unit = motor.onChild(this,child,r)      
     }
   }
   
@@ -288,12 +281,33 @@ object definition {
     def onInit():Unit
     def onExit():Result
     // Forwarded methods
-    def onInit(self: E):Unit
-    def onBeg(self: E): Unit
-    def onVal(self: E, v: V): R
-    def onEnd(self: E): R
-    def onChild(self: E, child: E, r: R): Unit
+    def onName(e:E, key: K): S
+    def onInit(e: E):Unit
+    def onBeg(e: E): Unit
+    def onVal(e: E, v: V): R
+    def onEnd(e: E): R
+    def onChild(e: E, child: E, r: R): Unit
   }
-  type Dlg[P<:Processor,U<:P#UserCtx] = Delegate[P#Element,P#Key,P#Kind,P#Status,U,P#Ret]
+  //for simplicity when used on a given processor ; loses variance information, hence generality.
+  type Dlg[P<:Processor] = Delegate[P#Element,P#Key,P#Value,P#Status,P#UserCtx,P#Ret]
   
+  /** A common pattern for defining a new Processor.
+   *  It is only a guideline and doesn't have to be followed, but it helps in understanding
+   *  what has to be done to write a proper processor. It also makes it easier to read a
+   *  processor code which is new.
+   */
+  abstract class ProcessorImpl {
+    //Here you fill up the spec for the implementation: mostly you close the abstract types
+    trait DefImpl extends definition.Impl {
+      //Here you create the delegate for the implementation
+      abstract class Impl(val userCtx:UserCtx) extends Dlg
+    }
+    //Here you instantiate your processor for all modes that it supports.
+    //It doesn't (and often will not) have to support all modes!
+    val ctx:CtxCore with DefImpl
+    val ext:ExtCore with DefImpl
+    val cre:Core    with DefImpl
+    //Here you provide a common way to read your specific parameters.
+    protected def readParams(pr: utils.ParamReader):Product
+  }
 }

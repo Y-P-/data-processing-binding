@@ -41,7 +41,7 @@ trait ParserBuilder {selfBuilder=>
   
   /** Actual parser implementation */
   type Parser[k,v,r] <: Impl[k,v,r]
-  type Proc[k,v,r]   = BaseProcessor { type Kind=v; type Key=k; type Ret=r }
+  type Proc[k,v,r]   = BaseProcessor { type Value=v; type Key=k; type Ret=r }
   type Elt[k,v,r]    = Proc[k,v,r]#Element
   type Launch[k,v,r] = Proc[k,v,r]#Launcher
   

@@ -8,7 +8,7 @@ import loader.core.context.FieldAnnot
 
 abstract class UserContext[-M<:Processor] {
   protected[this] type Proc = M
-  protected[this] type Elt = M#Elt
+  protected[this] type Elt  = M#Elt
   //the handler for generated events 
   def eventHandler:EventHandler[M] = null
   //parameter that asks the parser to accelerate where it can (i.e. skip unecessary data)
@@ -18,13 +18,10 @@ abstract class UserContext[-M<:Processor] {
   
   protected[this] class EltContext(protected[this] val elt:Elt) {
     /** Solving an include for e with data K */
-    def solver(s:M#Kind):()=>M#Ret = null
+    def solver(s:M#Value):()=>M#Ret = null
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
   }
-}
-object UserContext {
-  type Ctx[-k,-P<:Processor { type Kind <: k }] = UserContext[P]
 }
 
 
@@ -40,11 +37,11 @@ class UsrCtx[-P<:ParserBuilder { type BaseProcessor >: M},-M<:Processor { type B
     
   protected[this] class EltCtx(protected[this] val elt:M#Element) {
     /** Solving an include for e with data K */
-    def solver(s:M#Kind):()=>M#Ret = null
+    def solver(s:M#Value):()=>M#Ret = null
     /** Solving an include for e with data K */
     def keyMap(s:P#Key):M#Key = null
     /** Solving an include for e with data K */
-    def valMap(s:P#Value):M#Kind = null
+    def valMap(s:P#Value):M#Value = null
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
     /** maps the context in case of an include (different methods may be required) */

@@ -72,4 +72,9 @@ abstract class Callback[-E0,-S0,-R0,K,V>:Null] { self=>
       }
     }
   }
+  //will easily turn a single callback to a recursive one, where the implicit fails
+  def * = (new CallbacksBuilder[E0,S0,R0,K,V])(this)
+}
+object Callback {
+  implicit def toCbks[E0,S0,R0,K,V>:Null](cbk:Callback[E0,S0,R0,K,V]):Callbacks[E0,S0,R0,K,V] = cbk*
 }

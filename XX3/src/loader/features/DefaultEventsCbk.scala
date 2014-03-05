@@ -27,14 +27,14 @@ case class IncludeSuccessEvt[V>:Null](info:V)                        extends Def
  *  the processing state. In particular, it uses the Context#FieldMapping definition
  *  in order to check the validity of read fields.
  */
-class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[CtxCore#Element,CtxCore#Status,R0,K,V] {
+class DefaultCtxEventsCbk[P<:CtxCore] extends Callback[P#Element,P#Status,P#Ret,P#Key,P#Value] {
   /** Note that to avoid useless calls, we break down the Default event generator into three pieces,
-   *  one for each kind of element. There is scarce common code between them.
+   *  one for each Value of element. There is scarce common code between them.
    */
-  override def apply(e0:CtxCore#Element):Inner = e0 match {
+  override def apply(e0:P#Element):Inner = e0 match {
     //Struct events
-    case stc: CtxCore#Struct => new Inner(e0) {
-      override def onName[S<:CtxCore#Status](key:K, f: (K)=>S):S = {
+    case stc: P#Struct => new Inner(e0) {
+      override def onName[S<:P#Status](key:P#Key, f: (P#Key)=>S):S = {
         import ParserBuilder._
         val s = try { f(key) } catch {
           case x:SkipException => elt(IgnoredTagEvt(key.toString)); throw x
@@ -47,18 +47,18 @@ class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[CtxCore#Element,C
           if (stc.doFast) stc(FastWarnEvt()) else stc(FastDisabledEvt())
         f
       }
-      override def onVal[R<:R0](s:V, f: (V)=>R):R = {
+      override def onVal[R<:P#Ret](s:P#Value, f: (P#Value)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onSolver[R<:R0](s:V, r0:()=>R, f: (V,()=>R)=>R):R = {
+      override def onSolver[R<:P#Ret](s:P#Value, r0:()=>R, f: (P#Value,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onEnd[R<:R0](f: =>R):R = {
+      override def onEnd[R<:P#Ret](f: =>R):R = {
         if (stc.fd.loader!=null)
           for (f <- stc.tags.values)
             if (!stc.seen.contains(f.inName))
@@ -75,19 +75,19 @@ class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[CtxCore#Element,C
       }
     }
     //Lists events
-    case lst: CtxCore#List => new Inner(e0) {
-      override def onVal[R<:R0](s:V, f: (V)=>R):R = {
+    case lst: P#List => new Inner(e0) {
+      override def onVal[R<:P#Ret](s:P#Value, f: (P#Value)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onSolver[R<:R0](s:V, r0:()=>R, f: (V,()=>R)=>R):R = {
+      override def onSolver[R<:P#Ret](s:P#Value, r0:()=>R, f: (P#Value,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onEnd[R<:R0](f: =>R):R = {
+      override def onEnd[R<:P#Ret](f: =>R):R = {
         if (lst.fd.annot.min>0 && lst.index<lst.fd.annot.min || lst.fd.annot.max>0 && lst.index>lst.fd.annot.max)
           lst.parent(InvalidCardinalityEvt(lst.name, lst.fd.annot.min, lst.fd.annot.max, lst.index))
         val r = f
@@ -97,12 +97,12 @@ class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[CtxCore#Element,C
     }
     //Terminal events
     case _ => new Inner(e0) {
-      override def onVal[R<:R0](s:V, f: (V)=>R):R = {
+      override def onVal[R<:P#Ret](s:P#Value, f: (P#Value)=>R):R = {
         val r = f(s)
         elt(ReadTagEvt(r, s))
         r
       }
-      override def onSolver[R<:R0](s:V, r0:()=>R, f: (V,()=>R)=>R):R = {
+      override def onSolver[R<:P#Ret](s:P#Value, r0:()=>R, f: (P#Value,()=>R)=>R):R = {
         val r = f(s,r0)
         elt(IncludeSuccessEvt(s))
         elt(ReadTagEvt(r, s))
@@ -113,11 +113,9 @@ class DefaultCtxEventsCbk[R0,K>:Null,V>:Null] extends Callback[CtxCore#Element,C
 }
 object DefaultCtxEventsCbk {
   import scala.language.implicitConversions
-  import loader.core.callbacks.Callbacks
-  //a builder for Callbacks
-  def builder[P<:CtxCore] = new CallbacksBuilder[P#Element,P#Status,P#Ret,P#Key,P#Kind]
-  //converting DefaultCtxEventsCbk into a Callbacks recursive tree
-  implicit def cbks[P<:CtxCore](cbk:DefaultCtxEventsCbk[P#Ret,P#Key,P#Kind]):Callbacks[P#Element,P#Status,P#Ret,P#Key,P#Kind] = builder(cbk)
+  
+  def apply[P<:CtxCore] = new DefaultCtxEventsCbk[P]
+  
   
   val readTagIdx = 0
   val fastWarnIdx = 1

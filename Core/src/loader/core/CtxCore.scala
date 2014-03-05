@@ -88,33 +88,33 @@ trait CtxCore extends definition.Impl {
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
-  abstract class Motor extends super.Motor {
+  type Motor = Launcher
+  trait Launcher extends super.Launcher {
+    //a default stub ; it has to be overriden by the Struct/List/Terminal implementation
+    final def onName(e:Element,key:Key): Nothing  = ???
     //top factories
     def apply(fd:Context#FieldMapping,cbks:Cbks*):Parser=>Element = apply(noStatus(fd), cbks:_*)
     def apply(fd:Context#FieldMapping):Parser=>Element            = apply(noStatus(fd))
-    
-    //a default stub ; it has to be overriden by the Struct/List/Terminal implementation
-    final def onName(e:Element,key:Key): Status  = ???
-    
-    override protected def getBld = new Bld {
-      def apply(parser:Parser, parent: Element, s: Status) =
-        if      (s.fd.isList)   new XList(parser, Motor.this, s, parent)
-        else if (s.fd.isStruct) new XStruct(parser, Motor.this, s, parent)
-        else                    new XTerminal(parser, Motor.this, s, parent)
-      def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*) =
-        if      (s.fd.isList)   new XListCbks(parser, Motor.this, s, parent, cbks:_*)
-        else if (s.fd.isStruct) new XStructCbks(parser, Motor.this, s, parent, cbks:_*)
-        else                    new XTerminalCbks(parser, Motor.this, s, parent, cbks:_*)
-      def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) =
-        if      (s.fd.isList)   new XListCbk(parser, Motor.this, s, parent, cb, cbks:_*)
-        else if (s.fd.isStruct) new XStructCbk(parser, Motor.this, s, parent, cb, cbks:_*)
-        else                    new XTerminalCbk(parser, Motor.this, s, parent, cb, cbks:_*)
-    }
+  }
+  
+  def builder(m:Motor) = new Bld {
+    def apply(parser:Parser, parent: Element, s: Status) =
+      if      (s.fd.isList)   new XList(parser, m, s, parent)
+      else if (s.fd.isStruct) new XStruct(parser, m, s, parent)
+      else                    new XTerminal(parser, m, s, parent)
+    def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*) =
+      if      (s.fd.isList)   new XListCbks(parser, m, s, parent, cbks:_*)
+      else if (s.fd.isStruct) new XStructCbks(parser, m, s, parent, cbks:_*)
+      else                    new XTerminalCbks(parser, m, s, parent, cbks:_*)
+    def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) =
+      if      (s.fd.isList)   new XListCbk(parser, m, s, parent, cb, cbks:_*)
+      else if (s.fd.isStruct) new XStructCbk(parser, m, s, parent, cb, cbks:_*)
+      else                    new XTerminalCbk(parser, m, s, parent, cb, cbks:_*)
   }
   
   type Element = Elt
   //concrete class definitions
-  protected abstract class EltBase(parser:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends super.Elt(parser,motor,motor.delegate,key,parent) with Elt {
+  protected abstract class EltBase(parser:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends super.Elt(parser,motor,key,parent) with Elt {
     def this(parser:Parser, motor:Motor, s:Status, parent:Element) = this(parser,motor,s.key,parent,s.fd,s.idx,getData(parent, s))
   }
   protected class XStruct(parser:Parser,motor:Motor,s:Status,parent:Element)                             extends EltBase(parser,motor,s,parent) with Struct
@@ -129,5 +129,6 @@ trait CtxCore extends definition.Impl {
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
+  //using Abstract prevents code bloating due to trait expension
   abstract class Abstract[D] extends CtxCore { type Data=D }
 }

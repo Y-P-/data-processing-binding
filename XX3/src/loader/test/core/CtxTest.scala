@@ -25,18 +25,19 @@ object CtxTest {
     case null => throw new java.io.IOException(s"resource $rsc could not be found")
     case url  => url
   }
-  val p = new parsers.Struct(256,40,false)
-  val userCtx = new loader.core.UserContext[CtxCore { type BaseParser>:parsers.Struct; type Kind=String }] {
+  //a generic context that works with any parser for a string processor
+  val userCtx = new loader.core.UserContext[CtxCore { type BaseParser=ParserBuilder; type Value=String }] {
     val buf = new java.io.StringWriter
     override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
     def apply(e:Elt) = new EltContext(e)
     class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
-      override def solver(s:Proc#Kind):()=>Proc#Ret = {
-        if (!s.asInstanceOf[String].startsWith("@include:")) return null
-        ()=>run.include1[parsers.Struct,Proc](p,e)((u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
+      override def solver(s:Proc#Value):()=>Proc#Ret = {
+        if (!s.startsWith("@include:")) return null
+        ()=>run.include(p,e)((u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
       }
     }
   }
+  val p = new parsers.Struct(256,40,false)
     
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
@@ -53,9 +54,8 @@ object CtxTest {
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       val m = motors.Struct.ctx(out,2,userCtx)
-      //XXX was implicit to cast callback to callbacks
       try {
-        val r:Int = run(p,m)(_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk.cbks[motors.Struct.ctx.type](new DefaultCtxEventsCbk[Int,String,String])),null,null,_.read(load("small"), "UTF-8"))
+        val r:Int = run(p,m)(_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk[m.Proc]*),null,null,_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
         userCtx.buf.getBuffer.setLength(0)
