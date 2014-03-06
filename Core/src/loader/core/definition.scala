@@ -37,7 +37,6 @@ object definition {
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Key,Value]
     type CbksBld = callbacks.CallbacksBuilder[Element,Status,Ret,Key,Value]
     type Bld     = EltBuilder
-    type Dlg     = Delegate[Element,Key,Value,Status,UserCtx,Ret]
     
     val noKey:Key
     
@@ -233,10 +232,12 @@ object definition {
   }
   
   /** A possible implementation for the framework.
-   *  It redirects the element calls to the launcher class, which contains the processor logic.
-   *  This lets define standard Element classes.
+   *  It redirects the element calls to the delegate class, which contains the processor logic.
+   *  This lets define standard Element classes because they now don't contain themselves the processing logic.
    */
   trait Impl extends Processor {self=>
+    //the delegate type which will be used as the processor logic
+    type Dlg = Delegate[Element,Key,Value,Status,UserCtx,Ret]
     //a factory for reading textual parameters
     //there will be other, specific factories
     def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor
