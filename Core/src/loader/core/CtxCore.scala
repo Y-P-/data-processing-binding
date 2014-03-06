@@ -21,7 +21,7 @@ trait CtxCore extends definition.Impl {
   type Status = CtxCore.Status[Key]
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
-  type Data
+  protected[this] type Data
   def getData(parent:Element,s:Status):Data
     
   trait Elt extends super.Elt { this:Elt with Element=>
@@ -130,5 +130,5 @@ trait CtxCore extends definition.Impl {
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
   //using Abstract prevents code bloating due to trait expension
-  abstract class Abstract[D] extends CtxCore { type Data=D }
+  abstract class Abstract[+D] extends CtxCore { protected[this] type Data=D }
 }

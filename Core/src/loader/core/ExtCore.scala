@@ -7,7 +7,7 @@ trait ExtCore extends definition.Impl {
   type Status = ExtCore.Status[Key]
   protected[this] val noStatus = new Status(noKey)
     
-  type Data  //some data used in association to the element
+  protected[this] type Data  //some data used in association to the element
   def getData(parent:Element,s:Status):Data
   
   type Motor=Launcher
@@ -35,5 +35,5 @@ trait ExtCore extends definition.Impl {
 object ExtCore {
   class Status[K>:Null](key:K) extends Core.Status(key)
   //using Abstract prevents code bloating due to trait expension
-  abstract class Abstract[D] extends ExtCore { type Data=D }
+  abstract class Abstract[+D] extends ExtCore { protected[this] type Data=D }
 }

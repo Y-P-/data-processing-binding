@@ -18,7 +18,7 @@ abstract class UserContext[-M<:Processor] {
   
   protected[this] class EltContext(protected[this] val elt:Elt) {
     /** Solving an include for e with data K */
-    def solver(s:M#Value):()=>M#Ret = null
+    def solver(m:M,s:M#Value):()=>M#Ret = null
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
   }
@@ -29,12 +29,17 @@ abstract class UserContext[-M<:Processor] {
 //      context of the framework, it is of no importance here.
 //      of course, contexts built with no regards with these constraint
 //      won't be of any real use...
-class UsrCtx[-P<:ParserBuilder { type BaseProcessor >: M},-M<:Processor { type BaseParser >: P}] {
+class UsrCtx[-P<:ParserBuilder { type BaseProcessor >: M},-M<:Processor with Singleton] {
   def eventHandler:EventHandler[M] = null
   val fast = true
 
+  /** build an element context */
   def apply(e:M#Element):EltCtx = null
-    
+  
+  /** this defines every special action that is to be taken for a given Element.
+   *  Each element can define its own special actions: these do not have to be defined globaly.
+   *  However, if you need global actions, the previous method just has to return a constant. 
+   */
   protected[this] class EltCtx(protected[this] val elt:M#Element) {
     /** Solving an include for e with data K */
     def solver(s:M#Value):()=>M#Ret = null
@@ -45,6 +50,6 @@ class UsrCtx[-P<:ParserBuilder { type BaseProcessor >: M},-M<:Processor { type B
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
     /** maps the context in case of an include (different methods may be required) */
-    def map[P1<:ParserBuilder { type BaseProcessor >: M1}, M1<:Processor { type BaseParser >: P1}](q:P1):UsrCtx[P1,M1] = null
+   // def map[P1<:ParserBuilder { type BaseProcessor >: M1}, M1<:Processor { type BaseParser >: P1}](q:P1):UsrCtx[P1,M1] = null
   }
 }

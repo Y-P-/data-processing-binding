@@ -40,26 +40,23 @@ trait ParserBuilder {selfBuilder=>
   type BaseProcessor <: Processor { type BaseParser >: selfBuilder.type }
   
   /** Actual parser implementation */
-  type Parser[k,v,r] <: Impl[k,v,r]
-  type Proc[k,v,r]   = BaseProcessor { type Value=v; type Key=k; type Ret=r }
-  type Elt[k,v,r]    = Proc[k,v,r]#Element
-  type Launch[k,v,r] = Proc[k,v,r]#Launcher
+  type Parser[P<:BaseProcessor with Singleton] <: Impl[P]
   
-  /** This class glues together a given parser and a given processor.
+  /** This class glues together a parser spawned from this builder and a given processor.
    *  It requires:
    *  @param init, the function that will create the initial (top) element for the processor
    *               and a parser instance; the Launcher class in Processor provides such function.
    *  @param mapper, the function that lets translate the parser's Kind to the processor's Kind
    */
-  class Binder[K,V,R](val init:Parser[K,V,R]=>Elt[K,V,R], val mapper:(Elt[K,V,R],Value)=>V, val keyMapper:(Elt[K,V,R],Key)=>K)
-  def binder[K,V,R](init:Parser[K,V,R]=>Elt[K,V,R], mapper:(Elt[K,V,R],Value)=>V, keyMapper:(Elt[K,V,R],Key)=>K) = {
-    val mv:(Elt[K,V,R],Value)=>V = if (mapper==null)    (e,s)=>s.asInstanceOf[V] else mapper
-    val mk:(Elt[K,V,R],Key)=>K   = if (keyMapper==null) (e,s)=>s.asInstanceOf[K] else keyMapper
-    new Binder[K,V,R](init,mv,mk)
+  class Binder[P<:BaseProcessor with Singleton](val init:Parser[P]=>P#Element, val mapper:(P#Element,Value)=>P#Value, val keyMapper:(P#Element,Key)=>P#Key)
+  def binder[P<:BaseProcessor with Singleton](init:Parser[P]=>P#Element, mapper:(P#Element,Value)=>P#Value, keyMapper:(P#Element,Key)=>P#Key) = {
+    val mv:(P#Element,Value)=>P#Value = if (mapper==null)    (e,s)=>s.asInstanceOf[P#Value] else mapper
+    val mk:(P#Element,Key)=>P#Key     = if (keyMapper==null) (e,s)=>s.asInstanceOf[P#Key]   else keyMapper
+    new Binder[P](init,mv,mk)
   }
   
   /** factory for Parser */
-  def apply[K,V,R](bd:Binder[K,V,R]):Parser[K,V,R]
+  def apply[P<:BaseProcessor with Singleton](bd:Binder[P]):Parser[P]
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -67,15 +64,15 @@ trait ParserBuilder {selfBuilder=>
    *  in this trait.
    *  It has access to the launcher (hence the processor) if need be.
    *  It also has access to the user context.
-   *  @param launcher, the launcher used for the processor
-   *  @param exec, the executor (launcher.X) for the launcher
+   *  @param binder, which is used to attach the parser with the processor
    */
-  trait Impl[K,V,R] extends Locator { this:Parser[K,V,R]=>
+  trait Impl[P<:BaseProcessor with Singleton] extends Locator { this:Parser[P]=>
     final val builder:selfBuilder.type = selfBuilder
-    val binder:Binder[K,V,R]
-    val top:Elt[K,V,R] = binder.init(this) //creating the parser associates the top element for the bound processor.
+    val binder:Binder[P]
+    val top:P#Element = binder.init(this) //creating the parser associates the top element for the bound processor.
     private[this] var cur = top
     private[this] var ignore:Int = 0
+    //cur.eltCtx.mapper(v)
     def current = cur
     def userCtx = top.userCtx
     def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                     } catch errHandler finally { cur=cur.parent }
@@ -90,7 +87,7 @@ trait ParserBuilder {selfBuilder=>
       }
     }
     def onEnd() = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
-    def invoke(f:this.type=>Unit):R = {
+    def invoke(f:this.type=>Unit):P#Ret = {
       val r=top.invoke(f(this))
       onEnd()
       r
@@ -127,13 +124,14 @@ object ParserBuilder {
   
   /** This provides a standard API for these parser that read Characters, such as files.
    */
-  trait URLParser { this:ParserBuilder#Impl[_,_,_]=>
+  trait URLParser { this:ParserBuilder#Impl[_]=>
     def defaultEncoding = "ISO-8859-15"
 
     /** Reader from a CharReader. It is usually sufficient to fill this up. */
     def apply(d:utils.CharReader):Unit
       
     /** Read data from an URL. */
+    @throws(classOf[java.io.IOException])
     def read(url:java.net.URL,encoding:String):Unit = {
       val e = if (encoding==null) defaultEncoding else encoding
       val in = new java.io.InputStreamReader(url.openStream,e)
@@ -141,16 +139,20 @@ object ParserBuilder {
     }
     
     /** Read data from an URL with prefetch in an array. */
+    @throws(classOf[java.io.IOException])
     def readPrefetch(url:java.net.URL,encoding:String):Unit = {
       val e = if (encoding==null) defaultEncoding else encoding
       apply(utils.CharReader(utils.ByteArrayReader(url),e))
     }
     
     /** Read data from an input stream. */
+    @throws(classOf[java.io.IOException])
     def read(in: Reader): Unit = apply(in)
   }
+  
+  
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl[K,V,R] extends super.Impl[K,V,R] { this:Parser[K,V,R]=> }
+  abstract class AbstractImpl[P<:BaseProcessor with Singleton] extends super.Impl[P] { this:Parser[P]=> }
 }

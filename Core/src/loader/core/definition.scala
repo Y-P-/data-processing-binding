@@ -27,12 +27,12 @@ object definition {
     type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
     type BaseParser <: ParserBuilder
-    type Status >: Null <:definition.Status[Key]
+    type Status  >: Null <:definition.Status[Key]
     type Element >: Null <: Elt  //the base implementation
+    type Parser = (ParserBuilder { type BaseProcessor>:selfDef.type })#Parser[selfDef.type]
     
     //useful type shortcuts
     type UserCtx = UserContext[selfDef.type]    
-    type Parser  = BaseParser#Parser[_,_,Ret]
     type Cbk     = callbacks.Callback[Element,Status,Ret,Key,Value]
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Key,Value]
     type CbksBld = callbacks.CallbacksBuilder[Element,Status,Ret,Key,Value]
@@ -62,7 +62,7 @@ object definition {
      */
     trait Elt extends Launcher with Traversable[Element] { self:Element=>
       override def myself:proc.Element = this  //prevents some non necessary casts
-      implicit val eltCtx = userCtx(this)
+      val eltCtx = userCtx(this)
       /** Context for use */
       def userCtx:UserCtx
       /** Fields */
@@ -117,7 +117,7 @@ object definition {
       def pull(v:Value)   = {
         parent.doBeg
         parent.onChild(this,
-          eltCtx.solver(v) match {
+          eltCtx.solver(Processor.this,v) match {
             case null => onVal(v)
             case i    => onSolver(v,i)
           })
@@ -176,8 +176,8 @@ object definition {
       val cbx = cb(this)
       abstract override protected def onName(key: Key): Status              = if (cbx==null) super.onName(key) else cbx.onName(key, super.onName)
       abstract override protected def onBeg(): Unit                         = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
-      abstract override protected def onVal(v: Value): Ret                   = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
-      abstract override protected def onSolver(v: Value, x: ()=>Ret): Ret    = if (cbx==null) super.onSolver(v,x) else cbx.onSolver(v, x, super.onSolver)
+      abstract override protected def onVal(v: Value): Ret                  = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
+      abstract override protected def onSolver(v: Value, x: ()=>Ret): Ret   = if (cbx==null) super.onSolver(v,x) else cbx.onSolver(v, x, super.onSolver)
       abstract override protected def onEnd(): Ret                          = if (cbx==null) super.onEnd() else cbx.onEnd(super.onEnd)
       abstract override protected def onChild(child: Element, r: Ret): Unit = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
     }
@@ -266,7 +266,7 @@ object definition {
       protected def onName(key: Key)                      = motor.onName(this,key)
       protected def onInit(): Unit                        = motor.onInit(this)
       protected def onBeg(): Unit                         = motor.onBeg(this)
-      protected def onVal(v: Value): Ret                   = motor.onVal(this,v)
+      protected def onVal(v: Value): Ret                  = motor.onVal(this,v)
       protected def onEnd(): Ret                          = motor.onEnd(this)
       protected def onChild(child: Element, r: Ret): Unit = motor.onChild(this,child,r)      
     }
@@ -290,7 +290,7 @@ object definition {
     def onChild(e: E, child: E, r: R): Unit
   }
   //for simplicity when used on a given processor ; loses variance information, hence generality.
-  type Dlg[P<:Processor] = Delegate[P#Element,P#Key,P#Value,P#Status,P#UserCtx,P#Ret]
+  type Dlg[P<:Impl] = P#Dlg
   
   /** A common pattern for defining a new Processor.
    *  It is only a guideline and doesn't have to be followed, but it helps in understanding
