@@ -117,7 +117,7 @@ object definition {
       def pull(v:Value)   = {
         parent.doBeg
         parent.onChild(this,
-          eltCtx.solver(Processor.this,v) match {
+          eltCtx.solver(v) match {
             case null => onVal(v)
             case i    => onSolver(v,i)
           })
@@ -252,7 +252,7 @@ object definition {
       final val builder:Bld = Impl.this.builder(this)
     }
     def builder(m:Motor):Bld
-        
+
     /** Forwards the base methods to a companion object.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Delegates makes it easier to define processors, all using a common element base.

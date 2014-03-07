@@ -33,7 +33,8 @@ object CtxTest {
     class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null
-        ()=>run.include(p,e)((u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
+        //()=>run.include(p,e)((u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
+        null
       }
     }
   }

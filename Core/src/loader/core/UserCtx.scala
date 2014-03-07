@@ -18,7 +18,7 @@ abstract class UserContext[-M<:Processor] {
   
   protected[this] class EltContext(protected[this] val elt:Elt) {
     /** Solving an include for e with data K */
-    def solver(m:M,s:M#Value):()=>M#Ret = null
+    def solver(s:M#Value):()=>M#Ret = null
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
   }
