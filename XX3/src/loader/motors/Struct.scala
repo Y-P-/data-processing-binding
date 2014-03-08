@@ -26,7 +26,7 @@ object Struct extends ProcessorImpl {
      * @param out, where to write to
      * @param indent, indent value as space number ; 0 means all output on one line
      */    
-    abstract class Impl(userCtx:UserCtx, val out:Writer, val indent:Int) extends super.Impl(userCtx) {
+    abstract class Impl(val out:Writer, val indent:Int) extends super.Impl {
       type Result = Unit
     
       private def newLine(e:Elt):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
@@ -57,25 +57,25 @@ object Struct extends ProcessorImpl {
    *  Implementation 'ext' doesn't bring anything more than 'cre', except it's a bit slower!
    */
   object ctx extends loader.core.CtxCore.Abstract[Null] with DefImpl {
-    class Launcher(out:Writer,indent:Int=0,userCtx:UserCtx) extends Impl(userCtx,out,indent) with super.Launcher {
-      def this(p:(Writer,Int),userCtx:UserCtx) = this(p._1,p._2,userCtx)
+    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+      def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor  = new Launcher(readParams(pr),userCtx)
-    def apply(out:Writer,indent:Int=0,userCtx:UserCtx):Motor = new Launcher(out,indent,userCtx)
+    def apply(pr: utils.ParamReader):Motor  = new Launcher(readParams(pr))
+    def apply(out:Writer,indent:Int=0):Motor = new Launcher(out,indent)
   }
   object ext extends loader.core.ExtCore.Abstract[Null] with DefImpl {
-    class Launcher(out:Writer,indent:Int=0,userCtx:UserCtx) extends Impl(userCtx,out,indent) with super.Launcher {
-      def this(p:(Writer,Int),userCtx:UserCtx) = this(p._1,p._2,userCtx)
+    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+      def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor = new Launcher(readParams(pr),userCtx)
-    def apply(out:Writer, indent:Int=0, userCtx:UserCtx)    = new Launcher(out,indent,userCtx)
+    def apply(pr: utils.ParamReader):Motor = new Launcher(readParams(pr))
+    def apply(out:Writer, indent:Int=0)    = new Launcher(out,indent)
   }
   object cre extends loader.core.Core.Abstract with DefImpl {
-    class Launcher(out:Writer,indent:Int=0,userCtx:UserCtx) extends Impl(userCtx,out,indent) with super.Launcher {
-      def this(p:(Writer,Int),userCtx:UserCtx) = this(p._1,p._2,userCtx)
+    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+      def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor    = new Launcher(readParams(pr),userCtx)
-    def apply(out:Writer, indent:Int=0, userCtx:UserCtx):Motor = new Launcher(out,indent,userCtx)
+    def apply(pr: utils.ParamReader):Motor    = new Launcher(readParams(pr))
+    def apply(out:Writer, indent:Int=0):Motor = new Launcher(out,indent)
   }
   
 }

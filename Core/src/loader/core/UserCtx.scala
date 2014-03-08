@@ -6,7 +6,7 @@ import context.Context
 import loader.core.context.FieldAnnot
 
 
-abstract class UserContext[-M<:Processor] {
+abstract class UserContext[-P<:ParserBuilder,-M<:Processor] {
   protected[this] type Proc = M
   protected[this] type Elt  = M#Elt
   //the handler for generated events 
@@ -21,6 +21,10 @@ abstract class UserContext[-M<:Processor] {
     def solver(s:M#Value):()=>M#Ret = null
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
+    /** Solving an include for e with data K */
+    def keyMap(s:P#Key):M#Key = null
+    /** Solving an include for e with data K */
+    def valMap(s:P#Value):M#Value = null
   }
 }
 

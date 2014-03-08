@@ -2,6 +2,7 @@ package loader.parsers
 
 import loader.core.ParserSpawner
 import utils.parsers.StructParser
+import loader.core.UserContext
 
 
 class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends HandlerBridge {self=>

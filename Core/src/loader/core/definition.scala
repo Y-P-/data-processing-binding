@@ -32,7 +32,7 @@ object definition {
     type Parser = (ParserBuilder { type BaseProcessor>:selfDef.type })#Parser[selfDef.type]
     
     //useful type shortcuts
-    type UserCtx = UserContext[selfDef.type]    
+    type UserCtx = UserContext[_<:BaseParser,selfDef.type]    
     type Cbk     = callbacks.Callback[Element,Status,Ret,Key,Value]
     type Cbks    = callbacks.Callbacks[Element,Status,Ret,Key,Value]
     type CbksBld = callbacks.CallbacksBuilder[Element,Status,Ret,Key,Value]
@@ -240,7 +240,7 @@ object definition {
     type Dlg = Delegate[Element,Key,Value,Status,UserCtx,Ret]
     //a factory for reading textual parameters
     //there will be other, specific factories
-    def apply(pr: utils.ParamReader, userCtx:UserCtx):Motor
+    def apply(pr: utils.ParamReader):Motor
         
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
@@ -261,7 +261,7 @@ object definition {
     abstract class Elt(protected[this] var parser0:Parser,val motor:Motor,val key:Key,val parent:Element) extends super.Elt { this:Element=>
       def parser = parser0  //we would rather not have this var, but the alternative is not good either.
       protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
-      def userCtx = motor.userCtx
+      def userCtx = parser.userCtx
       def builder = motor.builder
       protected def onName(key: Key)                      = motor.onName(this,key)
       protected def onInit(): Unit                        = motor.onInit(this)
@@ -277,7 +277,6 @@ object definition {
   trait Delegate[-E,-K,-V,+S,+U,R] {
     protected[this] type Elt=E  //for easy method definitions
     type Result
-    def userCtx:U
       
     def onInit():Unit
     def onExit():Result
@@ -301,7 +300,7 @@ object definition {
     //Here you fill up the spec for the implementation: mostly you close the abstract types
     trait DefImpl extends definition.Impl {
       //Here you create the delegate for the implementation
-      abstract class Impl(val userCtx:UserCtx) extends Dlg
+      abstract class Impl extends Dlg
     }
     //Here you instantiate your processor for all modes that it supports.
     //It doesn't (and often will not) have to support all modes!

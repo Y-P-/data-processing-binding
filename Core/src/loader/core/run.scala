@@ -6,8 +6,8 @@ object run {
    *  Usually the next method is preferred.
    */
   def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton]
-        (p:P)(init:p.Parser[M]=>M#Element, mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,P#Key)=>M#Key, run:p.Parser[M]=>Unit):M#Ret = {
-    p(p.binder[M](init,mapper,keyMapper)).invoke(run)
+        (p:P)(userCtx:UserContext[P,M], init:p.Parser[M]=>M#Element, mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,P#Key)=>M#Key, run:p.Parser[M]=>Unit):M#Ret = {
+    p(p.binder[M](userCtx,init,mapper,keyMapper)).invoke(run)
   }
   
   /** The most standard way to launch a pair of Parser/Processor.
@@ -20,35 +20,19 @@ object run {
    */
   def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton](p:P, l:M#Launcher)                                                        //the parser and processor launcher
         (
+            userCtx:UserContext[P,M],
             init:l.type => (p.Parser[M] => M#Element),    //the parser initializer
             mapper:(M#Element,P#Value)=>M#Value,          //the mapper from the parser Value to the processor Value
             keyMapper:(M#Element,P#Key)=>M#Key,           //the mapper from the parser Value to the processor Value
             run:p.Parser[M]=>Unit                         //the parser runner
         ):
         M#Ret
-     = apply[P,M](p)(init(l),mapper,keyMapper,run)
+     = apply[P,M](p)(userCtx,init(l),mapper,keyMapper,run)
 
   /** The nominal runner on an existing element, i.e. this includes the new parser in the current processor.
    *  Usually the next method is preferred.
    */
   def include[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton]
-        (p:P,e:M#Element)(mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,p.Key)=>M#Key, run:P#Parser[M]=>Unit):M#Ret
-    = p(p.binder((q:M#Parser)=>{e.parser=q; e},mapper,keyMapper)).invoke(run)
-
-  
-  class Mapper[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton] {
-    def apply(elt:M#Elt):EltMapper = new EltMapper(elt)
-    class EltMapper(elt:M#Elt) {
-      def mapVal(v:P#Value):M#Value = null
-      def mapKey(v:P#Key):M#Key     = null
-    }    
-  }
-
-  def apply1[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton]
-        (p:P)(init:p.Parser[M]=>M#Element, mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,P#Key)=>M#Key, run:p.Parser[M]=>Unit):M#Ret = {
-    val map = new Mapper[p.type,M]
-    val f1 = (e:M#Elt,v:p.Value)=>map(e).mapVal(v)
-    p(p.binder[M](init,f1,keyMapper)).invoke(run)
-  }
-
+        (p:P,e:M#Element)(userCtx:UserContext[P,M],mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,p.Key)=>M#Key, run:P#Parser[M]=>Unit):M#Ret
+    = p(p.binder(userCtx,(q:M#Parser)=>{e.parser=q; e},mapper,keyMapper)).invoke(run)
 }

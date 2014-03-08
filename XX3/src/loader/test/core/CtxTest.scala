@@ -26,15 +26,14 @@ object CtxTest {
     case url  => url
   }
   //a generic context that works with any parser for a string processor
-  val userCtx = new loader.core.UserContext[CtxCore { type BaseParser=ParserBuilder; type Value=String }] {
+  val userCtx = new loader.core.UserContext[ParserBuilder,CtxCore { type BaseParser=ParserBuilder; type Value=String }] {self=>
     val buf = new java.io.StringWriter
     override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
     def apply(e:Elt) = new EltContext(e)
     class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null
-        //()=>run.include(p,e)((u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
-        null
+        ()=>run.include[p.type,e.proc.type](p,e.myself)(self,(u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
       }
     }
   }
@@ -43,9 +42,9 @@ object CtxTest {
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Int = {
-      val m = motors.Struct.ctx(out,2,userCtx)
+      val m = motors.Struct.ctx(out,2)
       try {
-        run(p,m)(_(ClassContext(classOf[Data.Top])),null,null,_.read(load("small"), "UTF-8"))
+        run(p,m)(userCtx,_(ClassContext(classOf[Data.Top])),null,null,_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
         userCtx.buf.getBuffer.setLength(0)
@@ -54,9 +53,9 @@ object CtxTest {
   }
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
-      val m = motors.Struct.ctx(out,2,userCtx)
+      val m = motors.Struct.ctx(out,2)
       try {
-        val r:Int = run(p,m)(_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk[m.Proc]*),null,null,_.read(load("small"), "UTF-8"))
+        val r:Int = run(p,m)(userCtx,_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk[m.Proc]*),null,null,_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
         userCtx.buf.getBuffer.setLength(0)

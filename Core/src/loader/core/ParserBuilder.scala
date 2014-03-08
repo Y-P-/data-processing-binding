@@ -48,11 +48,11 @@ trait ParserBuilder {selfBuilder=>
    *               and a parser instance; the Launcher class in Processor provides such function.
    *  @param mapper, the function that lets translate the parser's Kind to the processor's Kind
    */
-  class Binder[P<:BaseProcessor with Singleton](val init:Parser[P]=>P#Element, val mapper:(P#Element,Value)=>P#Value, val keyMapper:(P#Element,Key)=>P#Key)
-  def binder[P<:BaseProcessor with Singleton](init:Parser[P]=>P#Element, mapper:(P#Element,Value)=>P#Value, keyMapper:(P#Element,Key)=>P#Key) = {
+  class Binder[P<:BaseProcessor with Singleton](val userCtx:UserContext[selfBuilder.type,P], val init:Parser[P]=>P#Element, val mapper:(P#Element,Value)=>P#Value, val keyMapper:(P#Element,Key)=>P#Key)
+  def binder[P<:BaseProcessor with Singleton](userCtx:UserContext[selfBuilder.type,P], init:Parser[P]=>P#Element, mapper:(P#Element,Value)=>P#Value, keyMapper:(P#Element,Key)=>P#Key) = {
     val mv:(P#Element,Value)=>P#Value = if (mapper==null)    (e,s)=>s.asInstanceOf[P#Value] else mapper
     val mk:(P#Element,Key)=>P#Key     = if (keyMapper==null) (e,s)=>s.asInstanceOf[P#Key]   else keyMapper
-    new Binder[P](init,mv,mk)
+    new Binder[P](userCtx,init,mv,mk)
   }
   
   /** factory for Parser */
@@ -72,9 +72,8 @@ trait ParserBuilder {selfBuilder=>
     val top:P#Element = binder.init(this) //creating the parser associates the top element for the bound processor.
     private[this] var cur = top
     private[this] var ignore:Int = 0
-    //cur.eltCtx.mapper(v)
     def current = cur
-    def userCtx = top.userCtx
+    def userCtx = binder.userCtx
     def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                     } catch errHandler finally { cur=cur.parent }
     def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
     def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
