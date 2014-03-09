@@ -23,11 +23,11 @@ object exceptions {
   }
 
   /** A severe error in the framework, unlikely to get caught. It will get out of the framework. */
-  class InternalLoaderException[M<:Processor](message:String,cause:Throwable,elt:M#GenElt) extends RuntimeException(message,cause) {
-    def this(c:Throwable,elt:M#GenElt) = this(null,c,elt)
-    def this(m:String,elt:M#GenElt)    = this(m,null,elt)
-    def this(elt:M#GenElt)             = this("Illegal state",null,elt)
-    def this(m:String)                 = this(m,null)
+  class InternalLoaderException(message:String,cause:Throwable,elt:Processor#GenElt) extends RuntimeException(message,cause) {
+    def this(c:Throwable,elt:Processor#GenElt) = this(null,c,elt)
+    def this(m:String,elt:Processor#GenElt)    = this(m,null,elt)
+    def this(elt:Processor#GenElt)             = this("Illegal state",null,elt)
+    def this(m:String)                         = this(m,null)
   }
   
   /** Internal, expected, framework problems; these exceptions main purpose is reporting. */

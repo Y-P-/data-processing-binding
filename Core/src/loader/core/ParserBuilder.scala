@@ -108,10 +108,10 @@ trait ParserBuilder {selfBuilder=>
     // - throw exception if and only if the exception is InternalLoaderException or UserException with lvl<=1
     def errHandler:PartialFunction[Throwable,Unit] = {
       case u:NullPointerException if current==null => try { top(StackException(u)) } finally { throw new InternalLoaderException(StackException(u),current) }
-      case u:InternalLoaderException[_] => try { current(UnexpectedException(u)) } finally { throw u }
-      case u:UserException              => try { current(u) } finally { if (u.lvl<=1) throw u }
-      case u:Exception with Event       => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
-      case u:Throwable                  => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
+      case u:InternalLoaderException => try { current(UnexpectedException(u)) } finally { throw u }
+      case u:UserException           => try { current(u) } finally { if (u.lvl<=1) throw u }
+      case u:Exception with Event    => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
+      case u:Throwable               => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
     }
   }
 }
