@@ -4,6 +4,6 @@ import loader.core.definition.Processor
 
 package object events {
   
-  type EventHandler[-P<:Processor] = PartialFunction[(P#Element,Event),Unit]
+  type EventHandler[-P<:Processor] = PartialFunction[(P#GenElt,Event),Unit]
 
 }

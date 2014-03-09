@@ -4,7 +4,7 @@ import scala.collection.Map
 
 trait SubstBuilder {
   
-  type Element = loader.core.definition.Processor#Element
+  type Element = loader.core.definition.Processor#GenElt
   
   /**
    * Builds a variable substituter.

@@ -7,7 +7,8 @@ import loader.core.definition.Processor
 import scala.reflect.ClassTag
 
 
-abstract class ConversionSolver[-E<:Processor#Elt] {
+abstract class ConversionSolver[-M<:Processor] {
+  protected[this] type E = M#GenElt  //shortcut
   def collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_,E]]
   def get[U<:Any,V<:Any](src:Class[U],dst:Class[V],fd:ConvertData,name:String):Either[String,(U,E)=>V]
   def apply(src:Class[_],dst:Class[_],fd:ConvertData,name:String):Either[String,(Any,E)=>Any] = get[Any,Any](src.asInstanceOf[Class[Any]],dst.asInstanceOf[Class[Any]],fd,name)
@@ -25,7 +26,7 @@ abstract class ConversionSolver[-E<:Processor#Elt] {
  *    class and the second compatible with the Element class used.
  *  - by default, if nothing is specified, the created object is returned.
  */
-class StandardSolver[-E<:Processor#Elt:ClassTag](defaultString:(Class[_]=>Option[StringConverter[_]]),named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]],val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_,E]]) extends ConversionSolver[E] {
+class StandardSolver[-M<:Processor:ClassTag](defaultString:(Class[_]=>Option[StringConverter[_]]),named:Map[String,Converter[_,_,M#GenElt]],registered:Seq[Converter[_,_,M#GenElt]],val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_,M#GenElt]]) extends ConversionSolver[M] {
   /** Finds an appropriate converter from one of the sources by following these exclusive rules (in order):
    *  - if the name is significant (not null or "")
    *  -   o name starts with @    : take the appropriate entry (e.g. '@xyz') from the named list (no check done: it has to work)
@@ -82,8 +83,8 @@ class StandardSolver[-E<:Processor#Elt:ClassTag](defaultString:(Class[_]=>Option
 }
 
 object StandardSolver {
-  def apply[E<:Processor#Elt:ClassTag](defaultString:Class[_]=>Option[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]]):ConversionSolver[E] =
-    new StandardSolver(defaultString,named,registered,null)
+  def apply[M<:Processor:ClassTag](defaultString:Class[_]=>Option[StringConverter[_]],named:Map[String,Converter[_,_,M#GenElt]],registered:Seq[Converter[_,_,M#GenElt]]):ConversionSolver[M] =
+    new StandardSolver[M](defaultString,named,registered,null)
   def apply() = new StandardSolver(Converters.defaultMap,null,null,CollectionAdapter.defaultMap)
 }
 

@@ -17,16 +17,16 @@ object Struct extends ProcessorImpl {
     type Value      = String
     type Key        = String
     type Ret        = Int
-    type BaseParser = ParserBuilder //any parser
+    type BaseParser = ParserBuilder { type BaseProcessor>:DefImpl.this.type } //any parser
     
-    def getData(parent:Element,s:Status):Null = null
+    def getData[P<:BaseParser](parent:Element[P],s:Status):Null = null
     val noKey = ""
   
     /**
      * @param out, where to write to
      * @param indent, indent value as space number ; 0 means all output on one line
      */    
-    abstract class Impl(val out:Writer, val indent:Int) extends super.Impl {
+    abstract class Impl[P<:BaseParser](val out:Writer, val indent:Int) extends super.Impl[P] {
       type Result = Unit
     
       private def newLine(e:Elt):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
@@ -37,7 +37,7 @@ object Struct extends ProcessorImpl {
       def onBeg(e:Elt): Unit          = if (e.parent!=null) { tag(e); out.write("{") }
       def onVal(e:Elt,v: String): Int = { tag(e); quote(v); out.flush; 1 }
       def onEnd(e:Elt): Int           = if (e.parent!=null) { newLine(e); out.write("}"); out.flush; 1 } else 0
-      def onChild(e:Elt,child: Elt, r: Int): Unit = {}
+      def onChild(e:Elt,r: Int): Unit = {}
 
       def onInit():Unit = {}
       def onExit():Unit = out.flush
@@ -57,25 +57,25 @@ object Struct extends ProcessorImpl {
    *  Implementation 'ext' doesn't bring anything more than 'cre', except it's a bit slower!
    */
   object ctx extends loader.core.CtxCore.Abstract[Null] with DefImpl {
-    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+    protected[this] class Launcher[-P<:BaseParser](out:Writer,indent:Int=0) extends Impl[P](out,indent) with super.Launcher[P] {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader):Motor  = new Launcher(readParams(pr))
-    def apply(out:Writer,indent:Int=0):Motor = new Launcher(out,indent)
+    def apply[P<:BaseParser](pr: utils.ParamReader):Motor[P]  = new Launcher(readParams(pr))
+    def apply[P<:BaseParser](out:Writer,indent:Int=0):Motor[P] = new Launcher(out,indent)
   }
   object ext extends loader.core.ExtCore.Abstract[Null] with DefImpl {
-    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+    protected[this] class Launcher[-P<:BaseParser](out:Writer,indent:Int=0) extends Impl[P](out,indent) with super.Launcher[P] {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader):Motor = new Launcher(readParams(pr))
-    def apply(out:Writer, indent:Int=0)    = new Launcher(out,indent)
+    def apply[P<:BaseParser](pr: utils.ParamReader):Motor[P] = new Launcher(readParams(pr))
+    def apply[P<:BaseParser](out:Writer, indent:Int=0)    = new Launcher(out,indent)
   }
   object cre extends loader.core.Core.Abstract with DefImpl {
-    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+    protected[this] class Launcher[-P<:BaseParser](out:Writer,indent:Int=0) extends Impl[P](out,indent) with super.Launcher[P] {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader):Motor    = new Launcher(readParams(pr))
-    def apply(out:Writer, indent:Int=0):Motor = new Launcher(out,indent)
+    def apply[P<:BaseParser](pr: utils.ParamReader):Motor[P]    = new Launcher(readParams(pr))
+    def apply[P<:BaseParser](out:Writer, indent:Int=0):Motor[P] = new Launcher(out,indent)
   }
   
 }

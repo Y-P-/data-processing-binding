@@ -54,7 +54,8 @@ object AutoConvertData {
  *  The top class (which cannot be instancied because the constructor is private) is used for binding to a DataActor.
  *  Derived classes (which are also hidden) are used to bind sub-collections. 
  */
-sealed class Binder[-E<:Processor#Elt] private (val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
+sealed class Binder[-M<:Processor] private (val what:DataActor,protected[this] val solver:ConversionSolver[M],protected[this] val fd:AutoConvertData) {
+  protected[this] type E = M#GenElt  //shortcut
   protected[this] final type I = Analyze#Instance
   private[this] var cached:Analyze = null
   protected[this] def build(on:AnyRef):I = {
@@ -120,7 +121,7 @@ object Binder {
   /** Binder for a collection element. It can not be assigned until all elements have been first collected.
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
-  private class CollectionBinder[-E<:Processor#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
+  private class CollectionBinder[-M<:Processor](what:DataActor,solver:ConversionSolver[M],fd:AutoConvertData) extends Binder[M](what,solver,fd) {
     private[this] val deepCache = new Array[super.Analyze](6)   //Do we expect deep collection of more than this depth ?
     
     class Analyze(val depth:Int,val parent:super.Analyze) extends super.Analyze {
@@ -170,7 +171,7 @@ object Binder {
   }
 
   /** Factory that builds a Binder with a given DataActor */
-  final def apply[E<:Processor#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
+  final def apply[M<:Processor](what:DataActor,solver:ConversionSolver[M],fd:AutoConvertData,isCol:Boolean):Binder[M] = {
     if (isCol) new CollectionBinder(what,solver,fd)
     else       new Binder(what,solver,fd)
   }
@@ -180,7 +181,7 @@ object Binder {
    *  - method o is for specifying final inputs
    *  - method u is for specifying layers
    */
-  implicit final class Helper(val x: Binder[Processor#Elt]#Analyze#Instance) {
+  implicit final class Helper(val x: Binder[Processor]#Analyze#Instance) {
     @inline private def sub(f: Helper=>Unit*)                  = { val c:Helper=x.subInstance; f.foreach(_(c)); c.x }
     @inline final def u(f: Helper=>Unit*):Unit                 = sub(f:_*).close(null)
     @inline final def read                                     = x.read()

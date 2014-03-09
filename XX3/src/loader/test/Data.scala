@@ -15,7 +15,7 @@ object Data {
   import test._
   import scala.collection.mutable.{HashMap,ListBuffer}
   
-  type Element = loader.core.CtxCore#Element
+  type Element = loader.core.CtxCore#GenElt
 
   @TagStruct
   class Id {

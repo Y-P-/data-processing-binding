@@ -42,17 +42,17 @@ trait ParserBuilder {selfBuilder=>
   /** Actual parser implementation */
   type Parser[M<:BaseProcessor with Singleton] <: Impl[M]
   
+  protected[this] type Elt[M<:BaseProcessor with Singleton] = M#Element[selfBuilder.type]
+  
   /** This class glues together a parser spawned from this builder and a given processor.
    *  It requires:
    *  @param init, the function that will create the initial (top) element for the processor
    *               and a parser instance; the Launcher class in Processor provides such function.
    *  @param mapper, the function that lets translate the parser's Kind to the processor's Kind
    */
-  class Binder[M<:BaseProcessor with Singleton](val userCtx:UserContext[selfBuilder.type,M], val init:Parser[M]=>M#Element, val mapper:(M#Element,Value)=>M#Value, val keyMapper:(M#Element,Key)=>M#Key)
-  def binder[M<:BaseProcessor with Singleton](userCtx:UserContext[selfBuilder.type,M], init:Parser[M]=>M#Element, mapper:(M#Element,Value)=>M#Value, keyMapper:(M#Element,Key)=>M#Key) = {
-    val mv:(M#Element,Value)=>M#Value = if (mapper==null)    (e,s)=>s.asInstanceOf[M#Value] else mapper
-    val mk:(M#Element,Key)=>M#Key     = if (keyMapper==null) (e,s)=>s.asInstanceOf[M#Key]   else keyMapper
-    new Binder[M](userCtx,init,mv,mk)
+  protected[this] class Binder[-M<:BaseProcessor with Singleton](val userCtx:UserContext[selfBuilder.type,M], val init:Parser[M]=>Elt[M])
+  def binder[M<:BaseProcessor with Singleton](userCtx:UserContext[selfBuilder.type,M], init:Parser[M]=>Elt[M]) = {
+    new Binder[M](userCtx,init)
   }
   
   /** factory for Parser */
@@ -69,16 +69,16 @@ trait ParserBuilder {selfBuilder=>
   trait Impl[M<:BaseProcessor with Singleton] extends Locator { this:Parser[M]=>
     final val builder:selfBuilder.type = selfBuilder
     val binder:Binder[M]
-    val top:M#Element = binder.init(this) //creating the parser associates the top element for the bound processor.
+    protected[this] val top:Elt[M] = binder.init(this) //creating the parser associates the top element for the bound processor.
     private[this] var cur = top
     private[this] var ignore:Int = 0
-    def current = cur
+    def current:Elt[M] = cur
     def userCtx = binder.userCtx
     def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                     } catch errHandler finally { cur=cur.parent }
-    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
+    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(cur.valMap(v)) } catch errHandler finally { cur=cur.parent }
     def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
-      try { cur=cur.push(binder.keyMapper(cur,key)) } catch {
+      try { cur=cur.push(cur.keyMap(key)) } catch {
         case `skip`                 => ignore+=1
         case `skipEnd`   if canSkip => skipToEnd
         case e:Throwable if canSkip => errHandler(e); skipToEnd
@@ -108,10 +108,10 @@ trait ParserBuilder {selfBuilder=>
     // - throw exception if and only if the exception is InternalLoaderException or UserException with lvl<=1
     def errHandler:PartialFunction[Throwable,Unit] = {
       case u:NullPointerException if current==null => try { top(StackException(u)) } finally { throw new InternalLoaderException(StackException(u),current) }
-      case u:InternalLoaderException => try { current(UnexpectedException(u)) } finally { throw u }
-      case u:UserException           => try { current(u) } finally { if (u.lvl<=1) throw u }
-      case u:Exception with Event    => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
-      case u:Throwable               => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
+      case u:InternalLoaderException[_] => try { current(UnexpectedException(u)) } finally { throw u }
+      case u:UserException              => try { current(u) } finally { if (u.lvl<=1) throw u }
+      case u:Exception with Event       => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
+      case u:Throwable                  => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
     }
   }
 }

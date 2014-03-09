@@ -4,15 +4,15 @@ import loader.core.definition._
 import loader.core.events._
 import loader.core.exceptions._
 import loader.audit.{AuditInfo,IdentifierScheme,LogRecord,AuditRecorder}
-import loader.core.events.Event.{DispatchByClassArray,Dispatcher}
+import loader.core.events.Event.Dispatcher
 
 
-class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int) extends AuditInfo[P] {
+class StandardAuditLogger[-M<:Processor](val id:IdentifierScheme[M], val max:Int) extends AuditInfo[M] {
   import Event._
-  protected[this] final type E = P#Element
-  protected[this] final type Logger[+Evt<:Event] = Dispatcher[P,Evt,(Int)=>LogRecord]
-  class LogDispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((P#Element,Event))=>Int]) extends PartialFunction[(P#Element,Event),LogRecord] {
-    val d = new DispatchByClassArray[P,Evt,(Int)=>LogRecord](a)
+  protected[this] final type E = M#GenElt
+  protected[this] final type Logger[+Evt<:Event] = Dispatcher[M,Evt,(Int)=>LogRecord]
+  class LogDispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((E,Event))=>Int]) extends PartialFunction[(E,Event),LogRecord] {
+    val d = dispatchByClassArray[M,Evt,(Int)=>LogRecord](a)
     def isDefinedAt(x:(E,Event))     = d.isDefinedAt(x)
     def apply(x:(E,Event)):LogRecord = { val s=severity(x._2.idx)(x); if (s<=max) d(x)(s) else null }
   }
@@ -70,109 +70,109 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
   }
   
   private object StackExceptionLog extends Logger[StackException] {
-    def process(x:(E,StackException)) = new Log1(x,null,_,None,x._2) {
+    def process(x:(E,StackException)) = new Log1(x,null,_:Int,None,x._2) {
       val explain = s"parser stack underflow"
       val cause   = "X"
     }
   }
   private object UnexpectedExceptionLog extends Logger[UnexpectedException] {
-    def process(x:(E,UnexpectedException)) = new Log1(x,null,_,None,x._2.e) {
+    def process(x:(E,UnexpectedException)) = new Log1(x,null,_:Int,None,x._2.e) {
       val explain = s"unexpected error : ${exc.getClass}${if (exc.getMessage!=null) s" (${exc.getMessage})" else ""}"
       val cause   = "X"
     }
   }
   private object ParseLog extends Logger[ParseException] {
-    def process(x:(E,ParseException)) = new Log1(x,null,_,Some(x._2.s),x._2) {
+    def process(x:(E,ParseException)) = new Log1(x,null,_:Int,Some(x._2.s),x._2) {
       val explain = s"could not be parsed : ${x._2.info}"
       val cause   = "Xp"
     }
   }
   private object InvalidValueLog extends Logger[InvalidValueException] {
-    def process(x:(E,InvalidValueException)) = new Log1(x,null,_,Some(x._2.v),x._2) {
+    def process(x:(E,InvalidValueException)) = new Log1(x,null,_:Int,Some(x._2.v),x._2) {
       val explain = s"value was not accepted : ${x._2.info}"
       val cause   = "Xv"
     }
   }
   private object InvalidConversionLog extends Logger[InvalidConversionException] {
-    def process(x:(E,InvalidConversionException)) = new Log1(x,null,_,None,x._2.e) {
+    def process(x:(E,InvalidConversionException)) = new Log1(x,null,_:Int,None,x._2.e) {
       val explain = s"value ${x._2.v} could not be converted : ${x._2.getMessage}"
       val cause   = "Xc"
     }
   }
   private object IncludeLog extends Logger[IncludeException] {
-    def process(x:(E,IncludeException)) = new Log1(x,null,_,Some(x._2.s),x._2.e) {
+    def process(x:(E,IncludeException)) = new Log1(x,null,_:Int,Some(x._2.s),x._2.e) {
       val explain = s"degenerated list form couldn't be handled; check that the relevant solver name is declared in the factory : "
       val cause   = "Xi"
     }
   }
   private object DegenListLog extends Logger[DegenListException] {
-    def process(x:(E,DegenListException)) = new Log1(x,null,_,Some(x._2.s),x._2.e) {
+    def process(x:(E,DegenListException)) = new Log1(x,null,_:Int,Some(x._2.s),x._2.e) {
       val explain = s"degenerated list form couldn't be handled; check that the relevant solver name is declared in the factory : "
       val cause   = "Xl"
     }
   }
   private object UserLog extends Logger[UserException] {
-    def process(x:(E,UserException)) = new StandardLogRecord(id(x._1,null),_,localisation(x._1),None,x._2.e) {
+    def process(x:(E,UserException)) = new StandardLogRecord(id(x._1,null),_:Int,localisation(x._1),None,x._2.e) {
       val explain = x._2.msg
       val cause   = "U "
     }
   }
   private object ReadTagLog extends Logger[ReadTagEvt[Any]] {
-    def process(x:(E,ReadTagEvt[Any])) = new Log1(x, null, _, Some(x._2.s), null) {
+    def process(x:(E,ReadTagEvt[Any])) = new Log1(x, null, _:Int, Some(x._2.s), null) {
       val explain = s"${if (x._2.s!=null) s"'${x._2.s}' " else ""}was read${if (x._2.v.isInstanceOf[Unit]) "" else s": (${x._2.v})"}"
       val cause   = "R "
     }
   }
   private object FastWarnLog extends Logger[FastWarnEvt] {
-    def process(x:(E,FastWarnEvt)) = new Log1(x, null, _, None, null) {
+    def process(x:(E,FastWarnEvt)) = new Log1(x, null, _:Int, None, null) {
       val explain = s"fast skipping will prevent out of sequence detection"
       val cause   = "f+"
     }
   }
   private object FastDisabledLog extends Logger[FastDisabledEvt] {
-    def process(x:(E,FastDisabledEvt)) = new Log1(x,null, _, None, null) {
+    def process(x:(E,FastDisabledEvt)) = new Log1(x,null, _:Int, None, null) {
       val explain = s"fast skipping was overridden by non contiguous sequence"
       val cause   =  "f-"
     }
   }
   private object DefaultValueLog extends Logger[DefaultValueEvt] {
-    def process(x:(E,DefaultValueEvt)) = new Log1(x, x._2.name, _, None, null) {
+    def process(x:(E,DefaultValueEvt)) = new Log1(x, x._2.name, _:Int, None, null) {
       val explain = "was set to it's default value"
       val cause   =  "D "
     }
   }
   private object InvalidCardinalityLog extends Logger[InvalidCardinalityEvt] {
-    def process(x:(E,InvalidCardinalityEvt)) = new Log1(x, x._2.name, _, None, null) {
+    def process(x:(E,InvalidCardinalityEvt)) = new Log1(x, x._2.name, _:Int, None, null) {
       val explain = s"cardinality check failed - ${if(x._2.min>0) s"${x._2.min} min, " else ""}${if(x._2.max>0) s"${x._2.max} max, " else ""}${x._2.nb} found"
       val cause   =  "C "
     }
   }
   private object OutOfSeqLog extends Logger[OutOfSeqEvt] {
-    def process(x:(E,OutOfSeqEvt)) = new Log1(x, x._2.name, _, None, null) {
+    def process(x:(E,OutOfSeqEvt)) = new Log1(x, x._2.name, _:Int, None, null) {
       val explain = s"was found out of sequence (only first such item in a sub-sequence shown)"
       val cause   =  "s "
     }
   }
   private object IllegalRepetitionLog extends Logger[IllegalRepetitionEvt] {
-    def process(x:(E,IllegalRepetitionEvt)) = new Log1(x, x._2.name, _, None, null) {
+    def process(x:(E,IllegalRepetitionEvt)) = new Log1(x, x._2.name, _:Int, None, null) {
       val explain = s"illegal repetition of a simple field"
       val cause   =  "C "
     }
   }
   private object TagNotFoundLog extends Logger[TagNotFoundEvt] {
-    def process(x:(E,TagNotFoundEvt)) = new Log1(x, x._2.name, _, None, null) {
+    def process(x:(E,TagNotFoundEvt)) = new Log1(x, x._2.name, _:Int, None, null) {
       val explain = s"mandatory tag not found - ${x._2.min} expected"
       val cause   =  "C "
     }
   }
   private object IgnoredTagLog extends Logger[IgnoredTagEvt] {
-    def process(x:(E,IgnoredTagEvt)) = new Log1(x, x._2.name, _, None, null) {
+    def process(x:(E,IgnoredTagEvt)) = new Log1(x, x._2.name, _:Int, None, null) {
       val explain = "was ignored"
       val cause   =  "I "
     }
   }
   private object IncludeSuccessLog extends Logger[IncludeSuccessEvt[Any]] {
-    def process(x:(E,IncludeSuccessEvt[Any])) = new Log1(x, null, _, Some(x._2.info), null) {
+    def process(x:(E,IncludeSuccessEvt[Any])) = new Log1(x, null, _:Int, Some(x._2.info), null) {
       val explain = s"include successfull"
       val cause   =  "i "
     }
@@ -183,23 +183,23 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
 }
 
 /* XXX new events to handle ?
-  def unrecognizedParam(nm:String,value:String):LogRecord = log(XunrecognizedParam,null) { new Log1(_,_,Some(value)) { //XXX useless ?
+  def unrecognizedParam(nm:String,value:String):LogRecord = log(XunrecognizedParam,null) { new Log1(_,_:Int,Some(value)) { //XXX useless ?
     def explain = s"unrecognized parameter ${nm} = ${value}"
   }}
-  def invalidValueTypeLog(ld:E,v:Any,e:Throwable):LogRecord = log(XinvalidValueTypeLog,ld) { new Log1(_,_,Some(v),e) {
+  def invalidValueTypeLog(ld:E,v:Any,e:Throwable):LogRecord = log(XinvalidValueTypeLog,ld) { new Log1(_,_:Int,Some(v),e) {
     def explain = s"could not be assigned : ${e.getMessage}"
   }}
-  def parserEnd(ld:E,e:Throwable):LogRecord = log(XparserEnd,ld) { new Log1(_,_,exc=e) {
+  def parserEnd(ld:E,e:Throwable):LogRecord = log(XparserEnd,ld) { new Log1(_,_:Int,exc=e) {
     def explain = s"parsing ended ${if (e==null) "successfully" else s"in error : $e"}"
   }}  
-  def parserErrorLog(ld:E,e:Throwable):LogRecord = log(XparserErrorLog,ld) { new Log1(_,_,exc=e) {
+  def parserErrorLog(ld:E,e:Throwable):LogRecord = log(XparserErrorLog,ld) { new Log1(_,_:Int,exc=e) {
     def explain = s"parser failed : $e"
   }}
 */
 
 /** Event handler for auditing.
  */
-class DefaultAuditHandler[-P<:Processor](a:AuditInfo[P],ar:AuditRecorder) extends EventHandler[P] {
-  def isDefinedAt(x:(P#Element,Event)) = a.isDefinedAt(x)
-  def apply(x:(P#Element,Event)):Unit = ar.log(a(x))
+class DefaultAuditHandler[-M<:Processor](a:AuditInfo[M],ar:AuditRecorder) extends EventHandler[M] {
+  def isDefinedAt(x:(M#GenElt,Event)) = a.isDefinedAt(x)
+  def apply(x:(M#GenElt,Event)):Unit = ar.log(a(x))
 }

@@ -5,9 +5,9 @@ object run {
   /** The nominal runner from scratch.
    *  Usually the next method is preferred.
    */
-  def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton]
-        (p:P)(userCtx:UserContext[P,M], init:p.Parser[M]=>M#Element, mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,P#Key)=>M#Key, run:p.Parser[M]=>Unit):M#Ret = {
-    p(p.binder[M](userCtx,init,mapper,keyMapper)).invoke(run)
+  def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton { type BaseParser >: P }]
+        (p:P)(userCtx:UserContext[P,M], init:p.Parser[M]=>M#Element[P], run:p.Parser[M]=>Unit):M#Ret = {
+    p(p.binder[M](userCtx,init)).invoke(run)
   }
   
   /** The most standard way to launch a pair of Parser/Processor.
@@ -18,21 +18,19 @@ object run {
    *     apply(p,l)(_(ClassContext(classOf[Data.Top])),(e,s)=>s.toUpper,_.read(load("small"), "UTF-8"))
    *  Note that the function apply(p,l) _ will produce an interesting binding between a parser and a processor.
    */
-  def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton](p:P, l:M#Launcher)                                                        //the parser and processor launcher
+  def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton { type BaseParser >: P }](p:P, l:M#Launcher[P])                                                        //the parser and processor launcher
         (
             userCtx:UserContext[P,M],
-            init:l.type => (p.Parser[M] => M#Element),    //the parser initializer
-            mapper:(M#Element,P#Value)=>M#Value,          //the mapper from the parser Value to the processor Value
-            keyMapper:(M#Element,P#Key)=>M#Key,           //the mapper from the parser Value to the processor Value
+            init:l.type => (p.Parser[M] => M#Element[P]),    //the parser initializer
             run:p.Parser[M]=>Unit                         //the parser runner
         ):
         M#Ret
-     = apply[P,M](p)(userCtx,init(l),mapper,keyMapper,run)
+     = apply[P,M](p)(userCtx,init(l),run)
 
   /** The nominal runner on an existing element, i.e. this includes the new parser in the current processor.
    *  Usually the next method is preferred.
    */
-  def include[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton]
-        (p:P,e:M#Element)(userCtx:UserContext[P,M],mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,p.Key)=>M#Key, run:P#Parser[M]=>Unit):M#Ret
-    = p(p.binder(userCtx,(q:M#Parser)=>{e.parser=q; e},mapper,keyMapper)).invoke(run)
+//  def include[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton]
+//        (p:P,e:M#Element[P])(userCtx:UserContext[P,M], run:P#Parser[M]=>Unit):M#Ret
+//    = p(p.binder(userCtx,(q:M#Parser[P])=>{e.parser=q; e})).invoke(run)
 }

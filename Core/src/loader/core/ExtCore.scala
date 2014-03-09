@@ -8,29 +8,28 @@ trait ExtCore extends definition.Impl {
   protected[this] val noStatus = new Status(noKey)
     
   protected[this] type Data  //some data used in association to the element
-  def getData(parent:Element,s:Status):Data
+  def getData[P<:BaseParser](parent:Element[P],s:Status):Data
   
-  type Motor=Launcher
-  trait Launcher extends super.Launcher {
-    def onName(e:Element,key:Key) = new Status(key)
+  type Motor[-P<:BaseParser]=Launcher[P]
+  trait Launcher[-P<:BaseParser] extends super.Launcher[P] {
+    def onName(e:Element[_<:P],key:Key) = new Status(key)
     //top factories
-    def apply(cbks:Cbks*):Parser=>Element = apply(noStatus, cbks:_*)
-    def apply():Parser=>Element           = apply(noStatus)
+    def apply(cbks:Cbks[P]*):Parser[P]=>Element[P] = apply(noStatus, cbks:_*)
+    def apply():Parser[P]=>Element[P]           = apply(noStatus)
   }
   
-  def builder(m:Motor) = new Bld {
-    def apply(parser:Parser, parent: Element, s: Status)                      = new Elt(parser,m,s,parent)
-    def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*)         = new ElementCbks(parser,m,s,parent, cbks:_*)
-    def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) = new ElementCbk(parser,m,s,parent, cb, cbks:_*)
+  def builder[P<:BaseParser](m:Motor[P]) = new Bld[P] {
+    def apply(parser:Parser[P], parent: Element[P], s: Status)                            = new Element(parser,m,s,parent)
+    def apply(parser:Parser[P], parent: Element[P], s: Status, cbks: Cbks[P]*)            = new ElementCbks(parser,m,s,parent, cbks:_*)
+    def apply(parser:Parser[P], parent: Element[P], s: Status, cb:Cbk[P], cbks: Cbks[P]*) = new ElementCbk(parser,m,s,parent, cb, cbks:_*)
   }
   
 
-  type Element = Elt
-  protected class Elt(parser:Parser, motor:Motor, key:Key, parent:Element, val data:Data) extends super.Elt(parser,motor,key,parent) {
-    def this(parser:Parser,motor:Motor,s:Status,parent:Element) = this(parser,motor,s.key,parent,getData(parent,s))
+  class Element[-P<:BaseParser](parser:Parser[P], motor:Motor[P], key:Key, parent:Element[P], val data:Data) extends super.EltBase[P](parser,motor,key,parent) {
+    def this(parser:Parser[P],motor:Motor[P],s:Status,parent:Element[P]) = this(parser,motor,s.key,parent,getData(parent,s))
   }
-  protected class ElementCbks(parser:Parser, motor:Motor, s:Status, parent:Element, val cbks:Cbks*)         extends Elt(parser,motor,s,parent)                 with WithCallbacks
-  protected class ElementCbk (parser:Parser, motor:Motor, s:Status, parent:Element, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,motor,s,parent,cbks:_*) with WithCallback
+  protected[this] class ElementCbks[P<:BaseParser](parser:Parser[P], motor:Motor[P], s:Status, parent:Element[P], val cbks:Cbks[P]*)            extends Element(parser,motor,s,parent)             with WithCallbacks[P]
+  protected[this] class ElementCbk[P<:BaseParser] (parser:Parser[P], motor:Motor[P], s:Status, parent:Element[P], val cb:Cbk[P], cbks:Cbks[P]*) extends ElementCbks(parser,motor,s,parent,cbks:_*) with WithCallback[P]
 }
 object ExtCore {
   class Status[K>:Null](key:K) extends Core.Status(key)
