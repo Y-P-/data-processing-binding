@@ -19,12 +19,12 @@ abstract class UserContext[-P<:ParserBuilder,-M<:Processor] {
   protected[this] class EltContext(protected[this] val elt:Elt) {
     /** Solving an include for e with data K */
     def solver(s:M#Value):()=>M#Ret = null
-    /** Solving dynamic mappings */
-    def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
     /** Solving an include for e with data K */
     def keyMap(s:P#Key):M#Key = null
     /** Solving an include for e with data K */
     def valMap(s:P#Value):M#Value = null
+    /** Solving dynamic mappings */
+    def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
   }
 }
 

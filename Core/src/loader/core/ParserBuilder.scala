@@ -40,7 +40,7 @@ trait ParserBuilder {selfBuilder=>
   type BaseProcessor <: Processor { type BaseParser >: selfBuilder.type }
   
   /** Actual parser implementation */
-  type Parser[P<:BaseProcessor with Singleton] <: Impl[P]
+  type Parser[M<:BaseProcessor with Singleton] <: Impl[M]
   
   /** This class glues together a parser spawned from this builder and a given processor.
    *  It requires:
@@ -48,15 +48,15 @@ trait ParserBuilder {selfBuilder=>
    *               and a parser instance; the Launcher class in Processor provides such function.
    *  @param mapper, the function that lets translate the parser's Kind to the processor's Kind
    */
-  class Binder[P<:BaseProcessor with Singleton](val userCtx:UserContext[selfBuilder.type,P], val init:Parser[P]=>P#Element, val mapper:(P#Element,Value)=>P#Value, val keyMapper:(P#Element,Key)=>P#Key)
-  def binder[P<:BaseProcessor with Singleton](userCtx:UserContext[selfBuilder.type,P], init:Parser[P]=>P#Element, mapper:(P#Element,Value)=>P#Value, keyMapper:(P#Element,Key)=>P#Key) = {
-    val mv:(P#Element,Value)=>P#Value = if (mapper==null)    (e,s)=>s.asInstanceOf[P#Value] else mapper
-    val mk:(P#Element,Key)=>P#Key     = if (keyMapper==null) (e,s)=>s.asInstanceOf[P#Key]   else keyMapper
-    new Binder[P](userCtx,init,mv,mk)
+  class Binder[M<:BaseProcessor with Singleton](val userCtx:UserContext[selfBuilder.type,M], val init:Parser[M]=>M#Element, val mapper:(M#Element,Value)=>M#Value, val keyMapper:(M#Element,Key)=>M#Key)
+  def binder[M<:BaseProcessor with Singleton](userCtx:UserContext[selfBuilder.type,M], init:Parser[M]=>M#Element, mapper:(M#Element,Value)=>M#Value, keyMapper:(M#Element,Key)=>M#Key) = {
+    val mv:(M#Element,Value)=>M#Value = if (mapper==null)    (e,s)=>s.asInstanceOf[M#Value] else mapper
+    val mk:(M#Element,Key)=>M#Key     = if (keyMapper==null) (e,s)=>s.asInstanceOf[M#Key]   else keyMapper
+    new Binder[M](userCtx,init,mv,mk)
   }
   
   /** factory for Parser */
-  def apply[P<:BaseProcessor with Singleton](bd:Binder[P]):Parser[P]
+  def apply[M<:BaseProcessor with Singleton](bd:Binder[M]):Parser[M]
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -66,10 +66,10 @@ trait ParserBuilder {selfBuilder=>
    *  It also has access to the user context.
    *  @param binder, which is used to attach the parser with the processor
    */
-  trait Impl[P<:BaseProcessor with Singleton] extends Locator { this:Parser[P]=>
+  trait Impl[M<:BaseProcessor with Singleton] extends Locator { this:Parser[M]=>
     final val builder:selfBuilder.type = selfBuilder
-    val binder:Binder[P]
-    val top:P#Element = binder.init(this) //creating the parser associates the top element for the bound processor.
+    val binder:Binder[M]
+    val top:M#Element = binder.init(this) //creating the parser associates the top element for the bound processor.
     private[this] var cur = top
     private[this] var ignore:Int = 0
     def current = cur
@@ -86,7 +86,7 @@ trait ParserBuilder {selfBuilder=>
       }
     }
     def onEnd() = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
-    def invoke(f:this.type=>Unit):P#Ret = {
+    def invoke(f:this.type=>Unit):M#Ret = {
       val r=top.invoke(f(this))
       onEnd()
       r
@@ -153,5 +153,5 @@ object ParserBuilder {
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl[P<:BaseProcessor with Singleton] extends super.Impl[P] { this:Parser[P]=> }
+  abstract class AbstractImpl[M<:BaseProcessor with Singleton] extends super.Impl[M] { this:Parser[M]=> }
 }
