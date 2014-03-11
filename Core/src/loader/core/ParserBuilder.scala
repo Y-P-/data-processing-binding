@@ -37,26 +37,16 @@ trait ParserBuilder {selfBuilder=>
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
-  type BaseProcessor <: Processor { type BaseParser >: selfBuilder.type }
+  type BaseProcessor <: Processor
   
-  /** Actual parser implementation */
-  type Parser[P<:BaseProcessor with Singleton] <: Impl[P]
+  // Actual parser implementation
+  // As for Element, the generic signature isn't real nice.
+  //protected[this] type Parser[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]] <: Impl
+  protected[this] class Parser[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](pf: Impl=>X#Elt,val userCtx:U) extends Impl { val top=pf(this); type Proc=X; type UC=U }
   
-  /** This class glues together a parser spawned from this builder and a given processor.
-   *  It requires:
-   *  @param init, the function that will create the initial (top) element for the processor
-   *               and a parser instance; the Launcher class in Processor provides such function.
-   *  @param mapper, the function that lets translate the parser's Kind to the processor's Kind
-   */
-  class Binder[P<:BaseProcessor with Singleton](val userCtx:UserContext[selfBuilder.type,P], val init:Parser[P]=>P#Element, val mapper:(P#Element,Value)=>P#Value, val keyMapper:(P#Element,Key)=>P#Key)
-  def binder[P<:BaseProcessor with Singleton](userCtx:UserContext[selfBuilder.type,P], init:Parser[P]=>P#Element, mapper:(P#Element,Value)=>P#Value, keyMapper:(P#Element,Key)=>P#Key) = {
-    val mv:(P#Element,Value)=>P#Value = if (mapper==null)    (e,s)=>s.asInstanceOf[P#Value] else mapper
-    val mk:(P#Element,Key)=>P#Key     = if (keyMapper==null) (e,s)=>s.asInstanceOf[P#Key]   else keyMapper
-    new Binder[P](userCtx,init,mv,mk)
-  }
   
   /** factory for Parser */
-  def apply[P<:BaseProcessor with Singleton](bd:Binder[P]):Parser[P]
+  def top[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](u:U,pf: Impl=>X#Elt{type Parser>:selfBuilder.type}):Impl
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -66,19 +56,19 @@ trait ParserBuilder {selfBuilder=>
    *  It also has access to the user context.
    *  @param binder, which is used to attach the parser with the processor
    */
-  trait Impl[P<:BaseProcessor with Singleton] extends Locator { this:Parser[P]=>
-    final val builder:selfBuilder.type = selfBuilder
-    val binder:Binder[P]
-    val top:P#Element = binder.init(this) //creating the parser associates the top element for the bound processor.
+  trait Impl extends Locator {
+    type Proc <: BaseProcessor with Singleton
+    type UC <: UsrCtx[selfBuilder.type,Proc]
+    val userCtx:UC
+    val top:Proc#Elt
     private[this] var cur = top
     private[this] var ignore:Int = 0
     def current = cur
-    def userCtx = binder.userCtx
     def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                     } catch errHandler finally { cur=cur.parent }
-    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(binder.mapper(cur,v)) } catch errHandler finally { cur=cur.parent }
+    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(userCtx(cur).valMap(v)) } catch errHandler finally { cur=cur.parent }
     def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
-      try { cur=cur.push(binder.keyMapper(cur,key)) } catch {
+      try { cur=cur.push(userCtx(cur).keyMap(key)) } catch {
         case `skip`                 => ignore+=1
         case `skipEnd`   if canSkip => skipToEnd
         case e:Throwable if canSkip => errHandler(e); skipToEnd
@@ -86,7 +76,7 @@ trait ParserBuilder {selfBuilder=>
       }
     }
     def onEnd() = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
-    def invoke(f:this.type=>Unit):P#Ret = {
+    def invoke(f:this.type=>Unit):Proc#Ret = {
       val r=top.invoke(f(this))
       onEnd()
       r
@@ -123,7 +113,7 @@ object ParserBuilder {
   
   /** This provides a standard API for these parser that read Characters, such as files.
    */
-  trait URLParser { this:ParserBuilder#Impl[_]=>
+  trait URLParser { this:ParserBuilder#Impl=>
     def defaultEncoding = "ISO-8859-15"
 
     /** Reader from a CharReader. It is usually sufficient to fill this up. */
@@ -148,10 +138,8 @@ object ParserBuilder {
     @throws(classOf[java.io.IOException])
     def read(in: Reader): Unit = apply(in)
   }
-  
-  
 }
 
 abstract class AbstractParserBuilder extends ParserBuilder {
-  abstract class AbstractImpl[P<:BaseProcessor with Singleton] extends super.Impl[P] { this:Parser[P]=> }
+  //provides shared classes to work on when possible: reduce code volume.
 }

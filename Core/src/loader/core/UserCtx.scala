@@ -33,18 +33,18 @@ abstract class UserContext[-P<:ParserBuilder,-M<:Processor] {
 //      context of the framework, it is of no importance here.
 //      of course, contexts built with no regards with these constraint
 //      won't be of any real use...
-class UsrCtx[-P<:ParserBuilder { type BaseProcessor >: M},-M<:Processor with Singleton] {
+class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   def eventHandler:EventHandler[M] = null
   val fast = true
 
   /** build an element context */
-  def apply(e:M#Element):EltCtx = null
+  def apply(e:M#Elt):EltCtx = null
   
   /** this defines every special action that is to be taken for a given Element.
    *  Each element can define its own special actions: these do not have to be defined globaly.
    *  However, if you need global actions, the previous method just has to return a constant. 
    */
-  protected[this] class EltCtx(protected[this] val elt:M#Element) {
+  protected[this] class EltCtx(protected[this] val elt:M#Elt) {
     /** Solving an include for e with data K */
     def solver(s:M#Value):()=>M#Ret = null
     /** Solving an include for e with data K */

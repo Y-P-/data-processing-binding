@@ -8,11 +8,11 @@ trait ExtCore extends definition.Impl {
   protected[this] val noStatus = new Status(noKey)
     
   protected[this] type Data  //some data used in association to the element
-  def getData(parent:Element,s:Status):Data
+  def getData(parent:Elt,s:Status):Data
   
   type Motor=Launcher
   trait Launcher extends super.Launcher {
-    def onName(e:Element,key:Key) = new Status(key)
+    def onName(e:Elt,key:Key) = new Status(key)
     //top factories
     def apply(cbks:Cbks*):Parser=>Element = apply(noStatus, cbks:_*)
     def apply():Parser=>Element           = apply(noStatus)
@@ -25,12 +25,9 @@ trait ExtCore extends definition.Impl {
   }
   
 
-  type Element = Elt
-  protected class Elt(parser:Parser, motor:Motor, key:Key, parent:Element, val data:Data) extends super.Elt(parser,motor,key,parent) {
-    def this(parser:Parser,motor:Motor,s:Status,parent:Element) = this(parser,motor,s.key,parent,getData(parent,s))
-  }
-  protected class ElementCbks(parser:Parser, motor:Motor, s:Status, parent:Element, val cbks:Cbks*)         extends Elt(parser,motor,s,parent)                 with WithCallbacks
-  protected class ElementCbk (parser:Parser, motor:Motor, s:Status, parent:Element, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,motor,s,parent,cbks:_*) with WithCallback
+  protected class Element[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl, userCtx:U, motor:Motor, key:Key, parent:Elt, val data:Data) extends super.Element[X,U](parser,userCtx,motor,key,parent)
+  protected class ElementCbks[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl, userCtx:U, motor:Motor, s:Status, parent:Elt, val cbks:Cbks*)         extends Element(parser,userCtx,motor,s.key,parent,getData(parent,s)) with WithCallbacks
+  protected class ElementCbk[X<:BaseParser with Singleton,U<:UserCtx[X]] (parser:X#Impl, userCtx:U, motor:Motor, s:Status, parent:Elt, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,userCtx,motor,s,parent,cbks:_*) with WithCallback
 }
 object ExtCore {
   class Status[K>:Null](key:K) extends Core.Status(key)
