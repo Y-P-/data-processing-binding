@@ -19,7 +19,7 @@ abstract class HandlerBridge extends AbstractParserBuilder {self=>
   type Key   = String                                             //keys are string
   type BaseProcessor = Processor { type BaseParser >: self.type } //any processor
     
-  trait Impl[P<:BaseProcessor with Singleton] extends super.Impl[P] with utils.parsers.Handler with ParserBuilder.URLParser { this:Parser[P]=>
+  trait BaseImpl extends super.BaseImpl with utils.parsers.Handler with ParserBuilder.URLParser { this:Parser=>
     final protected[this] val charProc = newProc
     def location:String = charProc.state.line.toString
     def err(detail: String, cause: String): Nothing = throw new IllegalStateException(cause)
@@ -27,5 +27,5 @@ abstract class HandlerBridge extends AbstractParserBuilder {self=>
     def push(idx: Int): Unit = push("")
     def apply(d:CharReader):Unit = charProc(d)
   }
-  abstract class AbstractImpl[P<:BaseProcessor with Singleton] extends Impl[P] { this:Parser[P]=> }
+  abstract class AbstractImpl extends BaseImpl { this:Parser=> }
 }

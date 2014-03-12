@@ -24,7 +24,7 @@ object IdScheme {
   }
   
   abstract class BaseScheme[-P<:loader.core.definition.Processor] extends IdentifierScheme[P] {
-    protected[this] final type Elt = P#Element  //for easy reference when defining concrete classes
+    protected[this] final type Elt = P#Elt  //for easy reference when defining concrete classes
     def apply(ld:Elt):String = build(ld).toString
     def apply(ld:Elt,name:String):String = add(build(ld),name).toString
     protected def build(ld:Elt):StringBuffer

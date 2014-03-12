@@ -28,7 +28,7 @@ trait Locator {
  * This means that the top element onBeg/onEnd methods must be called by the user, if necessary.
  * 
  */
-trait ParserBuilder {selfBuilder=>
+trait ParserBuilder {
 
   /** Element type produced by this parser */
   type Value
@@ -37,13 +37,14 @@ trait ParserBuilder {selfBuilder=>
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
-  type BaseProcessor <: Processor
-  
-  // Actual parser implementation: You aren't forced to use it, but having that base class still helps...
-  protected[this] abstract class Parser[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](pf: Impl=>X#Elt,val userCtx:U) extends Impl { val top=pf(this); type Proc=X; type UC=U }
-  
+  type BaseProcessor>:Null<:Processor
+  //the abstract types which must be filled up by each implementation
+  type UCtx[-P<:BaseProcessor]>:Null<:UsrCtx[this.type,P]                       //the kind of UserCtx used
+  protected type Impl[X<:BaseProcessor with Singleton]<:Parser { type Proc=X }  //the concrete implementation
+  type Parser>:Null<:BaseImpl                                                   //the concrete implementation,
+    
   /** factory for Parser */
-  def top[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](u:U,pf: Impl{type Proc=X}=>X#Elt{type Parser>:selfBuilder.type}):Impl{type Proc=X}
+  def top[X<:BaseProcessor with Singleton](u:UCtx[X],pf: Impl[X]=>X#Elt):Impl[X]
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -53,10 +54,9 @@ trait ParserBuilder {selfBuilder=>
    *  It also has access to the user context.
    *  @param binder, which is used to attach the parser with the processor
    */
-  trait Impl extends Locator {
+  trait BaseImpl extends Locator {
     type Proc <: BaseProcessor with Singleton
-    type UC <: UsrCtx[selfBuilder.type,Proc]
-    val userCtx:UC
+    val userCtx:UCtx[Proc]
     val top:Proc#Elt
     private[this] var cur = top
     private[this] var ignore:Int = 0
@@ -110,7 +110,7 @@ object ParserBuilder {
   
   /** This provides a standard API for these parser that read Characters, such as files.
    */
-  trait URLParser { this:ParserBuilder#Impl=>
+  trait URLParser { this:ParserBuilder#BaseImpl=>
     def defaultEncoding = "ISO-8859-15"
 
     /** Reader from a CharReader. It is usually sufficient to fill this up. */

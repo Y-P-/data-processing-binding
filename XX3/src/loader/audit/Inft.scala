@@ -34,15 +34,15 @@ trait Recorder {
  */
 trait IdentifierScheme[-P<:Processor] {
   //builds the name for ld
-  def apply(ld:P#Element):String
+  def apply(ld:P#Elt):String
   //builds the name for a child of ld whose simple name is known
-  def apply(ld:P#Element,name:String):String
+  def apply(ld:P#Elt,name:String):String
 }
 
 
 /** Defines some information on what to log and how.
  */
-trait AuditInfo[-P<:Processor] extends PartialFunction[(P#Element,Event),LogRecord] {
+trait AuditInfo[-P<:Processor] extends PartialFunction[(P#Elt,Event),LogRecord] {
   def id:IdentifierScheme[P]            //how names are printed
   def max:Int                           //maximal error level logged
 }

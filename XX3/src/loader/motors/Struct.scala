@@ -19,14 +19,14 @@ object Struct extends ProcessorImpl {
     type Ret        = Int
     type BaseParser = ParserBuilder //any parser
     
-    def getData(parent:Element,s:Status):Null = null
+    def getData(parent:Elt,s:Status):Null = null
     val noKey = ""
   
     /**
      * @param out, where to write to
      * @param indent, indent value as space number ; 0 means all output on one line
      */    
-    abstract class Impl(val out:Writer, val indent:Int) extends super.Impl {
+    abstract class DlgBase(val out:Writer, val indent:Int) extends super.DlgBase {this:Dlg=>
       type Result = Unit
     
       private def newLine(e:Elt):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
@@ -57,25 +57,25 @@ object Struct extends ProcessorImpl {
    *  Implementation 'ext' doesn't bring anything more than 'cre', except it's a bit slower!
    */
   object ctx extends loader.core.CtxCore.Abstract[Null] with DefImpl {
-    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super.Dlg {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader):Motor  = new Launcher(readParams(pr))
-    def apply(out:Writer,indent:Int=0):Motor = new Launcher(out,indent)
+    def apply(pr: utils.ParamReader):Dlg   = new Dlg(readParams(pr))
+    def apply(out:Writer,indent:Int=0):Dlg = new Dlg(out,indent)
   }
   object ext extends loader.core.ExtCore.Abstract[Null] with DefImpl {
-    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super.Dlg {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader):Motor = new Launcher(readParams(pr))
-    def apply(out:Writer, indent:Int=0)    = new Launcher(out,indent)
+    def apply(pr: utils.ParamReader):Dlg    = new Dlg(readParams(pr))
+    def apply(out:Writer, indent:Int=0):Dlg = new Dlg(out,indent)
   }
   object cre extends loader.core.Core.Abstract with DefImpl {
-    class Launcher(out:Writer,indent:Int=0) extends Impl(out,indent) with super.Launcher {
+    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super.Dlg {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
-    def apply(pr: utils.ParamReader):Motor    = new Launcher(readParams(pr))
-    def apply(out:Writer, indent:Int=0):Motor = new Launcher(out,indent)
+    def apply(pr: utils.ParamReader):Dlg    = new Dlg(readParams(pr))
+    def apply(out:Writer, indent:Int=0):Dlg = new Dlg(out,indent)
   }
   
 }

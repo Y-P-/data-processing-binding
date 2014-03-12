@@ -26,16 +26,16 @@ object definition {
     type Value>:Null   //the Value type of data processed by this processor
     type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
+    type Status>:Null<:definition.Status[Key]
     type BaseParser <: ParserBuilder
-    type Status  >: Null <:definition.Status[Key]
-    type Elt >: Null <: EltBase
+    type UCtx[-P<:BaseParser]>:Null<:UsrCtx[P,this.type]
+    protected type Element[X<:BaseParser with Singleton] <: Elt { type Builder=X }
+    type Elt>:Null<:EltBase
         
     //useful type shortcuts
-    type UserCtx[-X<:BaseParser] = UsrCtx[X,selfDef.type]    
-    type Cbk        = callbacks.Callback[Elt,Status,Ret,Key,Value]
-    type Cbks       = callbacks.Callbacks[Elt,Status,Ret,Key,Value]
-    type CbksBld    = callbacks.CallbacksBuilder[Elt,Status,Ret,Key,Value]
-    type Bld        = EltBuilder
+    type Cbk            = callbacks.Callback[Elt,Status,Ret,Key,Value]
+    type Cbks           = callbacks.Callbacks[Elt,Status,Ret,Key,Value]
+    type CbksEltBuilder = callbacks.CallbacksBuilder[Elt,Status,Ret,Key,Value]
     
     val noKey:Key
     
@@ -44,21 +44,20 @@ object definition {
      *  it accordingly to the processor's requirements.
      */
     trait EltBase extends Traversable[Elt] { self:Elt=>
-      type Parser <: BaseParser with Singleton
-      val parser:Parser#Impl   //parser creating that element: Beware => this can change in case of includes
+      type Builder <: BaseParser with Singleton
+      val parser:Builder#Parser   //parser creating that element: Beware => this can change in case of includes
       /** Context for use */
-      type UC <: UserCtx[Parser]
-      val userCtx:UC
+      val userCtx:UCtx[Builder]
       val eltCtx = userCtx(this)
       /** Fields */
       def parent : Elt      //parent item
       def key    : Key      //element key
       def name   : String  = key.toString  //element name; provided for simplicity
-      protected[core] def parser_=(parser:Parser#Impl):Unit = () //XXX parser has write access for handling includes
+      protected[core] def parser_=(parser:Builder#Parser):Unit = () //XXX parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
-      def builder:Bld
+      def builder:EltBuilder
       /** building a child spawning children of the same nature; you must call this method because it can be overriden (callbacks) */
-      def build(p:Parser#Impl, u:UC, s:Status):Elt{type Parser=self.Parser;type UC=self.UC} = builder(p, u, this, s)
+      def build(p:Builder#Parser, u:UCtx[Builder], s:Status):Elt = builder(p, u, this, s)
       
       /** The standard, elementary methods dealing with parser events.
        *  The order in which these methods are executed is:
@@ -87,7 +86,7 @@ object definition {
       // - do nothing if handler not configured for that event
       def apply(evt:Event) = userCtx.eventHandler match {
         case null =>
-  //      case h    => h.applyOrElse((this,evt),(x:(Element,Event))=>())
+        case h    => h.applyOrElse((this,evt),(x:(Elt,Event))=>())
       }
       
       /** Ensure the call to doBeg is done as late as possible, but in time. */
@@ -139,22 +138,15 @@ object definition {
       def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.name}"))
       override def toString = { val s=new java.io.StringWriter; print(s); s.toString }      
     }
-    
-    /** A very basic implementation that can be used as a base for real use classes.
-     *  Its main feature is that it encapsulated the abstract types.
-     */
-    protected[this] abstract class Element[X<:BaseParser with Singleton,U<:UserCtx[X]](val parser:X#Impl,val userCtx:U) extends EltBase {self:Elt=> type Parser=X; type UC=U }
-    
+        
     /** Defines how Element are built in various contexts.
      *  - the first four methods define Top builders
      *  - the other define child builders within an already existing processor
      */
     abstract class EltBuilder {
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p:X#Impl, u:U, s:Status): Elt{type Parser=X;type UC=U}             = apply(p,u,null,s)
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p:X#Impl, u:U, s:Status, cbks:Cbks*): Elt{type Parser=X;type UC=U} = apply(p,u,null,s,cbks:_*)
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p:X#Impl, u:U, parent:Elt, s:Status): Elt{type Parser=X;type UC=U}
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p:X#Impl, u:U, parent:Elt, s: Status, cbks: Cbks*): Elt with WithCallbacks{type Parser=X;type UC=U}
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p:X#Impl, u:U, parent:Elt, s: Status, cb: Cbk, cbks: Cbks*): Elt with WithCallback{type Parser=X;type UC=U}
+      def apply[X<:BaseParser with Singleton](p:X#Parser, u:UCtx[X], parent:Elt, s: Status): Element[X]
+      def apply[X<:BaseParser with Singleton](p:X#Parser, u:UCtx[X], parent:Elt, s: Status, cbks: Cbks*): Element[X] with WithCallbacks
+      def apply[X<:BaseParser with Singleton](p:X#Parser, u:UCtx[X], parent:Elt, s: Status, cb: Cbk, cbks: Cbks*): Element[X] with WithCallback
     }
 
     /** Modifies the current element behavior by using a callback
@@ -180,14 +172,14 @@ object definition {
      */
     trait WithCallbacks extends EltBase { self:Elt=>
       protected[this] def cbks: Seq[Cbks] //current callbacks trees (for children)
-      override def build(p: Parser#Impl, u: UC, s: Status): Elt{type Parser=self.Parser;type UC=self.UC} = WithCallbacks(p,u,this,s,cbks,builder)
+      override def build(p: Builder#Parser, u: UCtx[Builder], s: Status): Element[Builder] = WithCallbacks(p,u,this,s,cbks,builder)
     }
     object WithCallbacks {
       /** Analyzes a callbacks sequence to know:
        *  1) whether it applies to the current item
        *  2) what sub sequence may apply to children
        */
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p: X#Impl, u:U, parent:Elt, s:Status, cbks:Seq[Cbks], builder:EltBuilder): Elt{type Parser=X;type UC=U} = {
+      def apply[X<:BaseParser with Singleton](p: X#Parser, u:UCtx[X], parent:Elt, s:Status, cbks:Seq[Cbks], builder:EltBuilder): Element[X] = {
         if (cbks.length == 1) {
           //first, the case where the sequence is one element only.
           //it's very common, and should be optimized! it's furthermore much easier to read!
@@ -226,21 +218,21 @@ object definition {
    */
   trait Impl extends Processor {self=>
     //the delegate type which will be used as the processor logic
-    type Dlg = Delegate[Elt,Key,Value,Status,UsrCtx[BaseParser,self.type],Ret]
+    type ThisDlg = Delegate[Elt,Key,Value,Status,UsrCtx[BaseParser,self.type],Ret]
     //a factory for reading textual parameters
     //there will be other, specific factories
-    def apply(pr: utils.ParamReader):Motor
+    def apply(pr: utils.ParamReader):Dlg
         
     /** Forwards the base methods to the upper layer.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      *  It also makes it possible to easily subclass an implementation.
      */
-    type Motor<:Launcher
-    trait Launcher extends Dlg { this:Motor=>
-      final val builder:Bld = Impl.this.builder(this)
+    type Dlg<:DlgBase
+    trait DlgBase extends ThisDlg { this:Dlg=>
+      final val builder:EltBuilder = Impl.this.builder(this)
     }
-    def builder(m:Motor):Bld
+    def builder(m:Dlg):EltBuilder
 
     /** Forwards the base methods to a companion object.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
@@ -248,16 +240,17 @@ object definition {
      *  It also makes it possible to easily subclass an implementation.
      *  We can already provide basic implementations for simple use case.
      */
-    protected abstract class Element[X<:BaseParser with Singleton,U<:UserCtx[X]] (parser:X#Impl,userCtx:U,val motor:Motor,val key:Key,val parent:Elt) extends super.Element[X,U](parser,userCtx) {this:Elt=>      
+    protected abstract class ElementBase[X<:BaseParser with Singleton] (val parser:X#Parser,val userCtx:UCtx[X],val dlg:Dlg,val key:Key,val parent:Elt) {this:Elt{type Builder=X}=>
+      type Builder = X
      // def parser = parser0  //we would rather not have this var, but the alternative is not good either.
      // protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
-      def builder = motor.builder
-      protected def onName(key: Key)      = motor.onName(this,key)
-      protected def onInit(): Unit        = motor.onInit(this)
-      protected def onBeg(): Unit         = motor.onBeg(this)
-      protected def onVal(v: Value): Ret  = motor.onVal(this,v)
-      protected def onEnd(): Ret          = motor.onEnd(this)
-      protected def onChild(child: Elt, r: Ret): Unit = motor.onChild(this,child,r)      
+      def builder = dlg.builder
+      protected def onName(key: Key)      = dlg.onName(this,key)
+      protected def onInit(): Unit        = dlg.onInit(this)
+      protected def onBeg(): Unit         = dlg.onBeg(this)
+      protected def onVal(v: Value): Ret  = dlg.onVal(this,v)
+      protected def onEnd(): Ret          = dlg.onEnd(this)
+      protected def onChild(child: Elt, r: Ret): Unit = dlg.onChild(this,child,r)      
     }    
   }
   
@@ -289,7 +282,7 @@ object definition {
     //Here you fill up the spec for the implementation: mostly you close the abstract types
     trait DefImpl extends definition.Impl {
       //Here you create the delegate for the implementation
-      abstract class Impl extends Dlg
+      abstract class DlgBase extends super.DlgBase {this:Dlg=>}
     }
     //Here you instantiate your processor for all modes that it supports.
     //It doesn't (and often will not) have to support all modes!

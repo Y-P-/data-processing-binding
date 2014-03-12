@@ -5,6 +5,7 @@ import scala.reflect.ClassTag
 import loader.reflect.DataActor
 import loader.reflect.StandardSolver
 import loader.reflect.Binder
+import loader.core.definition.Processor
 
 abstract protected class Helper {
     
@@ -23,6 +24,7 @@ abstract protected class Helper {
   /** A simple utility that fetches the Binder on the DataActor fld in object x */
   def get[X<:AnyRef:ClassTag](fld:String,x:X) = {
     val cz = implicitly[ClassTag[X]].runtimeClass
+    implicit val ct = scala.reflect.classTag[Processor#EltBase]
     Binder(DataActor(cz,fld,"f").getOrElse(throw new IllegalArgumentException(s"no field named $fld could be bound to $cz")),StandardSolver(),fx(cz),true)(x)
   }
   def write[X](a:Traversable[X]) = if (a==null) "<null>" else scala.runtime.ScalaRunTime.stringOf(a)

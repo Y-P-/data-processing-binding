@@ -33,7 +33,8 @@ object CtxTest {
     class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null
-        ()=>run.include[p.type,e.proc.type](p,e.myself)(self,(u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
+       // ()=>run.include[p.type,e.proc.type](p,e.myself)(self,(u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
+        null
       }
     }
   }
@@ -42,9 +43,12 @@ object CtxTest {
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Int = {
-      val m = motors.Struct.ctx(out,2)
+      import motors.Struct.ctx
+      val m = ctx(out,2)
       try {
-        run(p,m)(userCtx,_(ClassContext(classOf[Data.Top])),null,null,_.read(load("small"), "UTF-8"))
+        val f = run(p,ctx)(m) _
+        f(userCtx,null)
+        (userCtx,_(_,ClassContext(classOf[Data.Top]),_)(_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
         userCtx.buf.getBuffer.setLength(0)

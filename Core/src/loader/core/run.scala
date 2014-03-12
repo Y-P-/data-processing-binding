@@ -1,13 +1,15 @@
 package loader.core
-import loader.core.definition.Processor
+import loader.core.definition.Impl
 
 object run {
   /** The nominal builder from scratch. Usually the next method is preferred (one less parameter.)
    *  This builds a parser implementation ready to be run.
    */
-  //def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor { type BaseParser>:P }, U<:UsrCtx[P,M]]
-  //      (p:P,m:M,u:U)(l:m.Launcher)(init:(l.type,U)=>p.Impl{type Proc=m.type;type UC=U}=>m.Elt{type Parser=p.type;type UC=U}):p.Impl{type Proc=m.type;type UC=U}
-  // = null// = p.top[m.type,U](u,init(l,u))
+  def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Impl { type BaseParser>:P }]
+        (p:P,m:M)(dlg:m.Dlg)
+        (u:p.UCtx[m.type] with m.UCtx[p.type],init:(m.type,m.Dlg,p.UCtx[m.type] with m.UCtx[p.type])=>P#Parser=>(m.Elt {type Builder=p.type}))
+        (f:p.Parser { type Proc=m.type } => Unit):m.Ret
+     = p.top[m.type](u,init(m,dlg,u)).invoke(f)
 
   
   /** The most standard way to launch a pair of Parser/Processor.

@@ -7,9 +7,10 @@ import loader.core.UserContext
 
 class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends HandlerBridge {self=>
     
-  def apply[P<:BaseProcessor with Singleton](b:Binder[P]):Parser[P] = new Parser(b)
+  def apply[P<:BaseProcessor with Singleton](userCtx:UCtx[P],pf:Impl[P]=>P#Elt):Impl[P] = new Impl(userCtx,pf)
   
-  class Parser[P<:BaseProcessor with Singleton](val binder:Binder[P]) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.Impl[P] {
+  type Parser = BaseImpl
+  class Impl[X<:BaseProcessor with Singleton](val userCtx:UCtx[X],pf: Impl[X]=>X#Elt) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.BaseImpl {
     override final val canSkip:Boolean = true
     override def skipToEnd():Nothing = abort(0)  //this parser can skip to the end of the current data structure
   }

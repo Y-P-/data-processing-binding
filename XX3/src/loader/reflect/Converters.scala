@@ -212,7 +212,7 @@ object Converters {
    *         otherwise, we find the closest method that matches both name and parameter types
    *  @return a converter, or None if no converter could be found (or too many matched)
    */
-  def apply[U,V,E<:Processor#Elt:ClassTag](in:Class[_], src:Class[_>:U], dst:Class[_<:V], name:String):Option[Converter[U,V,E]] = {
+  def apply[U,V,E<:Processor#EltBase:ClassTag](in:Class[_], src:Class[_>:U], dst:Class[_<:V], name:String):Option[Converter[U,V,E]] = {
     val czE:RichClass[_] = implicitly[ClassTag[E]].runtimeClass
     val isSrc = src<in
     val isDst = in<dst //condition that must be met to search constructors

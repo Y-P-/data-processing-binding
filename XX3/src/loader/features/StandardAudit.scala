@@ -9,9 +9,9 @@ import loader.core.events.Event.{DispatchByClassArray,Dispatcher}
 
 class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int) extends AuditInfo[P] {
   import Event._
-  protected[this] final type E = P#Element
+  protected[this] final type E = P#Elt
   protected[this] final type Logger[+Evt<:Event] = Dispatcher[P,Evt,(Int)=>LogRecord]
-  class LogDispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((P#Element,Event))=>Int]) extends PartialFunction[(P#Element,Event),LogRecord] {
+  class LogDispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((P#Elt,Event))=>Int]) extends PartialFunction[(P#Elt,Event),LogRecord] {
     val d = new DispatchByClassArray[P,Evt,(Int)=>LogRecord](a)
     def isDefinedAt(x:(E,Event))     = d.isDefinedAt(x)
     def apply(x:(E,Event)):LogRecord = { val s=severity(x._2.idx)(x); if (s<=max) d(x)(s) else null }
@@ -200,6 +200,6 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
 /** Event handler for auditing.
  */
 class DefaultAuditHandler[-P<:Processor](a:AuditInfo[P],ar:AuditRecorder) extends EventHandler[P] {
-  def isDefinedAt(x:(P#Element,Event)) = a.isDefinedAt(x)
-  def apply(x:(P#Element,Event)):Unit = ar.log(a(x))
+  def isDefinedAt(x:(P#Elt,Event)) = a.isDefinedAt(x)
+  def apply(x:(P#Elt,Event)):Unit = ar.log(a(x))
 }

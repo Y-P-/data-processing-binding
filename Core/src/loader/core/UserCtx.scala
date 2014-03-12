@@ -40,7 +40,7 @@ class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   val fast = true
 
   /** build an element context */
-  def apply(e:M#Elt):EltCtx = null
+  def apply(e:M#Elt):EltCtx = new EltCtx(e)
   
   /** this defines every special action that is to be taken for a given Element.
    *  Each element can define its own special actions: these do not have to be defined globaly.

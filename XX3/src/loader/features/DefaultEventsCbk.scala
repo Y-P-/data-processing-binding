@@ -27,11 +27,11 @@ case class IncludeSuccessEvt[V>:Null](info:V)                        extends Def
  *  the processing state. In particular, it uses the Context#FieldMapping definition
  *  in order to check the validity of read fields.
  */
-class DefaultCtxEventsCbk[P<:CtxCore] extends Callback[P#Element,P#Status,P#Ret,P#Key,P#Value] {
+class DefaultCtxEventsCbk[P<:CtxCore] extends Callback[P#Elt,P#Status,P#Ret,P#Key,P#Value] {
   /** Note that to avoid useless calls, we break down the Default event generator into three pieces,
    *  one for each Value of element. There is scarce common code between them.
    */
-  override def apply(e0:P#Element):Inner = e0 match {
+  override def apply(e0:P#Elt):Inner = e0 match {
     //Struct events
     case stc: P#Struct => new Inner(e0) {
       override def onName[S<:P#Status](key:P#Key, f: (P#Key)=>S):S = {
