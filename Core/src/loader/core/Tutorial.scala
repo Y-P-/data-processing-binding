@@ -43,45 +43,44 @@ object Tutorial extends App {
   trait ParserBuilder {self=>
     type Val                                             //a type specific in ParserBuilder
     type BaseProcessor<:Processor                        //see Sup above
-    type UBase[-P<:BaseProcessor]<:UsrCtx[self.type,P]
-    type MyImpl<:Impl
-    trait Impl { this:MyImpl =>                          //see E above
+    type UBase[-P<:BaseProcessor]<:UsrCtx[self.type,P]                            //the UsrCtx class relevant to that parser
+    protected type Impl[X<:BaseProcessor with Singleton]<:Parser { type Proc=X }  //the actual parser class
+    type Parser<:BaseImpl                                //we cannot work on Parser[X] because X is inside; this will be used for covariance
+    trait BaseImpl { this:Parser=>                       //see E above
       println("building basic parser")
       type Proc <: BaseProcessor with Singleton          //see S above
-      type UC <: UBase[Proc]                             //the user data is precise in ParserBuilder kind, but only seen as BaseProcessor in Processor kind
+      type UC = UBase[Proc]                              //we have to follow Proc to access the correct types in Proc
       val userCtx:UC                                     //the exact type provided by the user
       val top:Proc#Elt                                   //see data above
-      def push(v:Val)  = top.push(userCtx(top)(v))       //we can convert from ParserBuilder#Val to Processor#Val using userCtx
+      var cur = top                                      //there are sometimes problems in getting back the right Elt kind ; check this
+      def push(v:Val)  = cur=cur.push(userCtx(top)(v))   //we can convert from ParserBuilder#Val to Processor#Val using userCtx, we can follow Elt.
       def invoke(f:this.type=>Unit):Proc#Ret = top.run(f(this))
       def runIt:Unit = ()
     }
-    //a concrete implementation
-    abstract class Parser[X<:BaseProcessor with Singleton](pf: MyImpl=>X#Elt,val userCtx:UBase[X]) extends Impl { this:MyImpl=> val top=pf(this); type Proc=X; type UC=UBase[X] }
     //the factory method we are interested in
-    def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: MyImpl=>X#Elt):MyImpl{type Proc=X} = new Parser(pf,u)
+    def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: Impl[X]=>X#Elt):Impl[X]
   }
   trait Processor {self=>
     type Val
     type Ret
     type BaseParser<:ParserBuilder
     type UBase[-P<:BaseParser]<:UsrCtx[P,self.type]
-    trait Elt {
+    protected type Element[X<:BaseParser with Singleton] <: Elt { type Parser=X }
+    type Elt <: BaseElt
+    trait BaseElt { this:Elt =>
       println("building basic processor")
       type Parser <: BaseParser with Singleton
-      type UC <: UBase[Parser]
+      type UC = UBase[Parser]
       val userCtx:UC
-      val parser:Parser#Impl
+      val parser:Parser#Parser
       val eltCtx = userCtx(this)                         //we cannot use this efficiently in ParserBuilder#Impl for specific typing on Processor kind
-      def push(v:Val):Unit = println(v)
+      def push(v:Val):Elt = { println(v); this }
       def run(f: =>Unit):Ret = null.asInstanceOf[Ret]
     }
-    //a concrete implementation
-    private class Element[X<:BaseParser with Singleton](val parser:X#Impl,val userCtx:UBase[X]) extends Elt { type Parser=X; type UC=UBase[X] }
-    //the dual factory method we are interested in
-    def builder[X<:BaseParser with Singleton](u:UBase[X]):X#Impl=>Elt{type Parser=X} = px => new Element(px,u)
+    def builder[X<:BaseParser with Singleton](u:UBase[X]):X#Parser=>Element[X]
   }
   //the factory; which returns a ParserBuilder#Impl
-  def join[P<:ParserBuilder { type BaseProcessor>:Q },Q<:Processor { type BaseParser>:P }](p:P,q:Q)(u:p.UBase[q.type] with q.UBase[p.type]):p.Impl { type Proc=q.type } =
+  def join[P<:ParserBuilder { type BaseProcessor>:Q },Q<:Processor { type BaseParser>:P }](p:P,q:Q)(u:p.UBase[q.type] with q.UBase[p.type]):p.Parser { type Proc=q.type } =
     p.top[q.type](u,q.builder[p.type](u))
   
   /**
@@ -96,19 +95,27 @@ object Tutorial extends App {
     }
   }
   
-  //CASE 1: have parser <-> processor work together with a generic UsrCtx
-  object parser extends ParserBuilder {self=>
+  /*************************************************************************
+   *  CASE 1: have parser <-> processor work together with a generic UsrCtx
+   *          this is the basic test that shows that elementary things are
+   *          compiling and working
+   *************************************************************************/
+  class P0 extends ParserBuilder {
     type Val = Int
     type BaseProcessor = Processor
-    type UBase[-P<:BaseProcessor]=UsrCtx[self.type,P]
-    class Parser[X<:BaseProcessor with Singleton](pf: MyImpl=>X#Elt,val userCtx:UBase[X]) extends Impl { this:MyImpl=> val top=pf(this); type Proc=X; type UC=UBase[X] }
-    def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: MyImpl=>X#Elt):MyImpl{type Proc=X} = new Parser(pf,u)
+    type UBase[-P<:BaseProcessor]=UsrCtx[this.type,P]
+    type Parser = BaseImpl
+    protected class Impl[X<:BaseProcessor with Singleton](pf: Impl[X]=>X#Elt,val userCtx:UBase[X]) extends BaseImpl { val top=pf(this); type Proc=X }
+    def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: Impl[X]=>X#Elt):Impl[X] = new Impl[X](pf,u)
   }
-  object processor extends Processor {self=>
+  class M0 extends Processor {
     type Val = String
     type Ret = Double
     type BaseParser = ParserBuilder
-    type UBase[-P<:BaseParser]=UsrCtx[P,self.type]
+    type UBase[-P<:BaseParser]=UsrCtx[P,this.type]
+    type Elt = BaseElt
+    class Element[X<:BaseParser with Singleton](val parser:X#Parser,val userCtx:UBase[X]) extends BaseElt { type Parser=X }
+    def builder[X<:BaseParser with Singleton](u:UBase[X]):X#Parser=>Element[X] = new Element(_,u)
   }
   object uCtx extends UsrCtx[ParserBuilder { type Val=Int }, Processor { type Val=String }] {
     override def apply(e:M#Elt):X = new X
@@ -117,43 +124,52 @@ object Tutorial extends App {
     }
   }
   
-  //CASE 2: have parser <-> processor work together with a specific UsrCtx and a specific implementation
-  object parser1 extends ParserBuilder {self=>
+  /*************************************************************************
+   *  CASE 2: have parser <-> processor work together with a custom UsrCtx
+   *          this is superior test that shows that advanced things are
+   *          working: i.e. custom parsers/processors
+   *************************************************************************/
+  class P1 extends ParserBuilder {
     type Val = Int
     type BaseProcessor = Processor
-    type UBase[-P<:BaseProcessor]=UsrCtx[self.type,P] with UCtx1
-    trait Impl extends super.Impl {
+    type UBase[-P<:BaseProcessor]=UsrCtx[this.type,P] with UCtx1
+    trait Parser extends super.BaseImpl { this:Parser=>
       println(userCtx.hello+" parser")
     }
-    //a concrete implementation
-    private class Parser[X<:BaseProcessor with Singleton](pf: Impl=>X#Elt,val userCtx:UBase[X]) extends Impl { val top=pf(this); type Proc=X; type UC=UBase[X] }
-    //the factory method we are interested in
-  //  override def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: Impl=>X#Elt):Impl{type Proc=X} = new Parser(pf,u)
+    protected class Impl[X<:BaseProcessor with Singleton](pf: Impl[X]=>X#Elt,val userCtx:UBase[X]) extends Parser { val top=pf(this); type Proc=X }
+    def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: Impl[X]=>X#Elt):Impl[X] = new Impl[X](pf,u)
   }
-  object processor1 extends Processor { self=>
+  class M1 extends Processor {
     type Val = String
     type Ret = Double
     type BaseParser = ParserBuilder
-    type UBase[-P<:BaseParser]=UsrCtx[P,self.type] with UCtx1
-    trait Elt extends super.Elt{
+    type UBase[-P<:BaseParser]=UsrCtx[P,this.type] with UCtx1
+    trait Elt extends super.BaseElt{
       println(userCtx.hello+" processor")
     }
-    //a concrete implementation
-    private class Element[X<:BaseParser with Singleton](val parser:X#Impl,val userCtx:UBase[X]) extends Elt { type Parser=X; type UC=UBase[X] }
-    //the dual factory method we are interested in
-    override def builder[X<:BaseParser with Singleton](u:UBase[X]):X#Impl=>Elt{type Parser=X} = px => new Element(px,u)
+    protected class Element[X<:BaseParser with Singleton](val parser:X#Parser,val userCtx:UBase[X]) extends Elt { type Parser=X }
+    def builder[X<:BaseParser with Singleton](u:UBase[X]):X#Parser=>Element[X] = new Element(_,u)
   }
   class UCtx1 extends UsrCtx[ParserBuilder { type Val=Int }, Processor { type Val=String }] {
     override def apply(e:M#Elt):X = new X
     val hello = "hello"
     protected[this] class X extends super.X {
-      override def apply(x:P#Val):M#Val = if (x.isInfinite) "inf" else x.toString
+      override def apply(x:P#Val):M#Val = if (x.isInfinite) "*inf*" else s"*${x.toString}*"
     }
   }
   
+  //testing
   println("started")
-  println(
-      join(parser,processor)(uCtx).invoke(_.runIt) + join(parser1,processor1)(new UCtx1).invoke(_.runIt)
-  )
+  val r1 = join(new P0,new M0)(uCtx).invoke(_.runIt)
+  join(new P1,new M1)(new UCtx1).invoke(_.runIt)
+  join(new P1,new M0)(new UCtx1).invoke(_.runIt)
+  join(new P0,new M1)(new UCtx1).invoke(_.runIt)
   println("finished")
+  //conclusion:
+  // 1) both parser and processor can be used with each other: that's expected because they share appropriate bases
+  // 2) when using a 1 version, then UCtx1 has to be used ; correct
+  // 3) the correct return type is inferred
+  // 4) generic types are correctly inferred (no need to indicate them to help the compiler)
+  // 5) transcoding from Int to String is OK ; it comes from UsrCtx
+  // 6) specific UserCtx works
 }
