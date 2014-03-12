@@ -28,9 +28,10 @@ object definition {
     type Ret
     type BaseParser <: ParserBuilder
     type Status  >: Null <:definition.Status[Key]
+    type Elt >: Null <: EltBase
         
     //useful type shortcuts
-    type UserCtx[X] = UsrCtx[X,selfDef.type]    
+    type UserCtx[-X<:BaseParser] = UsrCtx[X,selfDef.type]    
     type Cbk        = callbacks.Callback[Elt,Status,Ret,Key,Value]
     type Cbks       = callbacks.Callbacks[Elt,Status,Ret,Key,Value]
     type CbksBld    = callbacks.CallbacksBuilder[Elt,Status,Ret,Key,Value]
@@ -38,27 +39,11 @@ object definition {
     
     val noKey:Key
     
-    /** This is used to define the builder for an implementation.
-     *  It is used to start a processor. 
-     */
-    trait Launcher {
-      type Proc = Processor.this.type
-      val proc:Proc = Processor.this
-      def myself:proc.Launcher = this  //prevents some non necessary casts
-      def builder:Bld
-              
-      /** Specific factories.
-       *  A Parser=>Element function is expected: it spawns the Top element for a given Parser.
-       */
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](u:U,s:Status):X#Impl=>Elt{type Parser=X;type UC=U} = builder(_,u,s)
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](u:U,s:Status,cbks:Cbks*):X#Impl=>Elt{type Parser=X;type UC=U} = p=>if (cbks.isEmpty) builder(p,u,s) else builder(p,u,s,cbks:_*)
-    }
-
     /** An object that is attached to a parser object (that has been pushed, to the contrary of
      *  values that are pulled.) One such object is spawned for each parser object, to process
      *  it accordingly to the processor's requirements.
      */
-    trait Elt extends Launcher with Traversable[Elt] { self=>
+    trait EltBase extends Traversable[Elt] { self:Elt=>
       type Parser <: BaseParser with Singleton
       val parser:Parser#Impl   //parser creating that element: Beware => this can change in case of includes
       /** Context for use */
@@ -69,7 +54,7 @@ object definition {
       def parent : Elt      //parent item
       def key    : Key      //element key
       def name   : String  = key.toString  //element name; provided for simplicity
-      protected[core] def parser_=(parser:Parser):Unit //parser has write access for handling includes
+      protected[core] def parser_=(parser:Parser#Impl):Unit = () //XXX parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
       def builder:Bld
       /** building a child spawning children of the same nature; you must call this method because it can be overriden (callbacks) */
@@ -158,7 +143,7 @@ object definition {
     /** A very basic implementation that can be used as a base for real use classes.
      *  Its main feature is that it encapsulated the abstract types.
      */
-    protected[this] class Element[X<:BaseParser with Singleton,U<:UserCtx[X]](var parser:X#Impl,val userCtx:U) extends Elt { type Parser=X; type UC=U }
+    protected[this] abstract class Element[X<:BaseParser with Singleton,U<:UserCtx[X]](val parser:X#Impl,val userCtx:U) extends EltBase {self:Elt=> type Parser=X; type UC=U }
     
     /** Defines how Element are built in various contexts.
      *  - the first four methods define Top builders
@@ -193,16 +178,16 @@ object definition {
      *  - if a callback tree is present for the child, and a callback applies, the child uses the WithCallback trait
      *    this causes the same overhead as the previous case; in addition, the callback is carried and base methods pass through it (onBeg etc...)
      */
-    trait WithCallbacks extends Elt {
+    trait WithCallbacks extends EltBase { self:Elt=>
       protected[this] def cbks: Seq[Cbks] //current callbacks trees (for children)
-      override def build(p: Parser#Impl, s: Status): Elt = WithCallbacks(p,userCtx,this,s,cbks,builder)
+      override def build(p: Parser#Impl, u: UC, s: Status): Elt{type Parser=self.Parser;type UC=self.UC} = WithCallbacks(p,u,this,s,cbks,builder)
     }
     object WithCallbacks {
       /** Analyzes a callbacks sequence to know:
        *  1) whether it applies to the current item
        *  2) what sub sequence may apply to children
        */
-      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p: X#Impl, u:U, parent:Elt, s:Status, cbks:Seq[Cbks], builder:EltBuilder): Elt = {
+      def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](p: X#Impl, u:U, parent:Elt, s:Status, cbks:Seq[Cbks], builder:EltBuilder): Elt{type Parser=X;type UC=U} = {
         if (cbks.length == 1) {
           //first, the case where the sequence is one element only.
           //it's very common, and should be optimized! it's furthermore much easier to read!
@@ -252,7 +237,7 @@ object definition {
      *  It also makes it possible to easily subclass an implementation.
      */
     type Motor<:Launcher
-    trait Launcher extends super.Launcher with Dlg { this:Motor=>
+    trait Launcher extends Dlg { this:Motor=>
       final val builder:Bld = Impl.this.builder(this)
     }
     def builder(m:Motor):Bld
@@ -263,12 +248,7 @@ object definition {
      *  It also makes it possible to easily subclass an implementation.
      *  We can already provide basic implementations for simple use case.
      */
-    protected class Element[X<:BaseParser with Singleton,U<:UserCtx[X]] (parser:X#Impl,userCtx:U,val motor:Motor,val key:Key,val parent:Elt) extends super.Element[X,U](parser,userCtx) {
-      //the top constructor
-      def this(parser:X#Impl,userCtx:U,motor:Motor) = this(parser,userCtx,motor,noKey,null)
-      //a child constructor
-      def this(key:Key,parent:Element[X,U])         = this(parent.parser,parent.userCtx,parent.motor,key,parent)
-      
+    protected abstract class Element[X<:BaseParser with Singleton,U<:UserCtx[X]] (parser:X#Impl,userCtx:U,val motor:Motor,val key:Key,val parent:Elt) extends super.Element[X,U](parser,userCtx) {this:Elt=>      
      // def parser = parser0  //we would rather not have this var, but the alternative is not good either.
      // protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
       def builder = motor.builder

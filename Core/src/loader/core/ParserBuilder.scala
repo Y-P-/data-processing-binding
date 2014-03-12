@@ -39,14 +39,11 @@ trait ParserBuilder {selfBuilder=>
   //Note that the processor must accept this parser implementation!
   type BaseProcessor <: Processor
   
-  // Actual parser implementation
-  // As for Element, the generic signature isn't real nice.
-  //protected[this] type Parser[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]] <: Impl
-  protected[this] class Parser[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](pf: Impl=>X#Elt,val userCtx:U) extends Impl { val top=pf(this); type Proc=X; type UC=U }
-  
+  // Actual parser implementation: You aren't forced to use it, but having that base class still helps...
+  protected[this] abstract class Parser[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](pf: Impl=>X#Elt,val userCtx:U) extends Impl { val top=pf(this); type Proc=X; type UC=U }
   
   /** factory for Parser */
-  def top[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](u:U,pf: Impl=>X#Elt{type Parser>:selfBuilder.type}):Impl
+  def top[X<:BaseProcessor with Singleton,U<:UsrCtx[selfBuilder.type,X]](u:U,pf: Impl{type Proc=X}=>X#Elt{type Parser>:selfBuilder.type}):Impl{type Proc=X}
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed

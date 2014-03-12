@@ -34,6 +34,8 @@ abstract class UserContext[-P<:ParserBuilder,-M<:Processor] {
 //      of course, contexts built with no regards with these constraint
 //      won't be of any real use...
 class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
+  protected[this] type Proc = M
+  protected[this] type Pars = P
   def eventHandler:EventHandler[M] = null
   val fast = true
 

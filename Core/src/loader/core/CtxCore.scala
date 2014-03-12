@@ -19,12 +19,15 @@ import context.Context
  */
 trait CtxCore extends definition.Impl {
   type Status = CtxCore.Status[Key]
+  type Motor = Launcher
+  type Elt = EltBase
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
   protected[this] type Data
-  def getData(parent:Element,s:Status):Data
+  def getData(parent:Elt,s:Status):Data
     
-  trait Elt extends super.Elt { this:Elt with Element=>
+  trait EltBase extends super.EltBase {
+    def data: Data
     def idx: Int
     def fd: Context#FieldMapping
     /** gets the previous Struct layer */
@@ -42,7 +45,7 @@ trait CtxCore extends definition.Impl {
   }
 
   //parent is undefined here
-  trait Struct extends Elt { this:Element=>
+  trait Struct extends EltBase {
     /** the known tags for that struct */
     val tags = fd.loader.fields
     /** tags seen count */
@@ -72,7 +75,7 @@ trait CtxCore extends definition.Impl {
     }
   }
   //parent is undefined here
-  trait List extends Elt { this:Element=>
+  trait List extends EltBase {
     private val innerFd: Context#FieldMapping = fd.asSeq
     var index: Int = 0
     override protected def onName(key: Key):Status = {
@@ -83,49 +86,47 @@ trait CtxCore extends definition.Impl {
     }
   }
   //parent is undefined here
-  trait Terminal extends Elt { this:Element=>
+  trait Terminal extends EltBase {
     override protected def onName(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
-  type Motor = Launcher
   trait Launcher extends super.Launcher {
     //a default stub ; it has to be overriden by the Struct/List/Terminal implementation
-    final def onName(e:Element,key:Key): Nothing  = ???
+    final def onName(e:Elt,key:Key): Nothing  = ???
     //top factories
-    def apply(fd:Context#FieldMapping,cbks:Cbks*):Parser=>Element = apply(noStatus(fd), cbks:_*)
-    def apply(fd:Context#FieldMapping):Parser=>Element            = apply(noStatus(fd))
+    def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](u:U,fd:Context#FieldMapping,cbks:Cbks*):X#Impl=>Elt{type Parser=X;type UC=U} = builder(_,u,noStatus(fd),cbks:_*)
+    def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](u:U,fd:Context#FieldMapping):X#Impl=>Elt{type Parser=X;type UC=U}            = builder(_,u,noStatus(fd))
   }
   
-  def builder(m:Motor) = new Bld {
-    def apply(parser:Parser, parent: Element, s: Status) =
-      if      (s.fd.isList)   new XList(parser, m, s, parent)
-      else if (s.fd.isStruct) new XStruct(parser, m, s, parent)
-      else                    new XTerminal(parser, m, s, parent)
-    def apply(parser:Parser, parent: Element, s: Status, cbks: Cbks*) =
-      if      (s.fd.isList)   new XListCbks(parser, m, s, parent, cbks:_*)
-      else if (s.fd.isStruct) new XStructCbks(parser, m, s, parent, cbks:_*)
-      else                    new XTerminalCbks(parser, m, s, parent, cbks:_*)
-    def apply(parser:Parser, parent: Element, s: Status, cb:Cbk, cbks: Cbks*) =
-      if      (s.fd.isList)   new XListCbk(parser, m, s, parent, cb, cbks:_*)
-      else if (s.fd.isStruct) new XStructCbk(parser, m, s, parent, cb, cbks:_*)
-      else                    new XTerminalCbk(parser, m, s, parent, cb, cbks:_*)
+  def builder(m:Motor) = new EltBuilder {
+    def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl, userCtx:U, parent: Elt, s: Status) =
+      if      (s.fd.isList)   new XList(parser, userCtx, m, s, parent)
+      else if (s.fd.isStruct) new XStruct(parser, userCtx, m, s, parent)
+      else                    new XTerminal(parser, userCtx, m, s, parent)
+    def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl, userCtx:U, parent: Elt, s: Status, cbks: Cbks*) =
+      if      (s.fd.isList)   new XListCbks(parser, userCtx, m, s, parent, cbks:_*)
+      else if (s.fd.isStruct) new XStructCbks(parser, userCtx, m, s, parent, cbks:_*)
+      else                    new XTerminalCbks(parser, userCtx, m, s, parent, cbks:_*)
+    def apply[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl, userCtx:U, parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) =
+      if      (s.fd.isList)   new XListCbk(parser, userCtx, m, s, parent, cb, cbks:_*)
+      else if (s.fd.isStruct) new XStructCbk(parser, userCtx, m, s, parent, cb, cbks:_*)
+      else                    new XTerminalCbk(parser, userCtx, m, s, parent, cb, cbks:_*)
   }
   
-  type Element = Elt
   //concrete class definitions
-  protected abstract class EltBase(parser:Parser, motor:Motor, key:Key, parent:Element, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends super.Elt(parser,motor,key,parent) with Elt {
-    def this(parser:Parser, motor:Motor, s:Status, parent:Element) = this(parser,motor,s.key,parent,s.fd,s.idx,getData(parent, s))
+  protected abstract class Element[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl, userCtx:U, motor:Motor, key:Key, parent:Elt, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends super.Element[X,U](parser,userCtx,motor,key,parent) with Elt {
+    def this(parser:X#Impl, userCtx:U, motor:Motor, s:Status, parent:Elt) = this(parser,userCtx,motor,s.key,parent,s.fd,s.idx,getData(parent, s))
   }
-  protected class XStruct(parser:Parser,motor:Motor,s:Status,parent:Element)                             extends EltBase(parser,motor,s,parent) with Struct
-  protected class XList(parser:Parser,motor:Motor,s:Status,parent:Element)                               extends EltBase(parser,motor,s,parent) with List
-  protected class XTerminal(parser:Parser,motor:Motor,s:Status,parent:Element)                           extends EltBase(parser,motor,s,parent) with Terminal
-  protected class XStructCbks(parser:Parser,motor:Motor,s:Status,parent:Element,val cbks:Cbks*)          extends XStruct(parser,motor,s,parent) with WithCallbacks
-  protected class XListCbks(parser:Parser,motor:Motor,s:Status,parent:Element,val cbks:Cbks*)            extends XList(parser,motor,s,parent) with WithCallbacks
-  protected class XTerminalCbks(parser:Parser,motor:Motor,s:Status,parent:Element,val cbks:Cbks*)        extends XTerminal(parser,motor,s,parent) with WithCallbacks
-  protected class XStructCbk(parser:Parser,motor:Motor,s:Status,parent:Element,val cb:Cbk,cbks:Cbks*)    extends XStructCbks(parser,motor,s,parent,cbks:_*) with WithCallback
-  protected class XListCbk(parser:Parser,motor:Motor,s:Status,parent:Element,val cb:Cbk,cbks:Cbks*)      extends XListCbks(parser,motor,s,parent,cbks:_*) with WithCallback
-  protected class XTerminalCbk(parser:Parser,motor:Motor,s:Status, parent:Element,val cb:Cbk,cbks:Cbks*) extends XTerminalCbks(parser,motor,s,parent,cbks:_*) with WithCallback        
+  protected class XStruct[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt)                             extends Element(parser,userCtx,motor,s,parent) with Struct
+  protected class XList[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt)                               extends Element(parser,userCtx,motor,s,parent) with List
+  protected class XTerminal[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt)                           extends Element(parser,userCtx,motor,s,parent) with Terminal
+  protected class XStructCbks[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt,val cbks:Cbks*)          extends XStruct(parser,userCtx,motor,s,parent) with WithCallbacks
+  protected class XListCbks[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt,val cbks:Cbks*)            extends XList(parser,userCtx,motor,s,parent) with WithCallbacks
+  protected class XTerminalCbks[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt,val cbks:Cbks*)        extends XTerminal(parser,userCtx,motor,s,parent) with WithCallbacks
+  protected class XStructCbk[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*)    extends XStructCbks(parser,userCtx,motor,s,parent,cbks:_*) with WithCallback
+  protected class XListCbk[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*)      extends XListCbks(parser,userCtx,motor,s,parent,cbks:_*) with WithCallback
+  protected class XTerminalCbk[X<:BaseParser with Singleton,U<:UserCtx[X]](parser:X#Impl,userCtx:U,motor:Motor,s:Status, parent:Elt,val cb:Cbk,cbks:Cbks*) extends XTerminalCbks(parser,userCtx,motor,s,parent,cbks:_*) with WithCallback        
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)

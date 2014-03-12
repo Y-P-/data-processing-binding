@@ -23,17 +23,17 @@ object Event {
    * This two steps dispatcher is reasonnably fast and scales well.
    */
   abstract class Dispatcher[-P<:Processor,+Evt<:Event,+X] {
-    def apply(x:(P#Element,Event)):X = process(x.asInstanceOf[(P#Element,Evt)])  //XXX justify cast
-    protected[this] def process(e:(P#Element,Evt)):X
+    def apply(x:(P#Elt,Event)):X = process(x.asInstanceOf[(P#Elt,Evt)])  //XXX justify cast
+    protected[this] def process(e:(P#Elt,Evt)):X
   }
 
   /** Defines an event dispatcher partial function by matching both a super-class (Evt) and an array of Builder.
    *  This is useful for a reasonably fast dispatching of events.
    */
-  class DispatchByClassArray[-P<:Processor,-Evt<:Event:Manifest,+X](a:Array[_<:Dispatcher[P,Evt,X]]) extends PartialFunction[(P#Element,Event),X] {
+  class DispatchByClassArray[-P<:Processor,-Evt<:Event:Manifest,+X](a:Array[_<:Dispatcher[P,Evt,X]]) extends PartialFunction[(P#Elt,Event),X] {
     protected[this] val m = manifest[Evt]
-    def isDefinedAt(x:(P#Element,Event)):Boolean = m.runtimeClass.isAssignableFrom(x._2.getClass) && x._2.idx<a.length && x._2.idx>=0
-    def apply(x:(P#Element,Event)):X = a(x._2.idx)(x)
+    def isDefinedAt(x:(P#Elt,Event)):Boolean = m.runtimeClass.isAssignableFrom(x._2.getClass) && x._2.idx<a.length && x._2.idx>=0
+    def apply(x:(P#Elt,Event)):X = a(x._2.idx)(x)
   }
 
 }

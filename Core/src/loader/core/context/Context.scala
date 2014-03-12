@@ -13,7 +13,7 @@ abstract class TagManager extends ((String)=>(StructAnnot,Traversable[FieldAnnot
  *  - tagManager, which specifies how the tags are read in this context
  */
 abstract class Context(tagMapBuilder: =>TagMap) {
-  type Element = loader.core.definition.Processor#Element
+  type Element = loader.core.definition.Processor#Elt
   val tagManager:TagManager
   
   protected def top(id:String,name0:String) = new FieldAnnot {
