@@ -23,7 +23,7 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
    *  Each element can define its own special actions: these do not have to be defined globaly.
    *  However, if you need global actions, the previous method just has to return a constant. 
    */
-  protected[this] abstract class EltCtx(protected[this] val elt:M#Elt) extends ECtx[P,M] {
+  protected[this] abstract class EltCtx(val elt:M#Elt) extends ECtx[P,M] {
     /** Solving an include for e with data K */
     def solver(s:M#Value):()=>M#Ret = null
     /** Solving an include for e with data K */
@@ -38,7 +38,7 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
 }
 
 trait ECtx[P<:ParserBuilder,M<:Processor] {
-  protected[this] def elt:M#Elt
+  def elt:M#Elt
   def solver(s:M#Value):()=>M#Ret
   def keyMap(s:P#Key):M#Key
   def valMap(s:P#Value):M#Value

@@ -22,13 +22,13 @@ object definition {
    *  @see ExtCore for a richer implementation where elements can contain additional data
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
-  trait Processor {self=>
+  trait Processor {
     type Value>:Null   //the Value type of data processed by this processor
     type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
     type Status>:Null<:definition.Status[Key]
     type BaseParser <: ParserBuilder
-    type UCtx[-P<:BaseParser]>:Null<:UsrCtx[P,self.type]
+    type UCtx[-P<:BaseParser]>:Null<:UsrCtx[P,this.type]
     protected type Element[X<:BaseParser with Singleton] <: Elt { type Builder=X }
     type Elt>:Null<:EltBase
         
@@ -43,8 +43,10 @@ object definition {
      *  values that are pulled.) One such object is spawned for each parser object, to process
      *  it accordingly to the processor's requirements.
      */
-    trait EltBase extends Traversable[Elt] { self:Elt=>
-      final def myself:Elt = self //self cast
+    trait EltBase extends Traversable[Elt] { this:Elt=>
+      final type Proc = Processor.this.type with Singleton
+      val proc:Processor.this.type = Processor.this
+      final def myself:Elt = this //self cast
       type Builder <: BaseParser with Singleton
       val parser:Builder#Parser   //parser creating that element: Beware => this can change in case of includes
       /** Context for use */
@@ -129,14 +131,14 @@ object definition {
       }
       //iterator on the elements forming the full chain from this element to the top
       def toHead:Iterator[Elt] = new Iterator[Elt] {
-        private var cur = self
+        private var cur = EltBase.this
         def hasNext: Boolean = cur!=null
         def next: Elt = { val c=cur; cur=parent; c }
       }
       //iteration on the elements forming the full chain to this element starting from the top
-      def foreach[U](f:Elt=>U):Unit = { if (parent!=null) parent.foreach(f); f(self) }
+      def foreach[U](f:Elt=>U):Unit = { if (parent!=null) parent.foreach(f); f(EltBase.this) }
       def iter[U](f:Elt=>U):Traversable[Elt] = new Traversable[Elt] {
-        def foreach[U](f:(Elt)=>U) = self.foreach(f)
+        def foreach[U](f:(Elt)=>U) = EltBase.this.foreach(f)
       }
       /** Prints the stack */
       def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.name}"))

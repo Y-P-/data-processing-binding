@@ -1,5 +1,6 @@
 package loader.core
 import loader.core.definition.Impl
+import loader.core.definition.Processor
 
 object run {
   
@@ -16,12 +17,13 @@ object run {
         :(p.Ret,m.proc.Ret)
      = p(u,init(m)(u)).invoke(f)
 
-
-/*
-  /** The nominal runner on an existing element, i.e. this includes the new parser in the current processor.
-   *  Usually the next method is preferred.
-   */
-  def include[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor with Singleton]
-        (p:P,e:M#Element)(userCtx:UserContext[P,M],mapper:(M#Element,P#Value)=>M#Value, keyMapper:(M#Element,p.Key)=>M#Key, run:P#Parser[M]=>Unit):M#Ret
-    = p(p.binder(userCtx,(q:M#Parser)=>{e.parser=q; e},mapper,keyMapper)).invoke(run)*/
+  /** creating an include, i.e. an element based on a different parser and a current top element. */
+  def include[P<:ParserBuilder { type BaseProcessor>:M }, M<:Processor { type BaseParser>:P }]
+        (m:M)(e:m.Elt,p:P)
+        (
+            u:p.UCtx[m.type] with m.UCtx[p.type],
+            f:p.Parser { type Proc= m.type } => Unit
+        )
+        :(p.Ret,m.Ret)
+     = p[m.type](u,e.builder[p.type](_:p.Parser,u,e,null)).invoke(f)
 }
