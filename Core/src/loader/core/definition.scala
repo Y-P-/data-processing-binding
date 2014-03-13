@@ -22,13 +22,13 @@ object definition {
    *  @see ExtCore for a richer implementation where elements can contain additional data
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
-  trait Processor { selfDef=>
+  trait Processor {self=>
     type Value>:Null   //the Value type of data processed by this processor
     type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
     type Status>:Null<:definition.Status[Key]
     type BaseParser <: ParserBuilder
-    type UCtx[-P<:BaseParser]>:Null<:UsrCtx[P,this.type]
+    type UCtx[-P<:BaseParser]>:Null<:UsrCtx[P,self.type]
     protected type Element[X<:BaseParser with Singleton] <: Elt { type Builder=X }
     type Elt>:Null<:EltBase
         
@@ -44,6 +44,7 @@ object definition {
      *  it accordingly to the processor's requirements.
      */
     trait EltBase extends Traversable[Elt] { self:Elt=>
+      final def myself:Elt = self //self cast
       type Builder <: BaseParser with Singleton
       val parser:Builder#Parser   //parser creating that element: Beware => this can change in case of includes
       /** Context for use */
@@ -96,7 +97,7 @@ object definition {
       /** The push/pull interface on the processor side
        */
       def push(n:Key):Elt = { val c=build(parser,userCtx,onName(n)); c.onInit(); c }
-      def pull()         = { doBeg(); parent.onChild(this,onEnd()) }
+      def pull()          = { doBeg(); parent.onChild(this,onEnd()) }
       def pull(v:Value)   = {
         parent.doBeg
         parent.onChild(this,
@@ -104,6 +105,9 @@ object definition {
             case null => onVal(v)
             case i    => onSolver(v,i)
           })
+      }
+      object EltBase {
+        implicit def toElt(e:EltBase):Elt = e.myself
       }
       
       /** standard invoker, used on the top level elements */

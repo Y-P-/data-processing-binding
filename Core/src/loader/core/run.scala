@@ -8,7 +8,7 @@ object run {
   def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Impl { type BaseParser>:P }]
         (p:P,m:M)(dlg:m.Dlg)
         (u:p.UCtx[m.type] with m.UCtx[p.type],init:(m.type,m.Dlg,p.UCtx[m.type] with m.UCtx[p.type])=>P#Parser=>(m.Elt {type Builder=p.type}))
-        (f:p.Parser { type Proc=m.type } => Unit):m.Ret
+        (f:p.Parser { type Proc=m.type } => Unit):(p.Ret,m.Ret)
      = p.top[m.type](u,init(m,dlg,u)).invoke(f)
 
   

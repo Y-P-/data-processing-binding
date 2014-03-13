@@ -5,7 +5,7 @@ package loader.core
  */
 trait ExtCore extends definition.Impl {
   type Status = ExtCore.Status[Key]
-  type Dlg=DlgBase
+  type Dlg <: DlgBase
   type Elt = EltBase
   protected[this] val noStatus = new Status(noKey)
   
@@ -16,7 +16,7 @@ trait ExtCore extends definition.Impl {
     def data: Data
   }
   
-  trait DlgBase extends super.DlgBase {
+  trait DlgBase extends super.DlgBase {this:Dlg=>
     def onName(e:Elt,key:Key) = new Status(key)
   }
     

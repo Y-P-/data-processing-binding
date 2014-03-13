@@ -34,6 +34,8 @@ trait ParserBuilder {
   type Value
   /** Key types produced by this parser */
   type Key
+  /** A return value for the parser */
+  type Ret = Unit
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
@@ -61,7 +63,7 @@ trait ParserBuilder {
     private[this] var cur = top
     private[this] var ignore:Int = 0
     def current = cur
-    def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                     } catch errHandler finally { cur=cur.parent }
+    def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                       } catch errHandler finally { cur=cur.parent }
     def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(userCtx(cur).valMap(v)) } catch errHandler finally { cur=cur.parent }
     def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
@@ -72,11 +74,10 @@ trait ParserBuilder {
         case e:Throwable            => errHandler(e); ignore+=1 
       }
     }
-    def onEnd() = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
-    def invoke(f:this.type=>Unit):Proc#Ret = {
+    def onEnd():Ret = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
+    def invoke(f:this.type=>Unit):(Ret,Proc#Ret) = {
       val r=top.invoke(f(this))
-      onEnd()
-      r
+      (onEnd(),r)
     }
     
     /** when the processor rejects the current elemnt (push returns false), the parser is assumed to get to the

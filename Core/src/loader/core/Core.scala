@@ -6,11 +6,11 @@ import callbacks._
  */
 trait Core extends definition.Impl {
   type Status = Core.Status[Key]
-  type Dlg=DlgBase
+  type Dlg <: DlgBase
   type Elt = EltBase
   protected[this] val noStatus = new Status(noKey)
   
-  trait DlgBase extends super.DlgBase {
+  trait DlgBase extends super.DlgBase {this:Dlg=>
     def onName(e:Elt,key:Key) = new Status(key)
   }
   

@@ -19,7 +19,7 @@ import context.Context
  */
 trait CtxCore extends definition.Impl {
   type Status = CtxCore.Status[Key]
-  type Dlg=DlgBase
+  type Dlg<:DlgBase
   type Elt = EltBase
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
@@ -91,7 +91,7 @@ trait CtxCore extends definition.Impl {
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
-  trait DlgBase extends super.DlgBase {
+  trait DlgBase extends super.DlgBase { this:Dlg=>
     //a default stub ; it has to be overriden by the Struct/List/Terminal implementation
     final def onName(e:Elt,key:Key): Nothing  = ???
   }
