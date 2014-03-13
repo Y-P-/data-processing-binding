@@ -13,6 +13,9 @@ object Tutorial extends App {
    * There is a symmetry in the base pattern when both method in top and builder are effectively defined in both classes.
    * This pattern in itself is limited in use. The next example will highlight the actual pattern used in the code, with
    * the symmetry being broken, but also with additional properties.
+   * 
+   * In our case, their is a second disymmetry: one side (the parser) is controlling the other (the processor) ; the
+   * invocation flow is thus not symmetric. This is why this pattern is not exactly useful, except as a starting base.
    */
   trait Cross[+This<:Cross[This,P],+P<:Cross[P,This]] { self:This=>
      type Val
@@ -39,6 +42,8 @@ object Tutorial extends App {
    * Note: Having tried other patterns, this is the less constraining I found. Other experiments provided tighter,
    *       unnecessary coupling between ParserBuilder and Processor.
    *       The small cost is not being able to write top.push(top.eltCtx(v)) which is less expensive.
+   *       The actual implementation is a bit more complex because of the introduction of Delegates,
+   *       a subclass that the user actually wants to use
    */
   trait ParserBuilder {self=>
     type Val                                             //a type specific in ParserBuilder
@@ -51,11 +56,11 @@ object Tutorial extends App {
       type Proc <: BaseProcessor with Singleton          //see S above
       type UC = UBase[Proc]                              //we have to follow Proc to access the correct types in Proc
       val userCtx:UC                                     //the exact type provided by the user
-      val top:Proc#Elt                                   //see data above
+      val top:Proc#Elt                                   //see data above; actual declaration can only be done in actual class and will have to be lazy (the Impl[X]=>X#Elt function can only be called in the bottom class without resorting to a cast)
       var cur = top                                      //there are sometimes problems in getting back the right Elt kind ; check this
-      def push(v:Val)  = cur=cur.push(userCtx(top)(v))   //we can convert from ParserBuilder#Val to Processor#Val using userCtx, we can follow Elt.
+      def push(v:Val)  = cur=cur.push(userCtx(cur)(v))   //we can convert from ParserBuilder#Val to Processor#Val using userCtx, we can follow Elt.
       def invoke(f:this.type=>Unit):Proc#Ret = top.run(f(this))
-      def runIt:Unit = ()
+      def runIt():Unit = ()
     }
     //the factory method we are interested in
     def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: Impl[X]=>X#Elt):Impl[X]
@@ -75,7 +80,7 @@ object Tutorial extends App {
       val parser:Parser#Parser
       val eltCtx = userCtx(this)                         //we cannot use this efficiently in ParserBuilder#Impl for specific typing on Processor kind
       def push(v:Val):Elt = { println(v); this }
-      def run(f: =>Unit):Ret = null.asInstanceOf[Ret]
+      def run(f: =>Unit):Ret = { f; null.asInstanceOf[Ret] }
     }
     def builder[X<:BaseParser with Singleton](u:UBase[X]):X#Parser=>Element[X]
   }
@@ -105,7 +110,7 @@ object Tutorial extends App {
     type BaseProcessor = Processor
     type UBase[-P<:BaseProcessor]=UsrCtx[this.type,P]
     type Parser = BaseImpl
-    protected class Impl[X<:BaseProcessor with Singleton](pf: Impl[X]=>X#Elt,val userCtx:UBase[X]) extends BaseImpl { val top=pf(this); type Proc=X }
+    protected class Impl[X<:BaseProcessor with Singleton](pf: Impl[X]=>X#Elt,val userCtx:UBase[X]) extends BaseImpl { lazy val top=pf(this); type Proc=X; override def runIt()=println(push(3)) }
     def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: Impl[X]=>X#Elt):Impl[X] = new Impl[X](pf,u)
   }
   class M0 extends Processor {
@@ -136,7 +141,7 @@ object Tutorial extends App {
     trait Parser extends super.BaseImpl { this:Parser=>
       println(userCtx.hello+" parser")
     }
-    protected class Impl[X<:BaseProcessor with Singleton](pf: Impl[X]=>X#Elt,val userCtx:UBase[X]) extends Parser { val top=pf(this); type Proc=X }
+    protected class Impl[X<:BaseProcessor with Singleton](pf: Impl[X]=>X#Elt,val userCtx:UBase[X]) extends Parser { lazy val top=pf(this); type Proc=X }
     def top[X<:BaseProcessor with Singleton](u:UBase[X],pf: Impl[X]=>X#Elt):Impl[X] = new Impl[X](pf,u)
   }
   class M1 extends Processor {

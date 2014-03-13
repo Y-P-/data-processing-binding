@@ -234,6 +234,7 @@ object definition {
      */
     type Dlg<:DlgBase
     trait DlgBase extends ThisDlg { this:Dlg=>
+      final val proc:self.type = self
       final val builder:EltBuilder = Impl.this.builder(this)
     }
     def builder(m:Dlg):EltBuilder

@@ -35,7 +35,7 @@ trait ParserBuilder {
   /** Key types produced by this parser */
   type Key
   /** A return value for the parser */
-  type Ret = Unit
+  type Ret
   //The base processor kind accepted.
   //Usually Def for generality, could be for example loader.motors.Struct.ctx.type for strong coupling.
   //Note that the processor must accept this parser implementation!
@@ -46,7 +46,9 @@ trait ParserBuilder {
   type Parser>:Null<:BaseImpl                                                   //the concrete implementation,
     
   /** factory for Parser */
-  def top[X<:BaseProcessor with Singleton](u:UCtx[X],pf: Impl[X]=>X#Elt):Impl[X]
+  def apply[X<:BaseProcessor with Singleton](u:UCtx[X],pf:Impl[X]=>X#Elt):Impl[X]
+  /** idem, using the FastImpl mixin */
+  def apply[P<:BaseProcessor with Singleton](u:UCtx[P],pf:Impl[P]=>P#Elt,stackSize:Int):Impl[P] with FastImpl
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -60,24 +62,28 @@ trait ParserBuilder {
     type Proc <: BaseProcessor with Singleton
     val userCtx:UCtx[Proc]
     val top:Proc#Elt
-    private[this] var cur = top
-    private[this] var ignore:Int = 0
+    protected[this] var cur = top
+    private[this]   var ignore:Int = 0
     def current = cur
-    def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull()                       } catch errHandler finally { cur=cur.parent }
-    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(userCtx(cur).valMap(v)) } catch errHandler finally { cur=cur.parent }
+    def eltCtx:ECtx[ParserBuilder.this.type,Proc] = userCtx(cur)
+    def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull() } catch errHandler finally { cur=cur.parent }
+    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { pullVal(v) } catch errHandler finally { cur=cur.parent }
     def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
-      try { cur=cur.push(userCtx(cur).keyMap(key)) } catch {
+      try { pushKey(key) } catch {
         case `skip`                 => ignore+=1
         case `skipEnd`   if canSkip => skipToEnd
         case e:Throwable if canSkip => errHandler(e); skipToEnd
         case e:Throwable            => errHandler(e); ignore+=1 
       }
     }
-    def onEnd():Ret = if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
+    protected[this] def pushKey(key:Key) = cur=cur.push(eltCtx.keyMap(key))
+    protected[this] def pullVal(v:Value) = cur.pull(eltCtx.valMap(v))
+    def onExit():Ret
     def invoke(f:this.type=>Unit):(Ret,Proc#Ret) = {
       val r=top.invoke(f(this))
-      (onEnd(),r)
+      if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
+      (onExit(),r)
     }
     
     /** when the processor rejects the current elemnt (push returns false), the parser is assumed to get to the
@@ -101,6 +107,21 @@ trait ParserBuilder {
       case u:Exception with Event    => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
       case u:Throwable               => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
     }
+  }
+  /**
+   * This trait adds the eltCtx storage in an array.
+   * The benefit is that an eltCtx is only computed once for a given element (can improve performances).
+   * The drawback is that the expected stack depth has to be provided.
+   */
+  trait FastImpl extends BaseImpl {
+    def stkSz:Int
+    private[this] var depth:Int = 0
+    private[this] var a = new Array[ECtx[ParserBuilder.this.type,Proc]](stkSz)  //computed userCtx
+    a(0) = userCtx(top)
+    override def pull()            = { super.pull(); depth-=1 }
+    override def pullVal(v: Value) = { super.pullVal(v); depth-=1 }
+    override def pushKey(key:Key)  = { super.pushKey(key); depth+=1; a(depth)=userCtx(cur) }
+    override def eltCtx:ECtx[ParserBuilder.this.type,Proc] = a(depth)
   }
 }
 

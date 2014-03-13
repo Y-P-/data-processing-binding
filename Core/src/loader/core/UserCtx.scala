@@ -18,12 +18,12 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
 
   /** build an element context */
   def apply(e:M#Elt):EltCtx
-  
+ 
   /** this defines every special action that is to be taken for a given Element.
    *  Each element can define its own special actions: these do not have to be defined globaly.
    *  However, if you need global actions, the previous method just has to return a constant. 
    */
-  protected[this] abstract class EltCtx(protected[this] val elt:M#Elt) {
+  protected[this] abstract class EltCtx(protected[this] val elt:M#Elt) extends ECtx[P,M] {
     /** Solving an include for e with data K */
     def solver(s:M#Value):()=>M#Ret = null
     /** Solving an include for e with data K */
@@ -35,4 +35,12 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
     /** maps the context in case of an include (different methods may be required) */
    // def map[P1<:ParserBuilder { type BaseProcessor >: M1}, M1<:Processor { type BaseParser >: P1}](q:P1):UsrCtx[P1,M1] = null
   }
+}
+
+trait ECtx[P<:ParserBuilder,M<:Processor] {
+  protected[this] def elt:M#Elt
+  def solver(s:M#Value):()=>M#Ret
+  def keyMap(s:P#Key):M#Key
+  def valMap(s:P#Value):M#Value
+  def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping
 }

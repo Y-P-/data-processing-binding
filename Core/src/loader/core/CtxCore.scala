@@ -94,6 +94,8 @@ trait CtxCore extends definition.Impl {
   trait DlgBase extends super.DlgBase { this:Dlg=>
     //a default stub ; it has to be overriden by the Struct/List/Terminal implementation
     final def onName(e:Elt,key:Key): Nothing  = ???
+    def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd),cbks:_*)
+    def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping,cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,fd,cbks:_*)
   }
   
   def builder(dlg:Dlg) = new EltBuilder {
@@ -111,8 +113,7 @@ trait CtxCore extends definition.Impl {
       else                    new XTerminalCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
   }
 
-  def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,dlg:Dlg)           :X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus(fd))
-  def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,dlg:Dlg,cbks:Cbks*):X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus(fd),cbks:_*)
+  def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping): (UCtx[X],Dlg,Cbks*) => X#Parser=>Element[X] = (u,dlg,cbks) => dlg.builder(_,u,null,noStatus(fd),cbks:_*)
   
   //concrete class definitions
   protected abstract class Element[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {

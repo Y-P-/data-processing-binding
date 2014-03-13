@@ -18,6 +18,8 @@ trait ExtCore extends definition.Impl {
   
   trait DlgBase extends super.DlgBase {this:Dlg=>
     def onName(e:Elt,key:Key) = new Status(key)
+    def apply[X<:BaseParser with Singleton](u:UCtx[X],cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus,cbks:_*)
+    def apply[X<:BaseParser with Singleton](cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,cbks:_*)
   }
     
   def builder(dlg:Dlg) = new EltBuilder {
