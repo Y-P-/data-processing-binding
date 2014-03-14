@@ -114,7 +114,8 @@ class DefaultCtxEventsCbk[P<:CtxCore] extends Callback[P#Elt,P#Status,P#Ret,P#Ke
 object DefaultCtxEventsCbk {
   import scala.language.implicitConversions
   
-  def apply[P<:CtxCore] = new DefaultCtxEventsCbk[P]
+  //builds the standard recursive event callback (i.e. standard events for all elements)
+  def apply[P<:CtxCore](dlg:P#Dlg) = new DefaultCtxEventsCbk[P]
   
   
   val readTagIdx = 0

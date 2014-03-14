@@ -26,29 +26,28 @@ object CtxTest {
     case url  => url
   }
   //a generic context that works with any parser for a string processor
-  val userCtx = new loader.core.UserContext[ParserBuilder,CtxCore { type BaseParser=ParserBuilder; type Value=String }] {self=>
+  val userCtx = new loader.core.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
     val buf = new java.io.StringWriter
     override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
-    def apply(e:Elt) = new EltContext(e)
-    class EltContext(protected[this] val e:Elt) extends super.EltContext(e) {
+    override def apply(e:Proc#Elt) = new EltCtx(e)
+    class EltCtx(protected[this] val e:Proc#Elt) extends super.EltCtx(e) {
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null
-       // ()=>run.include[p.type,e.proc.type](p,e.myself)(self,(u,s)=>s+"*",null,_.read(load("verysmall1"), "UTF-8"))
-        null
+        ()=>run.includeX(p,e)(self,_.read(load("verysmall1"), "UTF-8"))._2
       }
+      def keyMap(s:Pars#Key):Proc#Key = s
+      def valMap(s:Pars#Value):Proc#Value = s
     }
   }
   val p = new parsers.Struct(256,40,false)
     
   /** Test to verify that DataActors are correctly found */
   @Test class CtxBaseTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter):Int = {
+    def apply(file:Solver,out:PrintWriter):(Unit,Int) = {
       import motors.Struct.ctx
       val m = ctx(out,2)
       try {
-        val f = run(p,ctx)(m) _
-        f(userCtx,null)
-        (userCtx,_(_,ClassContext(classOf[Data.Top]),_)(_.read(load("small"), "UTF-8"))
+        run(p,m)(userCtx,_(ClassContext(classOf[Data.Top])),_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
         userCtx.buf.getBuffer.setLength(0)
@@ -57,9 +56,10 @@ object CtxTest {
   }
   @Test class CtxCbkTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
-      val m = motors.Struct.ctx(out,2)
+      import motors.Struct.ctx
+      val m = ctx(out,2)
       try {
-        val r:Int = run(p,m)(userCtx,_(ClassContext(classOf[Data.Top]), DefaultCtxEventsCbk[m.Proc]*),null,null,_.read(load("small"), "UTF-8"))
+        run(p,m)(userCtx,_(ClassContext(classOf[Data.Top]),DefaultCtxEventsCbk(m)),_.read(load("small"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
         userCtx.buf.getBuffer.setLength(0)
@@ -67,3 +67,6 @@ object CtxTest {
     }
   }
 }
+
+//manage includes
+//pb line numbers

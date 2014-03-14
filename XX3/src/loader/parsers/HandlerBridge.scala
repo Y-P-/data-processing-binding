@@ -5,6 +5,7 @@ import utils.parsers.State
 import utils.{CharReader,ByteArrayReader}
 import loader.core.{AbstractParserBuilder,ParserBuilder,ParserSpawner,Locator}
 import loader.core.definition.Processor
+import loader.core.UsrCtx
 
 /** A standard bridge between utils.parsers.Handler and ParserBuilder.Parser.
  *  You only have to :
@@ -15,9 +16,11 @@ import loader.core.definition.Processor
 abstract class HandlerBridge extends AbstractParserBuilder {self=>
   import ParserBuilder._
 
-  type Value = String                                             //produces string
-  type Key   = String                                             //keys are string
-  type BaseProcessor = Processor { type BaseParser >: self.type } //any processor
+  type Value = String                                 //produces string
+  type Key   = String                                 //keys are string
+  type Ret   = Unit                                   //no return
+  type BaseProcessor = Processor                      //any processor
+  type UCtx[-m<:BaseProcessor] = UsrCtx[this.type,m]  //no requirement on UsrCtx
     
   trait BaseImpl extends super.BaseImpl with utils.parsers.Handler with ParserBuilder.URLParser { this:Parser=>
     final protected[this] val charProc = newProc
@@ -26,6 +29,7 @@ abstract class HandlerBridge extends AbstractParserBuilder {self=>
     def handler: PartialFunction[Throwable,Unit] = { case e:Throwable => throw new IllegalStateException(e) }
     def push(idx: Int): Unit = push("")
     def apply(d:CharReader):Unit = charProc(d)
+    def onExit() = ()
   }
   abstract class AbstractImpl extends BaseImpl { this:Parser=> }
 }

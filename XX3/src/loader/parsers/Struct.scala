@@ -2,15 +2,18 @@ package loader.parsers
 
 import loader.core.ParserSpawner
 import utils.parsers.StructParser
-import loader.core.UserContext
+import loader.core.UsrCtx
 
 
 class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends HandlerBridge {self=>
     
   def apply[P<:BaseProcessor with Singleton](userCtx:UCtx[P],pf:Impl[P]=>P#Elt):Impl[P] = new Impl(userCtx,pf)
+  def apply[P<:BaseProcessor with Singleton](userCtx:UCtx[P],pf:Impl[P]=>P#Elt,stackSize:Int):Impl[P] with FastImpl = new Impl(userCtx,pf) with FastImpl { def stkSz=stackSize }
   
   type Parser = BaseImpl
   class Impl[X<:BaseProcessor with Singleton](val userCtx:UCtx[X],pf: Impl[X]=>X#Elt) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.BaseImpl {
+    lazy val top = pf(this)                      //must be lazy. If not, it is initialized too late. It cannot be initialized upwards without a cast (because only here is 'this' a Impl[X]).
+    type Proc = X
     override final val canSkip:Boolean = true
     override def skipToEnd():Nothing = abort(0)  //this parser can skip to the end of the current data structure
   }

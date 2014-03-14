@@ -18,6 +18,7 @@ object Struct extends ProcessorImpl {
     type Key        = String
     type Ret        = Int
     type BaseParser = ParserBuilder //any parser
+    type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
     
     def getData(parent:Elt,s:Status):Null = null
     val noKey = ""
@@ -57,21 +58,21 @@ object Struct extends ProcessorImpl {
    *  Implementation 'ext' doesn't bring anything more than 'cre', except it's a bit slower!
    */
   object ctx extends loader.core.CtxCore.Abstract[Null] with DefImpl {
-    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super.Dlg {
+    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super[Abstract].DlgBase {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
     def apply(pr: utils.ParamReader):Dlg   = new Dlg(readParams(pr))
     def apply(out:Writer,indent:Int=0):Dlg = new Dlg(out,indent)
   }
   object ext extends loader.core.ExtCore.Abstract[Null] with DefImpl {
-    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super.Dlg {
+    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super[Abstract].DlgBase {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
     def apply(pr: utils.ParamReader):Dlg    = new Dlg(readParams(pr))
     def apply(out:Writer, indent:Int=0):Dlg = new Dlg(out,indent)
   }
   object cre extends loader.core.Core.Abstract with DefImpl {
-    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super.Dlg {
+    class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super[Abstract].DlgBase {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
     def apply(pr: utils.ParamReader):Dlg    = new Dlg(readParams(pr))
