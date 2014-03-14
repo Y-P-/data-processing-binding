@@ -6,9 +6,9 @@ import callbacks._
  */
 trait Core extends definition.Impl {
   type Status = Core.Status[Key]
-  type Dlg <: DlgBase
+  type Dlg >: Null <: DlgBase
   type Elt = EltBase
-  protected[this] val noStatus = new Status(noKey)
+  val noStatus = new Status(noKey)
   
   trait DlgBase extends super.DlgBase {this:Dlg=>
     def onName(e:Elt,key:Key) = new Status(key)
@@ -26,7 +26,9 @@ trait Core extends definition.Impl {
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg,cbks:Cbks*):X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus,cbks:_*)
   
   // Element implementation : redirect calls
-  protected class Element    [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt
+  protected class Element    [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {
+    def status = new Status(key)
+  }
   protected class ElementCbks[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent: Elt, val cbks: Cbks*) extends Element(parser,userCtx,dlg,key,parent) with WithCallbacks
   protected class ElementCbk [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent: Elt, val cb: Cbk, cbks: Cbks*)  extends ElementCbks(parser,userCtx,dlg,key,parent,cbks:_*) with WithCallback {
     override def onChild(child:Elt,r:Ret):Unit = super[WithCallback].onChild(child,r)

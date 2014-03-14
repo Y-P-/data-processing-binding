@@ -19,7 +19,7 @@ import context.Context
  */
 trait CtxCore extends definition.Impl {
   type Status = CtxCore.Status[Key]
-  type Dlg<:DlgBase
+  type Dlg>:Null<:DlgBase
   type Elt = EltBase
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
@@ -38,6 +38,7 @@ trait CtxCore extends definition.Impl {
     }
     //the 'official' list of names that uniquely identify that loader ; seq numbers or list index are used where necessary.
     def nameSeq:Traversable[String] = for (e<-this) yield e.rankedName
+    def status = new Status(key,idx,fd,false)
    
     //the name of this element, accounting for the fact that is can be anonymous, in which case its name becomes its rank
     def rankedName = if (fd.isSeq) s"${if(!name.isEmpty) s"$name." else ""}${idx.toString}" else name
@@ -131,6 +132,13 @@ trait CtxCore extends definition.Impl {
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
-  //using Abstract prevents code bloating due to trait expension
+  
+  /** Using Abstract prevents code bloating due to trait expansion
+   *  You need to implement:
+   *  - val noKey:Key
+   *  - class Dlg extends DlgBase
+   *  - def getData(p:Elt,s:Status)
+   *  - appropriate constructors/factories for Dlg (no specific pattern here)
+   */
   abstract class Abstract[+D>:Null] extends CtxCore { protected[this] type Data=D }
 }

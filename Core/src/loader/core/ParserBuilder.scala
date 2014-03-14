@@ -43,12 +43,12 @@ trait ParserBuilder {
   //the abstract types which must be filled up by each implementation
   type UCtx[-P<:BaseProcessor]>:Null<:UsrCtx[this.type,P]                       //the kind of UserCtx used
   protected type Impl[X<:BaseProcessor with Singleton]<:Parser { type Proc=X }  //the concrete implementation
-  type Parser>:Null<:BaseImpl                                                   //the concrete implementation,
+  type Parser>:Null<:BaseImpl                                                   //the concrete implementation
     
   /** factory for Parser */
   def apply[X<:BaseProcessor with Singleton](u:UCtx[X],pf:Impl[X]=>X#Elt):Impl[X]
   /** idem, using the FastImpl mixin */
-  def apply[P<:BaseProcessor with Singleton](u:UCtx[P],pf:Impl[P]=>P#Elt,stackSize:Int):Impl[P] with FastImpl
+  def apply[X<:BaseProcessor with Singleton](u:UCtx[X],pf:Impl[X]=>X#Elt,stackSize:Int):Impl[X] with FastImpl
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed

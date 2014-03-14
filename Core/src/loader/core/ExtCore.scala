@@ -5,7 +5,7 @@ package loader.core
  */
 trait ExtCore extends definition.Impl {
   type Status = ExtCore.Status[Key]
-  type Dlg <: DlgBase
+  type Dlg >: Null <: DlgBase
   type Elt = EltBase
   protected[this] val noStatus = new Status(noKey)
   
@@ -31,7 +31,9 @@ trait ExtCore extends definition.Impl {
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg)           :X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus)
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg,cbks:Cbks*):X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus,cbks:_*)
   
-  protected class Element    [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key,  parent:Elt, val data:Data)          extends ElementBase[X](parser,userCtx,dlg,key,parent) with EltBase
+  protected class Element    [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key,  parent:Elt, val data:Data)          extends ElementBase[X](parser,userCtx,dlg,key,parent) with EltBase {
+    def status = new Status(key)
+  }
   protected class ElementCbks[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt, val cbks:Cbks*)         extends Element(parser,userCtx,dlg,s.key,parent,getData(parent,s)) with WithCallbacks
   protected class ElementCbk [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback
 }

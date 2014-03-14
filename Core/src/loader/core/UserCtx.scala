@@ -8,8 +8,8 @@ import loader.core.context.FieldAnnot
 
 //Note: while type M#BaseParser>:P and M<:P#BaseProcessor are required in the
 //      context of the framework, it is of no importance here.
-//      of course, contexts built with no regards with these constraint
-//      won't be of any real use...
+//      actually, constraints here are counter-productive (types UCtx cannot be well defined)
+//      of course, contexts built with no regards with these constraint won't be of any real use...
 abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   protected[this] type Proc = M
   protected[this] type Pars = P

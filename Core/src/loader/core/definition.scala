@@ -22,7 +22,7 @@ object definition {
    *  @see ExtCore for a richer implementation where elements can contain additional data
    *  @see CtxCore for a very rich implementation based on prior knowledge of the expected structure (using context)
    */
-  trait Processor {
+  trait Processor {proc=>
     type Value>:Null   //the Value type of data processed by this processor
     type Key>:Null     //the keys recognized by this processor ; note that key.toString should be cached inside because heavy use of it is done
     type Ret
@@ -43,10 +43,8 @@ object definition {
      *  values that are pulled.) One such object is spawned for each parser object, to process
      *  it accordingly to the processor's requirements.
      */
-    trait EltBase extends Traversable[Elt] { this:Elt=>
-      final type Proc = Processor.this.type with Singleton
-      val proc:Processor.this.type = Processor.this
-      final def myself:Elt = this //self cast
+    trait EltBase extends Traversable[Elt] { self:Elt=>
+      final def myself:Elt { type Builder=self.Builder} = self //self cast
       type Builder <: BaseParser with Singleton
       val parser:Builder#Parser   //parser creating that element: Beware => this can change in case of includes
       /** Context for use */
@@ -61,7 +59,10 @@ object definition {
       def builder:EltBuilder
       /** building a child spawning children of the same nature; you must call this method because it can be overriden (callbacks) */
       def build(p:Builder#Parser, u:UCtx[Builder], s:Status):Elt = builder(p, u, this, s)
+      /** the status for this element */
+      def status:Status
       
+      def castAs[M<:Processor](m:M):m.Elt = this.asInstanceOf[m.Elt]
       /** The standard, elementary methods dealing with parser events.
        *  The order in which these methods are executed is:
        *  - parent executes onName ; child doesn't yet exist
@@ -224,7 +225,7 @@ object definition {
    */
   trait Impl extends Processor {self=>
     //the delegate type which will be used as the processor logic
-    type ThisDlg = Delegate[Elt,Key,Value,Status,UsrCtx[BaseParser,self.type],Ret]
+    type ThisDlg = Delegate[Elt,Key,Value,Status,UsrCtx[BaseParser,this.type],Ret]
     //a factory for reading textual parameters
     //there will be other, specific factories
     def apply(pr: utils.ParamReader):Dlg
@@ -234,23 +235,27 @@ object definition {
      *  defining all behaviours. Using Motor makes it easier to define processors, all using a common element base.
      *  It also makes it possible to easily subclass an implementation.
      */
-    type Dlg<:DlgBase
+    type Dlg>:Null<:DlgBase
     trait DlgBase extends ThisDlg { this:Dlg=>
       final val proc:self.type = self
       final val builder:EltBuilder = Impl.this.builder(this)
     }
     def builder(m:Dlg):EltBuilder
 
+    type Elt>:Null<:EltBase
+    trait EltBase extends super.EltBase { self:Elt=>
+      val dlg:Dlg
+      def myselfImpl:dlg.proc.Elt { type Builder=self.Builder } = this
+    }
+    
     /** Forwards the base methods to a companion object.
      *  This causes a redirection to apply them, but usually has the immense advantage of fully defining the element by
      *  defining all behaviours. Using Delegates makes it easier to define processors, all using a common element base.
      *  It also makes it possible to easily subclass an implementation.
      *  We can already provide basic implementations for simple use case.
      */
-    protected abstract class ElementBase[X<:BaseParser with Singleton] (val parser:X#Parser,val userCtx:UCtx[X],val dlg:Dlg,val key:Key,val parent:Elt) {this:Elt{type Builder=X}=>
+    protected abstract class ElementBase[X<:BaseParser with Singleton] (val parser:X#Parser,val userCtx:UCtx[X],val dlg:Dlg,val key:Key,val parent:Elt) extends EltBase {this:Element[X]=>
       type Builder = X
-     // def parser = parser0  //we would rather not have this var, but the alternative is not good either.
-     // protected[core] def parser_=(parser:Parser):Unit = parser0=parser      
       def builder = dlg.builder
       protected def onName(key: Key)      = dlg.onName(this,key)
       protected def onInit(): Unit        = dlg.onInit(this)
