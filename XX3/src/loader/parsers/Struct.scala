@@ -8,7 +8,6 @@ import loader.core.UsrCtx
 class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends HandlerBridge {self=>
     
   def apply[P<:BaseProcessor with Singleton](userCtx:UCtx[P],pf:Impl[P]=>P#Elt):Impl[P] = new Impl(userCtx,pf)
-  def apply[P<:BaseProcessor with Singleton](userCtx:UCtx[P],pf:Impl[P]=>P#Elt,stackSize:Int):Impl[P] with FastImpl = new Impl(userCtx,pf) with FastImpl { def stkSz=stackSize }
   
   type Parser = BaseImpl
   class Impl[X<:BaseProcessor with Singleton](val userCtx:UCtx[X],pf: Impl[X]=>X#Elt) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.BaseImpl {

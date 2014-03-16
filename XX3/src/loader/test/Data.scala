@@ -44,7 +44,7 @@ object Data {
     val cz0 = classOf[Treaty]
     final def cz = cz0
     //@TagSeq(dynamic="cz") var treaty:Array[AnyRef] = _
-    @TagSeq var treaty:Array[Treaty] = _
+    @TagSeq(loader=classOf[Treaty]) var treaty:Array[Treaty] = _
     @Convert def tagEnd(l:Element) = this
   }
   
@@ -91,7 +91,7 @@ object Data {
     //var load:loader.Parser.Value = _
     @TagSeq(loader=classOf[Top],min=3)
     var include:Array[Top]=null
-    @TagField
+    @TagField(loader=classOf[Header])
     protected var header:Header=null
     @TagField
     var test:Int=_
@@ -105,7 +105,7 @@ object Data {
     var event:Array[String]=_
     @TagList(check="...(.*)",valid="[000,800000]",min=10,max=100)  //was ....(.)?, [7000,8000]
     var history:Array[Int]=_
-    @TagField
+    @TagField(loader=classOf[GlobalData])
     var globaldata:GlobalData=_
     @TagSeq(inName="{provinc.}",loader=classOf[Province],min=50)
     var province:scala.collection.immutable.HashMap[Integer,String]=_

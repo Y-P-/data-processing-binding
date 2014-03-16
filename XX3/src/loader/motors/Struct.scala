@@ -19,6 +19,8 @@ object Struct extends ProcessorImpl {
     type Ret        = Int
     type BaseParser = ParserBuilder //any parser
     type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
+    final def baseParserClass = classOf[BaseParser]
+    final def baseUCtxClass = classOf[UCtx[_]]
     
     def getData(parent:Elt,s:Status):Null = null
     val noKey = ""

@@ -21,7 +21,8 @@ abstract class HandlerBridge extends AbstractParserBuilder {self=>
   type Ret   = Unit                                   //no return
   type BaseProcessor = Processor                      //any processor
   type UCtx[-m<:BaseProcessor] = UsrCtx[this.type,m]  //no requirement on UsrCtx
-    
+  final def baseProcessorClass = classOf[BaseProcessor]
+  final def baseUCtxClass = classOf[UCtx[_]]
   trait BaseImpl extends super.BaseImpl with utils.parsers.Handler with ParserBuilder.URLParser { this:Parser=>
     final protected[this] val charProc = newProc
     def location:String = charProc.state.line.toString

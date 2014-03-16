@@ -44,11 +44,13 @@ trait ParserBuilder {
   type UCtx[-P<:BaseProcessor]>:Null<:UsrCtx[this.type,P]                       //the kind of UserCtx used
   protected type Impl[X<:BaseProcessor with Singleton]<:Parser { type Proc=X }  //the concrete implementation
   type Parser>:Null<:BaseImpl                                                   //the concrete implementation
+  
+  //used for dynamic checks
+  def baseProcessorClass:Class[BaseProcessor]
+  def baseUCtxClass:Class[UCtx[_]]
     
   /** factory for Parser */
   def apply[X<:BaseProcessor with Singleton](u:UCtx[X],pf:Impl[X]=>X#Elt):Impl[X]
-  /** idem, using the FastImpl mixin */
-  def apply[X<:BaseProcessor with Singleton](u:UCtx[X],pf:Impl[X]=>X#Elt,stackSize:Int):Impl[X] with FastImpl
   
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
@@ -65,7 +67,13 @@ trait ParserBuilder {
     protected[this] var cur = top
     private[this]   var ignore:Int = 0
     def current = cur
-    def eltCtx:ECtx[ParserBuilder.this.type,Proc] = userCtx(cur)
+    //We should write: userCtx(cur)
+    //However:
+    //  - we know that cur.userCtx eq userCtx
+    //  - hence we have cur.eltCtx = cur.userCtx(cur) = userCtx(cur)
+    //  - so the cast is always valid
+    //  - it is useful because it prevents building eltCtx many times : it is built once, then shared
+    def eltCtx:ECtx[ParserBuilder.this.type,Proc] = top.eltCtx.asInstanceOf[ECtx[ParserBuilder.this.type,Proc]]
     def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull() } catch errHandler finally { cur=cur.parent }
     def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { pullVal(v) } catch errHandler finally { cur=cur.parent }
     def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
@@ -107,21 +115,6 @@ trait ParserBuilder {
       case u:Exception with Event    => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
       case u:Throwable               => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
     }
-  }
-  /**
-   * This trait adds the eltCtx storage in an array.
-   * The benefit is that an eltCtx is only computed once for a given element (can improve performances).
-   * The drawback is that the expected stack depth has to be provided.
-   */
-  trait FastImpl extends BaseImpl {
-    def stkSz:Int
-    private[this] var depth:Int = 0
-    private[this] var a = new Array[ECtx[ParserBuilder.this.type,Proc]](stkSz)  //computed userCtx
-    a(0) = userCtx(top)
-    override def pull()            = { super.pull(); depth-=1 }
-    override def pullVal(v: Value) = { super.pullVal(v); depth-=1 }
-    override def pushKey(key:Key)  = { super.pushKey(key); depth+=1; a(depth)=userCtx(cur) }
-    override def eltCtx:ECtx[ParserBuilder.this.type,Proc] = a(depth)
   }
 }
 

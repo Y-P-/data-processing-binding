@@ -1,8 +1,6 @@
 package loader.core
 
-import scala.reflect.ClassTag
 import exceptions._
-import reflect.runtime.universe.TypeTag
 import loader.core.events.Event
 
 object definition {
@@ -38,11 +36,18 @@ object definition {
     type CbksEltBuilder = callbacks.CallbacksBuilder[Elt,Status,Ret,Key,Value]
     
     val noKey:Key
+    //used for dynamic checks
+    def baseParserClass:Class[BaseParser]
+    def baseUCtxClass:Class[UCtx[_]]
+    
     
     /** An object that is attached to a parser object (that has been pushed, to the contrary of
      *  values that are pulled.) One such object is spawned for each parser object, to process
      *  it accordingly to the processor's requirements.
      */
+    object EltBase {
+      implicit def toElt(e:EltBase):Elt = e.myself
+    }
     trait EltBase extends Traversable[Elt] { self:Elt=>
       final def myself:Elt { type Builder=self.Builder} = self //self cast
       type Builder <: BaseParser with Singleton
@@ -54,7 +59,6 @@ object definition {
       def parent : Elt      //parent item
       def key    : Key      //element key
       def name   : String  = key.toString  //element name; provided for simplicity
-      protected[core] def parser_=(parser:Builder#Parser):Unit = () //XXX parser has write access for handling includes
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
       def builder:EltBuilder
       /** building a child spawning children of the same nature; you must call this method because it can be overriden (callbacks) */
@@ -109,9 +113,6 @@ object definition {
             case i    => onSolver(v,i)
           })
       }
-      object EltBase {
-        implicit def toElt(e:EltBase):Elt = e.myself
-      }
       
       /** standard invoker, used on the top level elements */
       def invoke(f: =>Unit): Ret = {
@@ -126,10 +127,7 @@ object definition {
        *  Value ; this is the most common occurence.
        */
       def isRoot: Boolean = parent==null        //head of stack
-      def isInclude: Boolean = parent match {   //head of sub-stack (i.e. include)
-        case null    => false
-        case p       => p.parser != parser
-      }
+      def isInclude: Boolean = parent!=null && !(parent.parser eq parser)
       //iterator on the elements forming the full chain from this element to the top
       def toHead:Iterator[Elt] = new Iterator[Elt] {
         private var cur = EltBase.this
@@ -137,7 +135,7 @@ object definition {
         def next: Elt = { val c=cur; cur=parent; c }
       }
       //iteration on the elements forming the full chain to this element starting from the top
-      def foreach[U](f:Elt=>U):Unit = { if (parent!=null) parent.foreach(f); f(EltBase.this) }
+      def foreach[U](f:Elt=>U):Unit = { if (parent!=null) parent.foreach(f); f(this) }
       def iter[U](f:Elt=>U):Traversable[Elt] = new Traversable[Elt] {
         def foreach[U](f:(Elt)=>U) = EltBase.this.foreach(f)
       }

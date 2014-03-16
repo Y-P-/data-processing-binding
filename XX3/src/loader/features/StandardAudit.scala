@@ -11,10 +11,9 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
   import Event._
   protected[this] final type E = P#Elt
   protected[this] final type Logger[+Evt<:Event] = Dispatcher[P,Evt,(Int)=>LogRecord]
-  class LogDispatcher[-Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((P#Elt,Event))=>Int]) extends PartialFunction[(P#Elt,Event),LogRecord] {
+  protected[this] def logDispatcher[Evt<:Event:Manifest](a:Array[_<:Logger[Evt]],severity:Array[((E,Event))=>Int]):PartialFunction[(E,Event),LogRecord] = {
     val d = new DispatchByClassArray[P,Evt,(Int)=>LogRecord](a)
-    def isDefinedAt(x:(E,Event))     = d.isDefinedAt(x)
-    def apply(x:(E,Event)):LogRecord = { val s=severity(x._2.idx)(x); if (s<=max) d(x)(s) else null }
+    return { case x:(E,Event) if d.isDefinedAt(x) => { val s=severity(x._2.idx)(x); if (s<=max) d(x)(s) else null } }
   }
   /** Handled base events */
   protected[this] def baseLoggers =  Array(
@@ -49,8 +48,8 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
   protected[this] def baseSeverity      = Array[((E,Event))=>Int](_=>5, _=>5, _=>5, _=>4, _=>4, _=>4, _=>4, _=>4, _=>4, _=>4)
   protected[this] def exceptionSeverity = Array[((E,Event))=>Int](_._2.asInstanceOf[UserException].lvl, _=>3, _=>3, _=>3, _=>3, _=>3, _=>2, _=>2)
   
-  private[this] val t1 = new LogDispatcher[DefaultEvent](baseLoggers,baseSeverity)
-  private[this] val t2 = new LogDispatcher[Exception with Event](exceptionLoggers,exceptionSeverity)
+  private[this] val t1 = logDispatcher(baseLoggers,baseSeverity)
+  private[this] val t2 = logDispatcher(exceptionLoggers,exceptionSeverity)
   
   val log:PartialFunction[(E,Event),LogRecord] = t1 orElse t2
   
@@ -58,8 +57,8 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
     val b = new StringBuilder
     val x = elt.foreach _     //for some reason, for (e <- elt) fails to compile...
     x( e=>{
-      if (e.isInclude) b.append(e.parent.parser.location).append("/")
-      b.append(elt.parser.location)
+      if (e.isInclude) b.append(e.parent.parser.location).append("/").append(elt.parser.location)
+      if (e.parent==null) b.append(elt.parser.location)
     })
     b.toString
   }

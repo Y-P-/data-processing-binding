@@ -35,7 +35,7 @@ object run {
             f:p.Parser { type Proc= m.type } => Unit
         )
         :(p.Ret,m.Ret)
-     = p[m.type](u,e.builder[p.type](_:p.Parser,u,e,e.status)).invoke(f)
+     = p[m.type](u,e.builder[p.type](_:p.Parser,u,e.parent,e.status)).invoke(f)
   
   /** unsafe include, where types are coerced. There is no warranty that this will succeed.
    *  this will often be used, as includes are by nature unsafe.
@@ -59,6 +59,14 @@ object run {
     val e1:m1.Elt                                   = e.asInstanceOf[m1.Elt]
     val u1:p1.UCtx[m1.type] with m1.UCtx[p1.type]   = u.asInstanceOf[p1.UCtx[m1.type] with m1.UCtx[p1.type]]
     val f1:p1.Parser { type Proc= m1.type } => Unit = f.asInstanceOf[p1.Parser { type Proc= m1.type } => Unit]
+    if (!p1.baseProcessorClass.isAssignableFrom(m1.getClass))
+      throw new ClassCastException(s"${m1.getClass} is not an acceptable processor class for parser ${p1.getClass}: required _ <: ${p1.baseProcessorClass}")
+    if (!m1.baseParserClass.isAssignableFrom(p1.getClass))
+      throw new ClassCastException(s"${p1.getClass} is not an acceptable parser class for processor ${m1.getClass}: required _ <: ${m1.baseParserClass}")
+    if (!p1.baseUCtxClass.isAssignableFrom(u1.getClass))
+      throw new ClassCastException(s"${u1.getClass} is not an acceptable user context class for parser ${p1.getClass}: required _ <: ${p1.baseUCtxClass}")
+    if (!m1.baseUCtxClass.isAssignableFrom(u1.getClass))
+      throw new ClassCastException(s"${u1.getClass} is not an acceptable user context class for processor ${m1.getClass}: required _ <: ${m1.baseUCtxClass}")
     include(m1)(p1,e1)(u1,f1)  //nothing warrants that [P,M] satisfy the class constraints: the call may fail
   }
 }
