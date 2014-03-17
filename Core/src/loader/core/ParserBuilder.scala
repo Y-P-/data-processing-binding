@@ -61,7 +61,6 @@ trait ParserBuilder {
    *  @param binder, which is used to attach the parser with the processor
    */
   trait BaseImpl extends Locator {
-    type Base = BaseProcessor
     type Proc <: BaseProcessor with Singleton
     val userCtx:UCtx[Proc]
     val top:Proc#Elt
