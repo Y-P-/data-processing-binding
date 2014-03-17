@@ -65,8 +65,9 @@ object definition {
       def build(p:Builder#Parser, u:UCtx[Builder], s:Status):Elt = builder(p, u, this, s)
       /** the status for this element */
       def status:Status
+      /** copies the element and assigns another compatible parser ; useful to manage includes. */
+      def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P }
       
-      def castAs[M<:Processor](m:M):m.Elt = this.asInstanceOf[m.Elt]
       /** The standard, elementary methods dealing with parser events.
        *  The order in which these methods are executed is:
        *  - parent executes onName ; child doesn't yet exist

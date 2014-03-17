@@ -14,6 +14,15 @@ trait ExtCore extends definition.Impl {
 
   trait EltBase extends super.EltBase {
     def data: Data
+    
+    /** This trait is used to create copies of the current Elt for changing parser and userCtx.
+     *  It must refer to the same fields as the copied item.
+     *  It must be "transparent", i.e. must not make any new method call (otehrwise methods with side effects would pose problems.)
+     */
+    protected[this] trait Copy {this:EltBase=>
+      override val data = EltBase.this.data //refer to the already computed data
+      override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]) = EltBase.this.copy(p,u)  //idempotent
+    }    
   }
   
   trait DlgBase extends super.DlgBase {this:Dlg=>
@@ -31,11 +40,18 @@ trait ExtCore extends definition.Impl {
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg)           :X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus)
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg,cbks:Cbks*):X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus,cbks:_*)
   
-  protected class Element    [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key,  parent:Elt, val data:Data)          extends ElementBase[X](parser,userCtx,dlg,key,parent) with EltBase {
+  protected class Element    [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key,  parent:Elt, val data:Data) extends ElementBase[X](parser,userCtx,dlg,key,parent) with EltBase {
     def status = new Status(key)
+    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,data) with super.Copy
+    def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)
   }
-  protected class ElementCbks[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt, val cbks:Cbks*)         extends Element(parser,userCtx,dlg,s.key,parent,getData(parent,s)) with WithCallbacks
-  protected class ElementCbk [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback
+  protected class ElementCbks[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt, val cbks:Cbks*) extends Element(parser,userCtx,dlg,s.key,parent,getData(parent,s)) with WithCallbacks {
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,cbks:_*) with WithCallbacks
+  }
+  protected class ElementCbk [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback {
+    override def onChild(child:Elt,r:Ret):Unit = super[WithCallback].onChild(child,r)    
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,cb,cbks:_*) with WithCallbacks
+  }
 }
 object ExtCore {
   class Status[K>:Null](key:K) extends Core.Status(key)

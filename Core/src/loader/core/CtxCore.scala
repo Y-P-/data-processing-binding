@@ -43,8 +43,17 @@ trait CtxCore extends definition.Impl {
     //the name of this element, accounting for the fact that is can be anonymous, in which case its name becomes its rank
     def rankedName = if (fd.isSeq) s"${if(!name.isEmpty) s"$name." else ""}${idx.toString}" else name
     override def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.rankedName}"))
+    
+    /** This trait is used to create copies of the current Elt for changing parser and userCtx.
+     *  It must refer to the same fields as the copied item.
+     *  It must be "transparent", i.e. must not make any new method call (otehrwise methods with side effects would pose problems.)
+     */
+    protected[this] trait Copy {this:EltBase=>
+      override val data = EltBase.this.data //refer to the already computed data
+      def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]) = EltBase.this.copy(p,u)  //idempotent
+    }    
   }
-
+  
   //parent is undefined here
   trait Struct extends EltBase {
     /** the known tags for that struct */
@@ -52,10 +61,19 @@ trait CtxCore extends definition.Impl {
     /** tags seen count */
     val seen = HashMap.empty[String, Int]
     /** the last fd seen in that struct */
-    private var previous: Context#FieldMapping = null
+    protected[this] var previous:Context#FieldMapping
     /** Tells whether that Struct can ask for fast forward to the parser */
     val canFast = userCtx.fast && fd.loader.annot.fast
     val doFast  = canFast && !tags.hasNonContig
+    
+    protected[this] trait Copy extends super.Copy { this:Struct=>
+      override val tags = Struct.this.tags 
+      override val seen = Struct.this.seen 
+      override val canFast = Struct.this.canFast
+      override val doFast = Struct.this.doFast
+      override protected def previous=Struct.this.previous
+      override protected def previous_=(fd:Context#FieldMapping) = Struct.this.previous=fd
+    }
   
     override protected def onName(key: Key):Status = {
       val name = key.toString
@@ -75,26 +93,29 @@ trait CtxCore extends definition.Impl {
       }
     }
   }
-  //parent is undefined here
   trait List extends EltBase {
-    private val innerFd: Context#FieldMapping = fd.asSeq
-    var index: Int = 0
+    protected val innerFd: Context#FieldMapping = fd.asSeq
+    protected[this] var index0: Int
+    def index = index0
+    protected[this] trait Copy extends super.Copy { this:List=>
+      override protected val innerFd=List.this.innerFd
+      override protected[this] def index0:Int = List.this.index0
+      override protected[this] def index0_=(i:Int):Unit = List.this.index0=i
+    }
     override protected def onName(key: Key):Status = {
       val name = key.toString
       if (!name.isEmpty) throw new IllegalStateException(s"illegal field $name in a list")
-      index += 1
+      index0 += 1
       new Status(key, index, innerFd, false)
     }
   }
-  //parent is undefined here
   trait Terminal extends EltBase {
     override protected def onName(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
   trait DlgBase extends super.DlgBase { this:Dlg=>
-    //a default stub ; it has to be overriden by the Struct/List/Terminal implementation
-    final def onName(e:Elt,key:Key): Nothing  = ???
+    final def onName(e:Elt,key:Key): Nothing  = ???  //a default stub ; it is be overriden by the Struct/List/Terminal implementation
     def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd),cbks:_*)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping,cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,fd,cbks:_*)
   }
@@ -120,15 +141,40 @@ trait CtxCore extends definition.Impl {
   protected abstract class Element[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {
     def this(parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt) = this(parser,userCtx,dlg,s.key,parent,s.fd,s.idx,getData(parent, s))
   }
-  protected class XStruct      [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt)                       extends Element(parser,userCtx,dlg,s,parent) with Struct
-  protected class XList        [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt)                       extends Element(parser,userCtx,dlg,s,parent) with List
-  protected class XTerminal    [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt)                       extends Element(parser,userCtx,dlg,s,parent) with Terminal
-  protected class XStructCbks  [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cbks:Cbks*)        extends XStruct(parser,userCtx,dlg,s,parent) with WithCallbacks
-  protected class XListCbks    [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cbks:Cbks*)        extends XList(parser,userCtx,dlg,s,parent) with WithCallbacks
-  protected class XTerminalCbks[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cbks:Cbks*)        extends XTerminal(parser,userCtx,dlg,s,parent) with WithCallbacks
-  protected class XStructCbk   [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*) extends XStructCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback
-  protected class XListCbk     [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*) extends XListCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback
-  protected class XTerminalCbk [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*) extends XTerminalCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback        
+  protected class XStruct[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with Struct {
+    protected var previous0:Context#FieldMapping=null
+    protected def previous:Context#FieldMapping = previous0
+    protected def previous_=(fd:Context#FieldMapping) = previous0=fd
+    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx,data) with Struct with super.Copy
+    def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)
+  }
+  protected class XList[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with List {
+    protected[this] var index0:Int = 0
+    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx,data) with List with super.Copy
+    def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)
+  }
+  protected class XTerminal[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with Terminal {
+    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx,data) with Terminal with super.Copy
+    def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)
+  }
+  protected class XStructCbks  [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cbks:Cbks*) extends XStruct(parser,userCtx,dlg,s,parent) with WithCallbacks {
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,cbks:_*) with WithCallbacks
+  }
+  protected class XListCbks    [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cbks:Cbks*) extends XList(parser,userCtx,dlg,s,parent) with WithCallbacks {
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,cbks:_*) with WithCallbacks
+  }
+  protected class XTerminalCbks[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cbks:Cbks*) extends XTerminal(parser,userCtx,dlg,s,parent) with WithCallbacks {
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,cbks:_*) with WithCallbacks
+  }
+  protected class XStructCbk   [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*) extends XStructCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback {
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,cb,cbks:_*) with WithCallback
+  }
+  protected class XListCbk     [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*) extends XListCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback {
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,cb,cbks:_*) with WithCallback
+  }
+  protected class XTerminalCbk [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cb:Cbk,cbks:Cbks*) extends XTerminalCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback {
+    override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,cb,cbks:_*) with WithCallback         
+  }
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
