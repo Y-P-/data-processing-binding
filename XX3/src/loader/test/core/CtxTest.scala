@@ -30,6 +30,10 @@ object CtxTest {
     val buf = new java.io.StringWriter
     override def apply(e:Proc#Elt) = new EltCtx(e)
     class EltCtx(protected[this] val e:Proc#Elt) extends super.EltCtx(e) {
+      e match {
+        case loader.core.definition.EltBase("header","") => println("toto")
+        case _ =>
+      }
       override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null

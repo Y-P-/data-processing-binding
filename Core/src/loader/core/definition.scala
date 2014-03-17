@@ -12,6 +12,10 @@ object definition {
   trait Status[+K>:Null] {
     def key:K
   }
+  
+  object EltBase {
+    def unapplySeq(e:Processor#EltBase): Option[Seq[String]] = Some(e.toHead.map(_.name))
+  }
 
   /** Defines the pattern through which we turn the sequence of parsed items into a structure with depth.
    *  The process involves 'stacking' data structures (Element), each referring to its parent.
@@ -45,9 +49,6 @@ object definition {
      *  values that are pulled.) One such object is spawned for each parser object, to process
      *  it accordingly to the processor's requirements.
      */
-    object EltBase {
-      implicit def toElt(e:EltBase):Elt = e.myself
-    }
     trait EltBase extends Traversable[Elt] { self:Elt=>
       final def myself:Elt { type Builder=self.Builder} = self //self cast
       type Builder <: BaseParser with Singleton
@@ -101,7 +102,7 @@ object definition {
       /** Ensure the call to doBeg is done as late as possible, but in time. */
       private[this] var begDone=false
       private def doBeg():Unit = if (!begDone) { begDone=true; if (parent!=null) parent.doBeg; onBeg; }
-      
+            
       /** The push/pull interface on the processor side
        */
       def push(n:Key):Elt = { val c=build(parser,userCtx,onName(n)); c.onInit(); c }
@@ -129,11 +130,22 @@ object definition {
        */
       def isRoot: Boolean = parent==null        //head of stack
       def isInclude: Boolean = parent!=null && !(parent.parser eq parser)
-      //iterator on the elements forming the full chain from this element to the top
-      def toHead:Iterator[Elt] = new Iterator[Elt] {
-        private var cur = EltBase.this
-        def hasNext: Boolean = cur!=null
-        def next: Elt = { val c=cur; cur=parent; c }
+      //sequence on the elements forming the full chain from this element to the top
+      def toHead:Seq[Elt] = new Seq[Elt] {
+        val l = depth
+        def iterator = new Iterator[Elt] {
+          private var cur = EltBase.this
+          def hasNext: Boolean = cur!=null
+          def next: Elt = { val c=cur; cur=cur.parent; c }
+        }
+        def apply(idx: Int): Elt = {
+          var i = idx
+          if (i<0 || i>l) throw new IndexOutOfBoundsException
+          var c = EltBase.this
+          while (i>0) { c=c.parent; i-=1 }
+          c
+        }
+        def length: Int = l+1
       }
       //iteration on the elements forming the full chain to this element starting from the top
       def foreach[U](f:Elt=>U):Unit = { if (parent!=null) parent.foreach(f); f(this) }
@@ -144,6 +156,7 @@ object definition {
       def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.name}"))
       override def toString = { val s=new java.io.StringWriter; print(s); s.toString }      
     }
+    
         
     /** Defines how Element are built in various contexts.
      *  - the first four methods define Top builders
