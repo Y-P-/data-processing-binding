@@ -55,7 +55,7 @@ class StandardAuditLogger[-P<:Processor](val id:IdentifierScheme[P], val max:Int
   
   def localisation(elt:E):String = {
     val b = new StringBuilder
-    elt.iter.foreach { u=>
+    elt.foreach { u:E=>             //for (u:E <- elt) :  compiler crash
       if      (u.parent==null) b.append(u.parser.location)
       else if (u.isInclude)    b.append("/").append(u.parser.location)
     }
