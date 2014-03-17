@@ -13,17 +13,20 @@ import loader.core.context.FieldAnnot
 abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   protected[this] type Proc = M
   protected[this] type Pars = P
-  def eventHandler:EventHandler[M] = null
-  val fast = true
 
-  /** build an element context */
+  /** builds an element context */
   def apply(e:M#Elt):EltCtx
  
   /** this defines every special action that is to be taken for a given Element.
-   *  Each element can define its own special actions: these do not have to be defined globaly.
+   *  Each element can define its own special actions: these do not have to be defined globally.
    *  However, if you need global actions, the previous method just has to return a constant. 
    */
   protected[this] abstract class EltCtx(val elt:M#Elt) extends ECtx[P,M] {
+    def usrCtx:UsrCtx.this.type = UsrCtx.this
+    /** event handler */
+    def eventHandler:EventHandler[M] = null
+    /** fast toggle for the parser */
+    val fast = true
     /** Solving an include for e with data K */
     def solver(s:M#Value):()=>M#Ret = null
     /** Solving an include for e with data K */
@@ -32,8 +35,6 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
     def valMap(s:P#Value):M#Value
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
-    /** maps the context in case of an include (different methods may be required) */
-   // def map[P1<:ParserBuilder { type BaseProcessor >: M1}, M1<:Processor { type BaseParser >: P1}](q:P1):UsrCtx[P1,M1] = null
   }
 }
 

@@ -93,7 +93,7 @@ object definition {
       //handle an event:
       // - ignore if no handler defined
       // - do nothing if handler not configured for that event
-      def apply(evt:Event) = userCtx.eventHandler match {
+      def apply(evt:Event) = eltCtx.eventHandler match {
         case null =>
         case h    => h.applyOrElse((this,evt),(x:(Elt,Event))=>())
       }

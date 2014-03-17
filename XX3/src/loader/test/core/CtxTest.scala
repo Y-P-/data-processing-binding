@@ -28,9 +28,9 @@ object CtxTest {
   //a generic context that works with any parser for a string processor
   val userCtx = new loader.core.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
     val buf = new java.io.StringWriter
-    override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
     override def apply(e:Proc#Elt) = new EltCtx(e)
     class EltCtx(protected[this] val e:Proc#Elt) extends super.EltCtx(e) {
+      override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null
         ()=>run.includeX(p,e,false)(self,_.read(load("verysmall1"), "UTF-8"))._2

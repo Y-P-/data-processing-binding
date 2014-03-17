@@ -63,7 +63,7 @@ trait CtxCore extends definition.Impl {
     /** the last fd seen in that struct */
     protected[this] var previous:Context#FieldMapping
     /** Tells whether that Struct can ask for fast forward to the parser */
-    val canFast = userCtx.fast && fd.loader.annot.fast
+    val canFast = eltCtx.fast && fd.loader.annot.fast
     val doFast  = canFast && !tags.hasNonContig
     
     protected[this] trait Copy extends super.Copy { this:Struct=>
