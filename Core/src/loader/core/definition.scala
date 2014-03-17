@@ -58,14 +58,14 @@ object definition {
       /** Fields */
       def parent : Elt      //parent item
       def key    : Key      //element key
-      def name   : String  = key.toString  //element name; provided for simplicity
+      def name   : String = key.toString  //element name; provided for simplicity
       /** Builder for children elements. builder should stay a def and point to the companion object to prevent bloating. */
       def builder:EltBuilder
-      /** building a child spawning children of the same nature; you must call this method because it can be overriden (callbacks) */
+      /** building a child spawning children of the same nature; you must call this method because it can be overridden (callbacks) */
       def build(p:Builder#Parser, u:UCtx[Builder], s:Status):Elt = builder(p, u, this, s)
       /** the status for this element */
       def status:Status
-      /** copies the element and assigns another compatible parser ; useful to manage includes. */
+      /** copies the element and assigns another compatible parser ; important to manage includes, especially for handling split elements/multiple redirections. */
       def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P }
       
       /** The standard, elementary methods dealing with parser events.
@@ -137,8 +137,8 @@ object definition {
       }
       //iteration on the elements forming the full chain to this element starting from the top
       def foreach[U](f:Elt=>U):Unit = { if (parent!=null) parent.foreach(f); f(this) }
-      def iter[U](f:Elt=>U):Traversable[Elt] = new Traversable[Elt] {
-        def foreach[U](f:(Elt)=>U) = EltBase.this.foreach(f)
+      def iter:Traversable[Elt] = new Traversable[Elt] {
+        def foreach[U](f:Elt=>U) = EltBase.this.foreach(f)
       }
       /** Prints the stack */
       def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.name}"))
