@@ -6,11 +6,14 @@ object run {
   
   /** The usual way to launch a pair parser/processor.
    *  The parameters look, well, ugly ; but the compiler will infer them nicely from standard functions.
+   *  Note that u is an acceptable user context type for both processor and parser.
+   *  
    *  @param p, the parser
    *  @param m, the delegate (processor)
    *  @param u, the context
    *  @param init, a m._ method for creating the initializing function
    *  @param f, a p._ method for starting the parser
+   *  @returns the return values of both the parser and the processor
    */
   def apply[P<:ParserBuilder { type BaseProcessor>:M }, M<:Impl { type BaseParser>:P }]
         (p:P,m:M#Dlg)

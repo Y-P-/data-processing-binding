@@ -52,46 +52,64 @@ trait ParserBuilder {
   /** factory for Parser */
   def apply[X<:BaseProcessor with Singleton](u:UCtx[X],pf:Impl[X]=>X#Elt):Impl[X]
   
+  
+  /** This implementation does a cast.
+   *  It is has the advantage of:
+   *  - building/sharing only one instance of EltCtx for one element
+   *  But it cannot ensure type security unless the user context passed on to the processor and parsers
+   *  are identical and that this type respects: UCtx[Proc] with Proc#UCtx[ParserBuilder.this.type]
+   *  In effect, this cannot be imposed here without falling into the 'volatile type' trap.
+   *  It will have to be ensured at the calling level.
+   *  IMPORTANT: object 'run' methods ensure this condition.
+   */
+  trait Efficient {this:BaseImpl=>
+    def eltCtx:ECtx[ParserBuilder.this.type,Proc] = cur.eltCtx.asInstanceOf[ECtx[ParserBuilder.this.type,Proc]]
+  }
+  /** This implementation is type secure.
+   *  But! eltCtx is recomputed every time. This may not be important (simple implementations will return a
+   *  common object) ; but this can be annoying when specific instances are built. In particular, this forces
+   *  these instances to be fully functional (no state would get shared.) Furthermore, this can severely impair
+   *  performances when computing eltCtx is costly.
+   */
+  trait Sure {this:BaseImpl=>
+    def eltCtx:ECtx[ParserBuilder.this.type,Proc] = userCtx(cur)
+  }
+  
   /** Base implementation that merges the actual parser with the Processor.
    *  The actual implementation will mostly have to call push/pull as needed
    *  while doing its own work ; it doesn't (shouldn't) care about anything else
    *  in this trait.
-   *  It has access to the launcher (hence the processor) if need be.
-   *  It also has access to the user context.
-   *  @param binder, which is used to attach the parser with the processor
    */
   trait BaseImpl extends Locator {
     type Proc <: BaseProcessor with Singleton
     val userCtx:UCtx[Proc]
     val top:Proc#Elt
+    def eltCtx:ECtx[ParserBuilder.this.type,Proc]
     protected[this] var cur = top
     private[this]   var ignore:Int = 0
     def current = cur
-    //We should write: userCtx(cur)
-    //However:
-    //  - we know that cur.userCtx eq userCtx
-    //  - hence we have cur.eltCtx = cur.userCtx(cur) = userCtx(cur)
-    //  - so the cast is always valid
-    //  - it is useful because it prevents building eltCtx many times : it is built once, then shared
-    def eltCtx:ECtx[ParserBuilder.this.type,Proc] = top.eltCtx.asInstanceOf[ECtx[ParserBuilder.this.type,Proc]]
     def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull() } catch errHandler finally { cur=cur.parent }
-    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { pullVal(v) } catch errHandler finally { cur=cur.parent }
+    def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(eltCtx.valMap(v)) } catch errHandler finally { cur=cur.parent }
     def push(key: Key):Unit = if (ignore>0) { if (canSkip) skipToEnd else ignore+=1 } else {
       import ParserBuilder.{ skip, skipEnd }
-      try { pushKey(key) } catch {
+      try { cur=cur.push(eltCtx.keyMap(key)) } catch {
         case `skip`                 => ignore+=1
         case `skipEnd`   if canSkip => skipToEnd
         case e:Throwable if canSkip => errHandler(e); skipToEnd
         case e:Throwable            => errHandler(e); ignore+=1 
       }
     }
-    protected[this] def pushKey(key:Key) = cur=cur.push(eltCtx.keyMap(key))
-    protected[this] def pullVal(v:Value) = cur.pull(eltCtx.valMap(v))
     def onExit():Ret
     def invoke(f:this.type=>Unit):(Ret,Proc#Ret) = {
+      if (!(top.userCtx eq userCtx)) throw new InternalLoaderException("userCtx on processor and parser are unconsistent", null)
       val r=top.invoke(f(this))
       if (!(cur eq top)) throw new InternalLoaderException("Parsing unfinished while calling final result", null)
       (onExit(),r)
+    }
+    def errHandler = try {
+      eltCtx.errHandler(this)
+    } catch {  //only NullPointerException expected here, but who knows ?
+      case u:Throwable => top(StackException(u)); throw u
     }
     
     /** when the processor rejects the current elemnt (push returns false), the parser is assumed to get to the
@@ -103,18 +121,6 @@ trait ParserBuilder {
      *  do nothing if not possible.
      */
     def skipToEnd(): Unit = ()
-
-        
-    //All exceptions handled in the same way:
-    // - process exception event
-    // - throw exception if and only if the exception is InternalLoaderException or UserException with lvl<=1
-    def errHandler:PartialFunction[Throwable,Unit] = {
-      case u:NullPointerException if current==null => try { top(StackException(u)) } finally { throw new InternalLoaderException(StackException(u),current) }
-      case u:InternalLoaderException => try { current(UnexpectedException(u)) } finally { throw u }
-      case u:UserException           => try { current(u) } finally { if (u.lvl<=1) throw u }
-      case u:Exception with Event    => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
-      case u:Throwable               => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
-    }
   }
 }
 

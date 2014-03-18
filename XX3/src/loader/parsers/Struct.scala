@@ -10,7 +10,7 @@ class Struct(maxSz:Int=256,maxDepth:Int=32,nlInString:Boolean=false) extends Han
   def apply[P<:BaseProcessor with Singleton](userCtx:UCtx[P],pf:Impl[P]=>P#Elt):Impl[P] = new Impl(userCtx,pf)
   
   type Parser = BaseImpl
-  class Impl[X<:BaseProcessor with Singleton](val userCtx:UCtx[X],pf: Impl[X]=>X#Elt) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.BaseImpl {
+  class Impl[X<:BaseProcessor with Singleton](val userCtx:UCtx[X],pf: Impl[X]=>X#Elt) extends StructParser('{','}','=',';','"','#',maxSz,maxDepth,nlInString,'^',Array(('t','\t'),('n','\n'),('u','+'))) with super.BaseImpl with Efficient {
     lazy val top = pf(this)                      //must be lazy. If not, it is initialized too late. It cannot be initialized upwards without a cast (because only here is 'this' a Impl[X]).
     type Proc = X
     override final val canSkip:Boolean = true

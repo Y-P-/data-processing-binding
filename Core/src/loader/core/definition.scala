@@ -2,6 +2,7 @@ package loader.core
 
 import exceptions._
 import loader.core.events.Event
+import scala.annotation.tailrec
 
 object definition {
   import scala.language.implicitConversions
@@ -11,10 +12,6 @@ object definition {
    */
   trait Status[+K>:Null] {
     def key:K
-  }
-  
-  object EltBase {
-    def unapplySeq(e:Processor#EltBase): Option[Seq[String]] = Some(e.toHead.map(_.name))
   }
 
   /** Defines the pattern through which we turn the sequence of parsed items into a structure with depth.
@@ -45,6 +42,24 @@ object definition {
     def baseUCtxClass:Class[UCtx[_]]
     
     
+  /** This implementation does a cast.
+   *  It is has the advantage of reducing the element memory footprint by reaching into the parser (which is
+   *  already itself referenced) ; it also will slightly improve performances by having one less field to fill in.
+   *  It ensures that one of the conditions for using Efficient in parsers is met: indeed: parser.userCtx == elt.userCtx
+   *  But it cannot ensure type security unless this type respects: UCtx[Builder] with Builder#UCtx[Processor.this.type]
+   *  In effect, this cannot be written here without falling into the 'volatile type' trap.
+   *  It will have to be ensured at the calling level.
+   *  IMPORTANT: object run ensures this.
+   *  Note: unused at this stage. The benefits do not seem to outweight the drawback of writing a whole special
+   *        brand of Element implementations. 
+   */
+    trait Efficient {this:EltBase=>
+      def userCtx:UCtx[Builder] = parser.userCtx.asInstanceOf[UCtx[Builder]]
+    }
+    trait Sure {this:EltBase=>
+      val userCtx:UCtx[Builder]
+    }
+    
     /** An object that is attached to a parser object (that has been pushed, to the contrary of
      *  values that are pulled.) One such object is spawned for each parser object, to process
      *  it accordingly to the processor's requirements.
@@ -54,8 +69,8 @@ object definition {
       type Builder <: BaseParser with Singleton
       val parser:Builder#Parser   //parser creating that element: Beware => this can change in case of includes
       /** Context for use */
-      val userCtx:UCtx[Builder]
-      val eltCtx = userCtx(this)
+      def userCtx:UCtx[Builder]
+      val eltCtx:ECtx[Builder,Processor.this.type] = userCtx(this)
       /** Fields */
       def parent : Elt      //parent item
       def key    : Key      //element key
@@ -98,6 +113,8 @@ object definition {
         case null =>
         case h    => h.applyOrElse((this,evt),(x:(Elt,Event))=>())
       }
+      /** element of rank n in the hierarchy ; 0 is the current element */
+      @tailrec final def apply(n:Int):Elt = if (n==0) this else if (parent!=null) parent(n-1) else throw new IndexOutOfBoundsException
       
       /** Ensure the call to doBeg is done as late as possible, but in time. */
       private[this] var begDone=false
@@ -122,6 +139,11 @@ object definition {
         f
         onEnd() //note that for included elements, the onBeg was called using the top parser when the onEnd is called using the bottom one.
       }
+      
+      /** Returns a view to the name sequence from the current item.
+       *  Especially useful for matching names in context.
+       */
+      def names() = toHead.view.map(_.name)
             
       /** Some convenient methods.
        *  Methods prefixed by g are general and use up the full parent chain.
@@ -132,20 +154,13 @@ object definition {
       def isInclude: Boolean = parent!=null && !(parent.parser eq parser)
       //sequence on the elements forming the full chain from this element to the top
       def toHead:Seq[Elt] = new Seq[Elt] {
-        val l = depth
+        lazy val length = depth+1
         def iterator = new Iterator[Elt] {
           private var cur = EltBase.this
           def hasNext: Boolean = cur!=null
           def next: Elt = { val c=cur; cur=cur.parent; c }
         }
-        def apply(idx: Int): Elt = {
-          var i = idx
-          if (i<0 || i>l) throw new IndexOutOfBoundsException
-          var c = EltBase.this
-          while (i>0) { c=c.parent; i-=1 }
-          c
-        }
-        def length: Int = l+1
+        def apply(idx: Int): Elt = EltBase.this(idx)
       }
       //iteration on the elements forming the full chain to this element starting from the top
       def foreach[U](f:Elt=>U):Unit = { if (parent!=null) parent.foreach(f); f(this) }
@@ -157,7 +172,6 @@ object definition {
       override def toString = { val s=new java.io.StringWriter; print(s); s.toString }      
     }
     
-        
     /** Defines how Element are built in various contexts.
      *  - the first four methods define Top builders
      *  - the other define child builders within an already existing processor
@@ -266,7 +280,7 @@ object definition {
      *  It also makes it possible to easily subclass an implementation.
      *  We can already provide basic implementations for simple use case.
      */
-    protected abstract class ElementBase[X<:BaseParser with Singleton] (val parser:X#Parser,val userCtx:UCtx[X],val dlg:Dlg,val key:Key,val parent:Elt) extends EltBase {this:Element[X]=>
+    protected abstract class ElementBase[X<:BaseParser with Singleton] (val parser:X#Parser, val userCtx:UCtx[X], val dlg:Dlg, val key:Key, val parent:Elt) extends EltBase {this:Element[X]=>
       type Builder = X
       def builder = dlg.builder
       protected def onName(key: Key)      = dlg.onName(this,key)

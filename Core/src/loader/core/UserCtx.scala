@@ -4,6 +4,8 @@ import definition._
 import events.EventHandler
 import context.Context
 import loader.core.context.FieldAnnot
+import exceptions._
+import loader.core.events.Event
 
 
 //Note: while type M#BaseParser>:P and M<:P#BaseProcessor are required in the
@@ -35,6 +37,17 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
     def valMap(s:P#Value):M#Value
     /** Solving dynamic mappings */
     def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
+    /** error handler */
+    def errHandler(p:P#BaseImpl):PartialFunction[Throwable,Unit] = {
+      import p._
+      {
+        case u:NullPointerException if current==null => try { p.top(StackException(u)) } finally { throw new InternalLoaderException(StackException(u),current) }
+        case u:InternalLoaderException => try { current(UnexpectedException(u)) } finally { throw u }
+        case u:UserException           => try { current(u) } finally { if (u.lvl<=1) throw u }
+        case u:Exception with Event    => try { current(u) } catch { case u:Throwable => throw new InternalLoaderException(u,current) }
+        case u:Throwable               => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
+      }
+    }
   }
 }
 
@@ -44,4 +57,7 @@ trait ECtx[P<:ParserBuilder,M<:Processor] {
   def keyMap(s:P#Key):M#Key
   def valMap(s:P#Value):M#Value
   def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping
+  def errHandler(p:P#BaseImpl):PartialFunction[Throwable,Unit]
+  def eventHandler:EventHandler[M]
+  def fast:Boolean
 }

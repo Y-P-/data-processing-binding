@@ -25,15 +25,28 @@ object CtxTest {
     case null => throw new java.io.IOException(s"resource $rsc could not be found")
     case url  => url
   }
+
+  import util.matching.Regex
+
+  implicit class RegexContext(val sc: StringContext) extends AnyVal {
+    def r(args: Any*):Regex = new Regex(sc.s(args))
+    def r:Regex = new Regex(sc.parts(0))
+  }
+  
+  val y="he"
+  val u = r"($y.*)"
+  def ex(e:Processor#EltBase) = {
+    e.names() match {
+      case Seq(r"h.*", r"include", _, _*) => println(s"OK")
+      case _ => 
+    }
+  }
+  
   //a generic context that works with any parser for a string processor
   val userCtx = new loader.core.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
     val buf = new java.io.StringWriter
     override def apply(e:Proc#Elt) = new EltCtx(e)
     class EltCtx(protected[this] val e:Proc#Elt) extends super.EltCtx(e) {
-      e match {
-        case loader.core.definition.EltBase("header","") => println("toto")
-        case _ =>
-      }
       override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null

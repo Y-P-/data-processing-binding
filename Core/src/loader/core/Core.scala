@@ -25,7 +25,6 @@ trait Core extends definition.Impl {
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg)           :X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus)
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg,cbks:Cbks*):X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus,cbks:_*)
   
-  // Element implementation : redirect calls
   protected class Element    [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {
     def status = new Status(key)
     def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Element[P](p,u,dlg,key,parent)
@@ -40,6 +39,6 @@ trait Core extends definition.Impl {
 }
 object Core {
   class Status[K>:Null](val key:K) extends definition.Status[K]
-  //using Abstract prevents code bloating due to trait expension
+  //using Abstract prevents code bloating due to trait expansion
   abstract class Abstract extends Core
 }
