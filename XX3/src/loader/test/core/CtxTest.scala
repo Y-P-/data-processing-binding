@@ -1,6 +1,7 @@
 package loader.test.core
 
 import utils.LogTester._
+import utils.stringContextes._
 import utils.RegexReplacer
 import loader._
 import loader.core.run
@@ -25,35 +26,29 @@ object CtxTest {
     case null => throw new java.io.IOException(s"resource $rsc could not be found")
     case url  => url
   }
-
-  import util.matching.Regex
-
-  implicit class RegexContext(val sc: StringContext) extends AnyVal {
-    def r(args: Any*):Regex = new Regex(sc.s(args))
-    def r:Regex = new Regex(sc.parts(0))
-  }
-  
-  val y="he"
-  val u = r"($y.*)"
-  def ex(e:Processor#EltBase) = {
-    e.names() match {
-      case Seq(r"h.*", r"include", _, _*) => println(s"OK")
-      case _ => 
-    }
-  }
   
   //a generic context that works with any parser for a string processor
   val userCtx = new loader.core.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
     val buf = new java.io.StringWriter
-    override def apply(e:Proc#Elt) = new EltCtx(e)
-    class EltCtx(protected[this] val e:Proc#Elt) extends super.EltCtx(e) {
-      override val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
+    val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
+    override def apply(e:Proc#Elt) = e.names match {
+      case _ if e.parent==null           => new EltCtx(e)
+      case _ if e.parent.eltCtx==EltCtxI => EltCtxI
+      case Seq(r"he.*", "include", _*)   => EltCtxI
+      case _                             => new EltCtx(e)
+    }
+    
+    class EltCtx(e:Proc#Elt) extends super.EltCtx(e) {
+      override def eventHandler = self.eventHandler 
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null
         ()=>run.includeX(p,e,false)(self,_.read(load("verysmall1"), "UTF-8"))._2
       }
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s
+    }
+    object EltCtxI extends EltCtx(null) {
+      override def valMap(s:Pars#Value):Proc#Value = s"*$s*"
     }
   }
   val p = new parsers.Struct(256,40,false)

@@ -170,7 +170,7 @@ object definition {
       /** Prints the stack */
       def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.name}"))
       override def toString = { val s=new java.io.StringWriter; print(s); s.toString }      
-    }
+    } 
     
     /** Defines how Element are built in various contexts.
      *  - the first four methods define Top builders

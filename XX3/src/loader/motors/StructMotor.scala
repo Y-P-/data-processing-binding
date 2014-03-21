@@ -22,7 +22,7 @@ object Struct extends ProcessorImpl {
     final def baseParserClass = classOf[BaseParser]
     final def baseUCtxClass = classOf[UCtx[_]]
     
-    def getData(parent:Elt,s:Status):Null = null
+    def getData(e:Elt):Null = null
     val noKey = ""
   
     /**

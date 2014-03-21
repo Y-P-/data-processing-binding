@@ -24,7 +24,7 @@ trait CtxCore extends definition.Impl {
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
   protected[this] type Data>:Null
-  def getData(parent:Elt,s:Status):Data
+  def getData(parent:Elt):Data
     
   trait EltBase extends super.EltBase {
     def data: Data
@@ -138,23 +138,24 @@ trait CtxCore extends definition.Impl {
   def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping): (UCtx[X],Dlg,Cbks*) => X#Parser=>Element[X] = (u,dlg,cbks) => dlg.builder(_,u,null,noStatus(fd),cbks:_*)
   
   //concrete class definitions
-  protected abstract class Element[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt, val fd:Context#FieldMapping, val idx:Int, val data:Data) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {
-    def this(parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt) = this(parser,userCtx,dlg,s.key,parent,s.fd,s.idx,getData(parent, s))
+  protected abstract class Element[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt, val fd:Context#FieldMapping, val idx:Int) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {
+    val data = getData(this)
+    def this(parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt) = this(parser,userCtx,dlg,s.key,parent,s.fd,s.idx)
   }
   protected class XStruct[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with Struct {
     protected var previous0:Context#FieldMapping=null
     protected def previous:Context#FieldMapping = previous0
     protected def previous_=(fd:Context#FieldMapping) = previous0=fd
-    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx,data) with Struct with super.Copy
+    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx) with Struct with super.Copy
     def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)
   }
   protected class XList[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with List {
     protected[this] var index0:Int = 0
-    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx,data) with List with super.Copy
+    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx) with List with super.Copy
     def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)
   }
   protected class XTerminal[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with Terminal {
-    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx,data) with Terminal with super.Copy
+    protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent,fd,idx) with Terminal with super.Copy
     def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)
   }
   protected class XStructCbks  [X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt,val cbks:Cbks*) extends XStruct(parser,userCtx,dlg,s,parent) with WithCallbacks {
@@ -178,7 +179,7 @@ trait CtxCore extends definition.Impl {
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
-  
+
   /** Using Abstract prevents code bloating due to trait expansion
    *  You need to implement:
    *  - val noKey:Key
