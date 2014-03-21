@@ -60,6 +60,47 @@ import loader.reflect._
 import loader.core.context.Context
 
 object ObjectMotor extends ProcessorImpl {
+  /*
+  class Data
+  CASE 1:  Stc in Stc
+    build new instance OR fetch existing one
+    build Binder for field
+  CASE 2:  Stc in Lst
+    build new Instance
+    use Lst Binder subInstance
+  CASE 3:  Stc in Seq
+    build new Instance
+    use Binder subinstance fetched from map OR build it and put it in map
+  CASE 4:  Lst in Stc
+    build Binder subinstance for field
+  CASE 5:  Lst in Lst
+    build Binder subinstance from upper list subinstance
+  CASE 6:  Lst in Seq
+    build Binder subinstance from upper list subinstance fetched from map (create it first if doesn't exist)
+  CASE 7:  Seq in Stc
+    use Binder subinstance fetched from map OR build it and put it in map
+  CASE 8:  Seq in Lst
+    nothing (nominal situation)
+  CASE 9:  Ter in Stc
+    build Binder for field
+  CASE 10: Ter in Lst
+    use Lst Binder subInstance
+  CASE 11: Ter in Seq
+    use Binder subinstance fetched from map OR build it and put it in map
+  
+  - seq are only found in stc
+  - 
+  
+  class StcData(val o:AnyRef,val b:Binder[CtxCore#Elt]#I) extends Data {
+    def this(e:CtxCore#Elt) {
+      val d = if (e.parent.fd.isStruct) DataActor(e.parent.data.o.getClass,e.name,"bsfm").get      
+    }
+    val seqs = scala.collection.mutable.HashMap.empty[String,Binder[CtxCore#Elt]#I]
+  }
+  class LstData
+   
+  */
+  class Data(val o:AnyRef,val b:Binder[CtxCore#Elt]#I)
   implicit final class ToACD(val fd:Context#FieldMapping) extends AutoConvertData {
     def convert: String = fd.annot.convert
     def check: String = fd.annot.check
@@ -76,16 +117,22 @@ object ObjectMotor extends ProcessorImpl {
     type Value      = String
     type Key        = String
     type Ret        = Unit
-    override type Data = Binder[CtxCore#Elt]#I
+    override type Data = ObjectMotor.Data
     type BaseParser = ParserBuilder //any parser
     type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
     final def baseParserClass = classOf[BaseParser]
     final def baseUCtxClass   = classOf[UCtx[_]]
     
-    var top:Binder[CtxCore#Elt]#I = _
+    var top:Data = _
     
-    def getData(e:Elt):Binder[CtxCore#Elt]#I =
-      if (e.parent==null) top else Binder(DataActor(e.parent.data.on.getClass,e.name,"bsfm").get,StandardSolver(),e.fd,e.fd.isSeq)(e.parent.data.on)
+    def getData(e:Elt):Data =
+      if (e.parent==null) top else {
+        val d = if (e.parent.fd.isStruct) DataActor(e.parent.data.o.getClass,e.name,"bsfm").get else null
+        val b = if      (e.fd.isList) Binder(d,StandardSolver(),e.fd,true)(e.parent.data.o).subInstance
+                else if (e.fd.isSeq)  e.parent.data.b
+                else                  Binder(d,StandardSolver(),e.fd,false)(e.parent.data.o)
+        if (e.fd.isStruct) new Data(d.underlying.newInstance(),b) else new Data(null,b)
+      }
     val noKey = ""
   
     /**
@@ -93,17 +140,21 @@ object ObjectMotor extends ProcessorImpl {
      * @param indent, indent value as space number ; 0 means all output on one line
      */    
     abstract class DlgBase(val on:AnyRef) extends super.DlgBase {this:Dlg=>
-      type Result = Unit
-      top = Binder(DataActor.DummyElt,StandardSolver(),dummy,false)(on)
+      type Result = AnyRef
+      top = new Data(on,null)
   
       def onInit(e:Elt):Unit           = {}
       def onBeg(e:Elt): Unit           = {}
-      def onVal(e:Elt,v: String): Unit = e.data.set(v,e)
-      def onEnd(e:Elt): Unit           = e.data.close(e)
-      def onChild(e:Elt,child: Elt, r: Unit): Unit = {}
+      def onVal(e:Elt,v: String): Unit = e.data.b.set(v,e)
+      def onEnd(e:Elt): Unit           = {}
+      def onChild(e:Elt,child: Elt, r: Unit): Unit = child.kind match {
+        case CtxCore.terminal =>
+        case CtxCore.list     => child.data.b.close(child)
+        case CtxCore.struct   => child.data.b.set(child.data.o,child)
+      }
 
       def onInit():Unit = {}
-      def onExit():Unit = {}
+      def onExit():AnyRef = on
     }
   }
   
@@ -111,11 +162,11 @@ object ObjectMotor extends ProcessorImpl {
   
   /** Actual implementation. Due to the nature of this processor, we have only the ctx implementation
    */
-  object ctx extends loader.core.CtxCore.Abstract[Binder[CtxCore#Elt]#I] with DefImpl {
+  object ctx extends loader.core.CtxCore.Abstract[Data] with DefImpl {
     class Dlg(on:AnyRef) extends DlgBase(on) with super[Abstract].DlgBase
     def apply(pr: utils.ParamReader):Dlg   = ???
     def apply(on:AnyRef):Dlg = new Dlg(on:AnyRef)
   }
-  val ext = ???
-  val cre = ???
+  val ext = null
+  val cre = null
 }

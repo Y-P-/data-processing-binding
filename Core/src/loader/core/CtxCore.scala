@@ -30,6 +30,7 @@ trait CtxCore extends definition.Impl {
     def data: Data
     def idx: Int
     def fd: Context#FieldMapping
+    def kind:Int
     /** gets the previous Struct layer */
     def parentStc:Struct = parent match {
       case s:Struct  => s
@@ -65,6 +66,7 @@ trait CtxCore extends definition.Impl {
     /** Tells whether that Struct can ask for fast forward to the parser */
     val canFast = eltCtx.fast && fd.loader.annot.fast
     val doFast  = canFast && !tags.hasNonContig
+    final def kind=CtxCore.struct
     
     protected[this] trait Copy extends super.Copy { this:Struct=>
       override val tags = Struct.this.tags 
@@ -94,6 +96,7 @@ trait CtxCore extends definition.Impl {
     }
   }
   trait List extends EltBase {
+    final def kind=CtxCore.list
     protected val innerFd: Context#FieldMapping = fd.asSeq
     protected[this] var index0: Int
     def index = index0
@@ -110,13 +113,16 @@ trait CtxCore extends definition.Impl {
     }
   }
   trait Terminal extends EltBase {
+    final def kind=CtxCore.terminal
     override protected def onName(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
   trait DlgBase extends super.DlgBase { this:Dlg=>
     final def onName(e:Elt,key:Key): Nothing  = ???  //a default stub ; it is be overriden by the Struct/List/Terminal implementation
+    def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd))
     def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd),cbks:_*)
+    def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping): UCtx[X] => X#Parser=>Element[X] = apply(_,fd)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping,cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,fd,cbks:_*)
   }
   
@@ -180,6 +186,10 @@ trait CtxCore extends definition.Impl {
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
 
+  val struct=0
+  val list=1
+  val terminal=2
+  
   /** Using Abstract prevents code bloating due to trait expansion
    *  You need to implement:
    *  - val noKey:Key

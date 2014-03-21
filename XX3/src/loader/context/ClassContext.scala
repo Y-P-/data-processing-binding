@@ -41,7 +41,8 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       def loader(fd:FieldAnnot,cz:Class[_]) = if (cz!=classOf[Unknown]) cz.getName else {
         try {
           val l = getClass //XXX ana(fd.isList,fd.isSeq).getLoadableClass
-          if (l.isInstanceOf[AnyRef]) l.getName else null
+          //if (l.isInstanceOf[AnyRef]) l.getName else null
+          null
         } catch {
           case d:DynamicInvocation => ""
         }

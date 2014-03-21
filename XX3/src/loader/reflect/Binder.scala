@@ -85,7 +85,7 @@ sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected
     class Instance protected[Analyze] (val on:AnyRef) {
       final def read():Any             = what.get(on)
       def set(x:Any,e:E):Unit          = rcv(convert(x,e),e)
-      def close(e:E):Unit              = throw new IllegalStateException("cannot close a field instance")
+      def close(e:E):Unit              = () //harmless: throw new IllegalStateException("cannot close a field instance")
       def close(key:Any,e:E):Unit      = throw new IllegalStateException("cannot close a field instance")
       def subInstance:I                = throw new IllegalStateException("sub instance are only allowed on collections")
       protected[reflect] def rcv(x:Any,e:E):Unit          = what.set(on,x)
