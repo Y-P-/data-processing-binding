@@ -1,17 +1,14 @@
 package loader.motors
 
-import java.io.Writer
+import java.io.{Writer,FileWriter,File,OutputStreamWriter}
 import loader._
 import utils.Indent
 import loader.core._
 import loader.core.callbacks._
-import java.io.FileWriter
-import java.io.File
-import java.io.OutputStreamWriter
-import loader.core.ParserBuilder
 import loader.core.definition._
+import loader.core.ParserBuilder
 
-object Struct extends ProcessorImpl {
+object StructMotor extends ProcessorImpl {
   
   trait DefImpl extends super.DefImpl {
     type Value      = String
@@ -20,7 +17,7 @@ object Struct extends ProcessorImpl {
     type BaseParser = ParserBuilder //any parser
     type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
     final def baseParserClass = classOf[BaseParser]
-    final def baseUCtxClass = classOf[UCtx[_]]
+    final def baseUCtxClass   = classOf[UCtx[_]]
     
     def getData(e:Elt):Null = null
     val noKey = ""

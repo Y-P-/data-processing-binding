@@ -1,6 +1,5 @@
-package loader.motors.old
+package loader.motors
 
-import loader._
 /*
 /**
  * @param root, a method that gives an initial item to work on
@@ -52,3 +51,71 @@ protected abstract class BaseObjectEngine(val stc:StructField,val item:AnyRef,va
   override def onStcField(child:Loader,value:Any) = child.binding.set(item,value)
 }
 */
+
+import java.io.{Writer,FileWriter,File,OutputStreamWriter}
+import loader.core._
+import loader.core.definition._
+import loader.core.ParserBuilder
+import loader.reflect._
+import loader.core.context.Context
+
+object ObjectMotor extends ProcessorImpl {
+  implicit final class ToACD(val fd:Context#FieldMapping) extends AutoConvertData {
+    def convert: String = fd.annot.convert
+    def check: String = fd.annot.check
+    def param: String = fd.annot.param
+    def valid: String = fd.annot.valid
+  }
+  val dummy = new AutoConvertData {
+    def convert: String = ""
+    def check: String = ""
+    def param: String = ""
+    def valid: String = ""
+  }  
+  trait DefImpl extends super.DefImpl with CtxCore {
+    type Value      = String
+    type Key        = String
+    type Ret        = Unit
+    override type Data = Binder[CtxCore#Elt]#I
+    type BaseParser = ParserBuilder //any parser
+    type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
+    final def baseParserClass = classOf[BaseParser]
+    final def baseUCtxClass   = classOf[UCtx[_]]
+    
+    var top:Binder[CtxCore#Elt]#I = _
+    
+    def getData(e:Elt):Binder[CtxCore#Elt]#I =
+      if (e.parent==null) top else Binder(DataActor(e.parent.data.on.getClass,e.name,"bsfm").get,StandardSolver(),e.fd,e.fd.isSeq)(e.parent.data.on)
+    val noKey = ""
+  
+    /**
+     * @param out, where to write to
+     * @param indent, indent value as space number ; 0 means all output on one line
+     */    
+    abstract class DlgBase(val on:AnyRef) extends super.DlgBase {this:Dlg=>
+      type Result = Unit
+      top = Binder(DataActor.DummyElt,StandardSolver(),dummy,false)(on)
+  
+      def onInit(e:Elt):Unit           = {}
+      def onBeg(e:Elt): Unit           = {}
+      def onVal(e:Elt,v: String): Unit = e.data.set(v,e)
+      def onEnd(e:Elt): Unit           = e.data.close(e)
+      def onChild(e:Elt,child: Elt, r: Unit): Unit = {}
+
+      def onInit():Unit = {}
+      def onExit():Unit = {}
+    }
+  }
+  
+  protected def readParams(pr: utils.ParamReader) = ???
+  
+  /** Actual implementation. Due to the nature of this processor, we have only the ctx implementation
+   */
+  object ctx extends loader.core.CtxCore.Abstract[Binder[CtxCore#Elt]#I] with DefImpl {
+    class Dlg(on:AnyRef) extends DlgBase(on) with super[Abstract].DlgBase
+    def apply(pr: utils.ParamReader):Dlg   = ???
+    def apply(on:AnyRef):Dlg = new Dlg(on:AnyRef)
+  }
+  val ext = ???
+  val cre = ???
+}

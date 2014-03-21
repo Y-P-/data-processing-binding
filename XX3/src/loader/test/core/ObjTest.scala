@@ -21,7 +21,7 @@ import loader.test.Data
 import loader.core.events.EventHandler
 import loader.core.definition.Processor
 
-object CtxTest {
+object ObjTest {
   def load(rsc:String) = getClass.getResource(rsc) match {
     case null => throw new java.io.IOException(s"resource $rsc could not be found")
     case url  => url
@@ -31,47 +31,23 @@ object CtxTest {
   val userCtx = new loader.core.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
     val buf = new java.io.StringWriter
     val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
-    override def apply(e:Proc#Elt) = e.names match {
-      case _ if e.parent==null           => new EltCtx(e)
-      case _ if e.parent.eltCtx==EltCtxI => EltCtxI
-      case Seq(r"he.*", "include", _*)   => EltCtxI
-      case _                             => new EltCtx(e)
-    }
-    
-    class EltCtx(e:Proc#Elt) extends super.EltCtx(e) {
+    override def apply(e:Proc#Elt) = eltCtx
+    object eltCtx extends super.EltCtx(null) {
       override def eventHandler = self.eventHandler 
-      override def solver(s:Proc#Value):()=>Proc#Ret = {
-        if (!s.startsWith("@include:")) return null
-        ()=>run.includeX(p,e,false)(self,_.read(load("verysmall1"), "UTF-8"))._2
-      }
+      override def solver(s:Proc#Value):()=>Proc#Ret = null
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s
-    }
-    object EltCtxI extends EltCtx(null) {
-      override def valMap(s:Pars#Value):Proc#Value = s"*$s*"
     }
   }
   val p = new parsers.Struct(256,40,false)
     
   /** Test to verify that DataActors are correctly found */
-  @Test class CtxBaseTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter):(Unit,Int) = {
-      import motors.StructMotor.ctx
-      val m = ctx(out,2)
+  @Test class ObjBaseTest extends StandardTester {
+    def apply(file:Solver,out:PrintWriter):Unit = {
+      import loader.motors.ObjectMotor.ctx
+      val m = ctx(new Data.Id)
       try {
-        run(p,m)(userCtx,_(ClassContext(classOf[Data.Top])),_.read(load("small"), "UTF-8"))
-      } finally {
-        out.print(userCtx.buf)
-        userCtx.buf.getBuffer.setLength(0)
-      }
-    }
-  }
-  @Test class CtxCbkTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter) = {
-      import motors.StructMotor.ctx
-      val m = ctx(out,2)
-      try {
-        run(p,m)(userCtx,_(ClassContext(classOf[Data.Top]),DefaultCtxEventsCbk(m)),_.read(load("small"), "UTF-8"))
+        run(p,m)(userCtx,_(ClassContext(classOf[Data.Id])),_.read(load("id.txt"), "UTF-8"))
       } finally {
         out.print(userCtx.buf)
         userCtx.buf.getBuffer.setLength(0)

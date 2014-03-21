@@ -20,14 +20,15 @@ object AutoConvertData {
   
 /** A Binder ties an AccessibleObject (Field, Method with one argument, which is hidden in a DataActor) with a ConversionSolver and
  *  some conversion data.
- *  As a result, it can be used to automatically set any value into into, possibly automatically converted to the appropriate type.
+ *  As a result, it can be used to automatically set any value, possibly automatically converted to the appropriate type.
  *  Binder cannot be created by the user: the Binder factory must be used for that.
  *  The Binder exists only to store the relevant data pertaining to the underlying operations (conversion, field/method setting etc.)
+ *  It can be kept and reused.
  *  An Instance must be created in order to use the binder on an actual object.
  *  
  *  A Binder is kind of a lazy immutable object: once its internal state is calculated (which happens only once the first
  *  conversion is requested), it never changes.
- *  It is important to note that this implies that a Binder can only convert from one type of end data.
+ *  It is important to note that this implies that a Binder can only convert from one type of data.
  *  If you have once read a String to set a int field, for example, then you cannot use the same binder to use an int as input.
  *  Another Binder, using the same DataActor would have to be used for that purpose (the internal conversion is obviously not the same!) 
  *  
@@ -54,8 +55,8 @@ object AutoConvertData {
  *  The top class (which cannot be instancied because the constructor is private) is used for binding to a DataActor.
  *  Derived classes (which are also hidden) are used to bind sub-collections. 
  */
-sealed class Binder[-E<:Processor#Elt] private (val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
-  protected[this] final type I = Analyze#Instance
+sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
+  final type I = Analyze#Instance
   private[this] var cached:Analyze = null
   protected[this] def build(on:AnyRef):I = {
     if (cached==null) cached = new Analyze
@@ -81,7 +82,7 @@ sealed class Binder[-E<:Processor#Elt] private (val what:DataActor,protected[thi
     
     /** The instance class actually binds an object with a DataActor.
      */
-    class Instance protected[Analyze] (on:AnyRef) {
+    class Instance protected[Analyze] (val on:AnyRef) {
       final def read():Any             = what.get(on)
       def set(x:Any,e:E):Unit          = rcv(convert(x,e),e)
       def close(e:E):Unit              = throw new IllegalStateException("cannot close a field instance")
@@ -120,7 +121,7 @@ object Binder {
   /** Binder for a collection element. It can not be assigned until all elements have been first collected.
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
-  private class CollectionBinder[-E<:Processor#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
+  private class CollectionBinder[-E<:Processor#EltBase](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
     private[this] val deepCache = new Array[super.Analyze](6)   //Do we expect deep collection of more than this depth ?
     
     class Analyze(val depth:Int,val parent:super.Analyze) extends super.Analyze {
@@ -170,7 +171,7 @@ object Binder {
   }
 
   /** Factory that builds a Binder with a given DataActor */
-  final def apply[E<:Processor#Elt](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
+  final def apply[E<:Processor#EltBase](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
     if (isCol) new CollectionBinder(what,solver,fd)
     else       new Binder(what,solver,fd)
   }

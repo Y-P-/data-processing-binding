@@ -97,7 +97,7 @@ object DataActor {
     def expected = set.getGenericParameterTypes()(0)
     override def toString = s"method ${name}"
   }
-  final private object DummyElt extends DataActor {
+  final object DummyElt extends DataActor {
     val name = null
     def set(on:AnyRef,a:Any):Unit = ()
     def get(on:AnyRef):Any = null

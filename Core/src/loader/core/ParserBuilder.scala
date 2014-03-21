@@ -86,7 +86,7 @@ trait ParserBuilder {
     val top:Proc#Elt
     def eltCtx:ECtx[ParserBuilder.this.type,Proc]
     protected[this] var cur = top
-    private[this]   var ignore:Int = 0
+    private[this] var ignore:Int = 0
     def current = cur
     def pull():Unit         = if (ignore>0) ignore-=1 else try { cur.pull() } catch errHandler finally { cur=cur.parent }
     def pull(v: Value):Unit = if (ignore>0) ignore-=1 else try { cur.pull(eltCtx.valMap(v)) } catch errHandler finally { cur=cur.parent }
