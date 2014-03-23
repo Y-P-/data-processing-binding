@@ -71,6 +71,7 @@ sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected
     def isMap:Boolean = false                            //indicates whether this is a map
     private[this] var eConvert:(Any, E) => Any = null
     protected[this] def eType:Type = what.expected
+    val eClass:Class[_] = Binder.findClass(eType)
     final protected[this] def convert(src:Any,e:E):Any = { //builds the actual value for x as expected from the container
       //finds the converter for source class src; will only be defined on the first invocation (when a value is actually set)
       if (eConvert==null) eConvert=getSolver(src.getClass,eType)
@@ -83,7 +84,9 @@ sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected
     /** The instance class actually binds an object with a DataActor.
      */
     class Instance protected[Analyze] (val on:AnyRef) {
+      final def binder                 = Binder.this
       final def read():Any             = what.get(on)
+      def eltClass                     = Analyze.this.eClass
       def set(x:Any,e:E):Unit          = rcv(convert(x,e),e)
       def close(e:E):Unit              = () //harmless: throw new IllegalStateException("cannot close a field instance")
       def close(key:Any,e:E):Unit      = throw new IllegalStateException("cannot close a field instance")

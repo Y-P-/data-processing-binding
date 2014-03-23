@@ -264,9 +264,8 @@ object definition {
     type Dlg>:Null<:DlgBase
     trait DlgBase extends ThisDlg { this:Dlg=>
       final val proc:self.type = self
-      final val builder:EltBuilder = Impl.this.builder(this)
+      val builder:EltBuilder
     }
-    def builder(m:Dlg):EltBuilder
 
     type Elt>:Null<:EltBase
     trait EltBase extends super.EltBase { self:Elt=>

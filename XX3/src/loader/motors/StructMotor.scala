@@ -19,7 +19,6 @@ object StructMotor extends ProcessorImpl {
     final def baseParserClass = classOf[BaseParser]
     final def baseUCtxClass   = classOf[UCtx[_]]
     
-    def getData(e:Elt):Null = null
     val noKey = ""
   
     /**
@@ -28,6 +27,7 @@ object StructMotor extends ProcessorImpl {
      */    
     abstract class DlgBase(val out:Writer, val indent:Int) extends super.DlgBase {this:Dlg=>
       type Result = Unit
+      def getData(e:Elt):Null = null
     
       private def newLine(e:Elt):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
       private def quote(s:String):Unit  = out.write(if(parser.px.Data.isChar(s)) s else s""""$s"""")

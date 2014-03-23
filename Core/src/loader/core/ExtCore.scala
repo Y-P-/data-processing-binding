@@ -10,7 +10,6 @@ trait ExtCore extends definition.Impl {
   protected[this] val noStatus = new Status(noKey)
   
   protected[this] type Data>:Null    //some data used in association to the element
-  protected def getData(e:Elt):Data  //getting the data for the current element
 
   trait EltBase extends super.EltBase {
     def data: Data
@@ -25,23 +24,24 @@ trait ExtCore extends definition.Impl {
     }    
   }
   
-  trait DlgBase extends super.DlgBase {this:Dlg=>
+  trait DlgBase extends super.DlgBase {dlg:Dlg=>
+    def getData(e:Elt):Data  //getting the data for the current element
     def onName(e:Elt,key:Key) = new Status(key)
     def apply[X<:BaseParser with Singleton](u:UCtx[X],cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus,cbks:_*)
     def apply[X<:BaseParser with Singleton](cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,cbks:_*)
+    val builder = new EltBuilder {
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status):Element[X]                                        = new Element(parser,userCtx,dlg,s.key,parent)
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*):Element[X] with WithCallbacks        = new ElementCbks(parser,userCtx,dlg,s,parent, cbks:_*)
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*):Element[X] with WithCallback = new ElementCbk(parser,userCtx,dlg,s,parent, cb, cbks:_*)
+    }
   }
     
-  def builder(dlg:Dlg) = new EltBuilder {
-    def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status):Element[X]                                        = new Element(parser,userCtx,dlg,s.key,parent)
-    def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*):Element[X] with WithCallbacks        = new ElementCbks(parser,userCtx,dlg,s,parent, cbks:_*)
-    def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*):Element[X] with WithCallback = new ElementCbk(parser,userCtx,dlg,s,parent, cb, cbks:_*)
-  }
   
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg)           :X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus)
   def apply[X<:BaseParser with Singleton](u:UCtx[X],dlg:Dlg,cbks:Cbks*):X#Parser=>Element[X] = dlg.builder(_,u,null,noStatus,cbks:_*)
   
   protected class Element[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key,  parent:Elt) extends ElementBase[X](parser,userCtx,dlg,key,parent) with EltBase {
-    val data:Data = getData(this)
+    val data:Data = dlg.getData(this)
     def status = new Status(key)
     protected class Copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P],val cb:Cbk,val cbks:Cbks*) extends Element[P](p,u,dlg,key,parent) with super.Copy
     def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,null)

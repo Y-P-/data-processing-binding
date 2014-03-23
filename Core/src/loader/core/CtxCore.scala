@@ -24,7 +24,6 @@ trait CtxCore extends definition.Impl {
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
   protected[this] type Data>:Null
-  def getData(parent:Elt):Data
     
   trait EltBase extends super.EltBase {
     def data: Data
@@ -118,34 +117,35 @@ trait CtxCore extends definition.Impl {
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
-  trait DlgBase extends super.DlgBase { this:Dlg=>
-    final def onName(e:Elt,key:Key): Nothing  = ???  //a default stub ; it is be overriden by the Struct/List/Terminal implementation
+  trait DlgBase extends super.DlgBase { dlg:Dlg=>
+    def getData(parent:Elt):Data
+    final def onName(e:Elt,key:Key): Nothing  = ???  //a default stub ; it is overriden by the Struct/List/Terminal implementation
     def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd))
     def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd),cbks:_*)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping): UCtx[X] => X#Parser=>Element[X] = apply(_,fd)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping,cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,fd,cbks:_*)
-  }
   
-  def builder(dlg:Dlg) = new EltBuilder {
-    def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status) =
-      if      (s.fd.isList)   new XList(parser, userCtx, dlg, s, parent)
-      else if (s.fd.isStruct) new XStruct(parser, userCtx, dlg, s, parent)
-      else                    new XTerminal(parser, userCtx, dlg, s, parent)
-    def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*) =
-      if      (s.fd.isList)   new XListCbks(parser, userCtx, dlg, s, parent, cbks:_*)
-      else if (s.fd.isStruct) new XStructCbks(parser, userCtx, dlg, s, parent, cbks:_*)
-      else                    new XTerminalCbks(parser, userCtx, dlg, s, parent, cbks:_*)
-    def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) =
-      if      (s.fd.isList)   new XListCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
-      else if (s.fd.isStruct) new XStructCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
-      else                    new XTerminalCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+    val builder = new EltBuilder {
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status) =
+        if      (s.fd.isList)   new XList(parser, userCtx, dlg, s, parent)
+        else if (s.fd.isStruct) new XStruct(parser, userCtx, dlg, s, parent)
+        else                    new XTerminal(parser, userCtx, dlg, s, parent)
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*) =
+        if      (s.fd.isList)   new XListCbks(parser, userCtx, dlg, s, parent, cbks:_*)
+        else if (s.fd.isStruct) new XStructCbks(parser, userCtx, dlg, s, parent, cbks:_*)
+        else                    new XTerminalCbks(parser, userCtx, dlg, s, parent, cbks:_*)
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) =
+        if      (s.fd.isList)   new XListCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+        else if (s.fd.isStruct) new XStructCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+        else                    new XTerminalCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+    }
   }
 
   def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping): (UCtx[X],Dlg,Cbks*) => X#Parser=>Element[X] = (u,dlg,cbks) => dlg.builder(_,u,null,noStatus(fd),cbks:_*)
   
   //concrete class definitions
   protected abstract class Element[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt, val fd:Context#FieldMapping, val idx:Int) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {
-    val data = getData(this)
+    val data = dlg.getData(this)
     def this(parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt) = this(parser,userCtx,dlg,s.key,parent,s.fd,s.idx)
   }
   protected class XStruct[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with Struct {

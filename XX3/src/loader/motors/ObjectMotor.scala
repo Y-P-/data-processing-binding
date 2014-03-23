@@ -100,12 +100,26 @@ object ObjectMotor extends ProcessorImpl {
   class LstData
    
   */
-  class Data(val o:AnyRef,val b:Binder[CtxCore#Elt]#I)
+  class Data(val b:Binder[CtxCore#Elt]#I)
+  class StcData(val o:AnyRef,b:Binder[CtxCore#Elt]#I,val seqs:scala.collection.mutable.HashMap[String,Binder[CtxCore#Elt]#I]) extends Data(b)
+  
+  object Data {
+    def apply(e:CtxCore#Elt,i:Binder[CtxCore#EltBase]#I) = e match {
+      case _:CtxCore#Terminal =>
+        new Data(i)
+      case _:CtxCore#Struct =>
+        //we need: a new object for the structure, the binder to attach that object to the parent, a map to manage sequences
+        new StcData(i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance,i,scala.collection.mutable.HashMap.empty)
+      case _:CtxCore#List =>
+        new Data(i.subInstance)
+    }
+  }
+  
   implicit final class ToACD(val fd:Context#FieldMapping) extends AutoConvertData {
-    def convert: String = fd.annot.convert
-    def check: String = fd.annot.check
-    def param: String = fd.annot.param
-    def valid: String = fd.annot.valid
+    final def convert: String = fd.annot.convert
+    final def check: String   = fd.annot.check
+    final def param: String   = fd.annot.param
+    final def valid: String   = fd.annot.valid
   }
   val dummy = new AutoConvertData {
     def convert: String = ""
@@ -123,16 +137,6 @@ object ObjectMotor extends ProcessorImpl {
     final def baseParserClass = classOf[BaseParser]
     final def baseUCtxClass   = classOf[UCtx[_]]
     
-    var top:Data = _
-    
-    def getData(e:Elt):Data =
-      if (e.parent==null) top else {
-        val d = if (e.parent.fd.isStruct) DataActor(e.parent.data.o.getClass,e.name,"bsfm").get else null
-        val b = if      (e.fd.isList) Binder(d,StandardSolver(),e.fd,true)(e.parent.data.o).subInstance
-                else if (e.fd.isSeq)  e.parent.data.b
-                else                  Binder(d,StandardSolver(),e.fd,false)(e.parent.data.o)
-        if (e.fd.isStruct) new Data(d.underlying.newInstance(),b) else new Data(null,b)
-      }
     val noKey = ""
   
     /**
@@ -141,16 +145,28 @@ object ObjectMotor extends ProcessorImpl {
      */    
     abstract class DlgBase(val on:AnyRef) extends super.DlgBase {this:Dlg=>
       type Result = AnyRef
-      top = new Data(on,null)
+      def getData(e:Elt):Data = e.parent match {
+        //this is the top object we are filloing/building
+        case null => new StcData(on,null,scala.collection.mutable.HashMap.empty)
+        //parent is an object: we must bind one of its field
+        case s:Struct =>
+          val d0 = s.data.asInstanceOf[StcData]
+          val o = d0.o
+          if (e.fd.isSeq)  //for a seq, find or create the appropriate binder
+            Data(e,d0.seqs.getOrElseUpdate(e.name, Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, true)(o)))
+          else             //otherwise, bind the field
+            Data(e,Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, e.fd.isList)(o))
+        case l:List => Data(e,l.data.b)
+      }
   
       def onInit(e:Elt):Unit           = {}
       def onBeg(e:Elt): Unit           = {}
       def onVal(e:Elt,v: String): Unit = e.data.b.set(v,e)
-      def onEnd(e:Elt): Unit           = {}
-      def onChild(e:Elt,child: Elt, r: Unit): Unit = child.kind match {
-        case CtxCore.terminal =>
-        case CtxCore.list     => child.data.b.close(child)
-        case CtxCore.struct   => child.data.b.set(child.data.o,child)
+      def onEnd(e:Elt): Unit           = if (e.parent!=null) e.data.b.close(e)
+      def onChild(e:Elt,child: Elt, r: Unit): Unit = child match {
+        case _:Terminal =>
+        case _:List     => 
+        case _:Struct   => child.data.b.set(child.data.asInstanceOf[StcData].o,child)
       }
 
       def onInit():Unit = {}
