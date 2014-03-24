@@ -84,9 +84,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       def convert:String     = f.convert()
       def audit:String       = f.audit()
       def contiguous:Boolean = false
-      def isList:Boolean     = false
       def isSeq:Boolean      = false
-      def isFld:Boolean      = loader==null
       def depth:Int          = 0
     }
     /** Translate TagSeq into something usable
@@ -104,9 +102,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       def audit:String       = f.audit()
       def contiguous:Boolean = f.contiguous()
       def depth:Int          = f.depth()
-      def isList:Boolean     = false
       def isSeq:Boolean      = true
-      def isFld:Boolean      = loader==null
    }
     /** Translate TagList into something usable
      */
@@ -122,9 +118,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       def audit:String       = f.audit()
       def depth:Int          = f.depth()
       def contiguous:Boolean = false
-      def isList:Boolean     = true
       def isSeq:Boolean      = false
-      def isFld:Boolean      = loader==null
     }
     /** Translate TagStruct into something usable
      */

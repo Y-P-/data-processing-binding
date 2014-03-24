@@ -94,14 +94,13 @@ abstract class Context(tagMapBuilder: =>TagMap) {
   final class FieldMapping(val annot:FieldAnnot) {
     final lazy val loader = build(annot.loader)
     final def isStruct = loader!=null
-    final def isList   = annot.isList
     final def isSeq    = annot.isSeq
     final def depth    = annot.depth
     final def inName   = annot.inName
     final def ctx      = Context.this
-    //transforms this list Mapping into a seq mapping ; this is used to manage the internal sequence forming the actual list.
+    //transforms this list/seq Mapping into a seq mapping ; this is used to manage the internal sequence forming the actual list.
     final def asSeq:FieldMapping = {
-      if (!annot.isList) throw new IllegalStateException
+      if (annot.depth<=0) throw new IllegalStateException
       new FieldMapping(new FieldAnnot {
         def inName:String  = ""
         def min:Int        = annot.min
@@ -111,9 +110,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
         def param:String   = annot.param
         def audit:String   = annot.audit
         def contiguous:Boolean = true
-        def isList:Boolean = false
         def isSeq:Boolean  = true
-        def isFld:Boolean  = false
         def depth:Int      = annot.depth-1
         def loader:String  = annot.loader
         def convert:String = annot.convert     

@@ -115,7 +115,7 @@ object ObjectMotor extends ProcessorImpl {
           if (e.fd.isSeq)  //for a seq, find or create the appropriate binder
             Data(e,d0.seqs.getOrElseUpdate(e.name, Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, true)(o).subInstance))
           else             //otherwise, bind the field
-            Data(e,Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, e.fd.isList)(o))
+            Data(e,Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, e.fd.depth>0)(o))
         case l:List => Data(e,l.data.b)
       }
   

@@ -10,6 +10,6 @@ object Indent {
              "                                                                                                                "+
              "                                                                                                                "+
              "                                                                                                                "
-  def apply(n:Int) = base.substring(0,n+1)
+  def apply(n:Int) = base.substring(0,if (n==0) 0 else n+1)
   def apply(n:Int,p:Int) = base.substring(0,n*p+1)
 }

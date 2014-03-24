@@ -23,5 +23,5 @@ public @interface TagSeq {
   String audit()       default "";
   String param()       default "";
   String convert()     default "";
-  int depth()          default 1;
+  int depth()          default 0;
 }

@@ -105,7 +105,7 @@ trait CtxCore extends definition.Impl {
       val name = key.toString
       if (!name.isEmpty) throw new IllegalStateException(s"illegal field $name in a list")
       index0 += 1
-      new Status(key, index, innerFd, false)
+      new Status(key, index0, innerFd, false)
     }
   }
   trait Terminal extends EltBase {
@@ -123,15 +123,15 @@ trait CtxCore extends definition.Impl {
   
     val builder = new EltBuilder {
       def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status) =
-        if      (s.fd.isList)   new XList(parser, userCtx, dlg, s, parent)
+        if      (s.fd.depth>0)  new XList(parser, userCtx, dlg, s, parent)
         else if (s.fd.isStruct) new XStruct(parser, userCtx, dlg, s, parent)
         else                    new XTerminal(parser, userCtx, dlg, s, parent)
       def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*) =
-        if      (s.fd.isList)   new XListCbks(parser, userCtx, dlg, s, parent, cbks:_*)
+        if      (s.fd.depth>0)  new XListCbks(parser, userCtx, dlg, s, parent, cbks:_*)
         else if (s.fd.isStruct) new XStructCbks(parser, userCtx, dlg, s, parent, cbks:_*)
         else                    new XTerminalCbks(parser, userCtx, dlg, s, parent, cbks:_*)
       def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) =
-        if      (s.fd.isList)   new XListCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+        if      (s.fd.depth>0)  new XListCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
         else if (s.fd.isStruct) new XStructCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
         else                    new XTerminalCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
     }

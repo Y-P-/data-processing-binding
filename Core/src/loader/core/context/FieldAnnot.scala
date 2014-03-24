@@ -22,11 +22,8 @@ package loader.core.context
 abstract class FieldAnnot {
   def inName:String        //the name for the field in the parser (it is meaningful for the TagMap to recognized which entry names match this Field)
   def loader:String        //the id to a StructAnnot ; null if not mapped to a structure ; "" if the structure is unknown (dynamic)
-  def isList:Boolean       //indicates that the fields is a list: it contains a unique field sequence
   def isSeq:Boolean        //indicates that the field can be repeated
-  def isFld:Boolean        //indicates that a field is terminal
   def depth:Int            //for list/seq, indicates the depth of embedding
-  def isStc:Boolean = !isFld && !isList
   
   /* information pertaining to the expected syntax.
    */
@@ -48,5 +45,5 @@ abstract class FieldAnnot {
     ""
 //    s"<$inName${if (outName!=inName) v(" outName",outName) else ""}${v("min",min,0)}${v("min",max,5)}${v("contiguous",contiguous)}${v("audit",audit)}${v("check",check)}${v("valid",valid)}${v("param",param)}${v("isList",isList)}${v("isSeq",isSeq)}${v("isFld",isFld)}${v("loader",loader)}/>"
   }
-  override def toString  = s"FieldAnnot<$inName>(${if (isList)"lst"else if(isSeq)"seq"else"fld"}${if (loader!=null && !loader.isEmpty())s":$loader"else""})"
+  override def toString  = s"FieldAnnot<$inName>(${if (depth>0)s"${if(isSeq)"seq" else "lst"} $depth"else "fld"}${if (loader!=null && !loader.isEmpty())s":$loader"else""})"
 }
