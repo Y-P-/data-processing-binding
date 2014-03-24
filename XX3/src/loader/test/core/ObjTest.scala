@@ -31,6 +31,8 @@ object ObjTest {
     @TagList  val idx1:Array[Array[Double]] = null
     @TagField(loader=classOf[Cz]) val cz:Cz = null
     @TagList(loader=classOf[Cz]) val czs:List[Cz] = null
+    @TagSeq   val seq:List[Integer] = null
+    @TagSeq(loader=classOf[Cz])   val seq1:Array[Cz] = null
   }
   
   def load(rsc:String) = getClass.getResource(rsc) match {
@@ -65,6 +67,11 @@ object ObjTest {
       println(on.czs(0).id)
       println(on.czs(1).id)
       println(on.czs(2).id)
+      println(on.seq(0))
+      println(on.seq(1))
+      println(on.seq(2))
+      println(on.seq1(0).id)
+      println(on.seq1(1).id)
       println(on.idx1(0)(0))
       println(on.idx1(0)(1))
       println(on.idx1(1)(0))

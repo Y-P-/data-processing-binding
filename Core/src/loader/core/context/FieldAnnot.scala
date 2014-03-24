@@ -25,6 +25,7 @@ abstract class FieldAnnot {
   def isList:Boolean       //indicates that the fields is a list: it contains a unique field sequence
   def isSeq:Boolean        //indicates that the field can be repeated
   def isFld:Boolean        //indicates that a field is terminal
+  def depth:Int            //for list/seq, indicates the depth of embedding
   def isStc:Boolean = !isFld && !isList
   
   /* information pertaining to the expected syntax.

@@ -60,46 +60,7 @@ import loader.reflect._
 import loader.core.context.Context
 
 object ObjectMotor extends ProcessorImpl {
-  /*
-  class Data
-  CASE 1:  Stc in Stc
-    build new instance OR fetch existing one
-    build Binder for field
-  CASE 2:  Stc in Lst
-    build new Instance
-    use Lst Binder subInstance
-  CASE 3:  Stc in Seq
-    build new Instance
-    use Binder subinstance fetched from map OR build it and put it in map
-  CASE 4:  Lst in Stc
-    build Binder subinstance for field
-  CASE 5:  Lst in Lst
-    build Binder subinstance from upper list subinstance
-  CASE 6:  Lst in Seq
-    build Binder subinstance from upper list subinstance fetched from map (create it first if doesn't exist)
-  CASE 7:  Seq in Stc
-    use Binder subinstance fetched from map OR build it and put it in map
-  CASE 8:  Seq in Lst
-    nothing (nominal situation)
-  CASE 9:  Ter in Stc
-    build Binder for field
-  CASE 10: Ter in Lst
-    use Lst Binder subInstance
-  CASE 11: Ter in Seq
-    use Binder subinstance fetched from map OR build it and put it in map
-  
-  - seq are only found in stc
-  - 
-  
-  class StcData(val o:AnyRef,val b:Binder[CtxCore#Elt]#I) extends Data {
-    def this(e:CtxCore#Elt) {
-      val d = if (e.parent.fd.isStruct) DataActor(e.parent.data.o.getClass,e.name,"bsfm").get      
-    }
-    val seqs = scala.collection.mutable.HashMap.empty[String,Binder[CtxCore#Elt]#I]
-  }
-  class LstData
-   
-  */
+
   class Data(val b:Binder[CtxCore#Elt]#I)
   class StcData(val o:AnyRef,b:Binder[CtxCore#Elt]#I,val seqs:scala.collection.mutable.HashMap[String,Binder[CtxCore#Elt]#I]) extends Data(b)
   
@@ -140,20 +101,19 @@ object ObjectMotor extends ProcessorImpl {
     val noKey = ""
   
     /**
-     * @param out, where to write to
-     * @param indent, indent value as space number ; 0 means all output on one line
+     * @param on, the object to fill up
      */    
-    abstract class DlgBase(val on:AnyRef) extends super.DlgBase {this:Dlg=>
+    abstract class DlgBase(on:AnyRef) extends super.DlgBase {this:Dlg=>
       type Result = AnyRef
       def getData(e:Elt):Data = e.parent match {
-        //this is the top object we are filloing/building
+        //this is the top object we are filling/building
         case null => new StcData(on,null,scala.collection.mutable.HashMap.empty)
         //parent is an object: we must bind one of its field
         case s:Struct =>
           val d0 = s.data.asInstanceOf[StcData]
           val o = d0.o
           if (e.fd.isSeq)  //for a seq, find or create the appropriate binder
-            Data(e,d0.seqs.getOrElseUpdate(e.name, Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, true)(o)))
+            Data(e,d0.seqs.getOrElseUpdate(e.name, Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, true)(o).subInstance))
           else             //otherwise, bind the field
             Data(e,Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, e.fd.isList)(o))
         case l:List => Data(e,l.data.b)
@@ -162,12 +122,14 @@ object ObjectMotor extends ProcessorImpl {
       def onInit(e:Elt):Unit           = {}
       def onBeg(e:Elt): Unit           = {}
       def onVal(e:Elt,v: String): Unit = e.data.b.set(v,e)
-      def onEnd(e:Elt): Unit           = if (e.parent!=null) e.data.b.close(e)
-      def onChild(e:Elt,child: Elt, r: Unit): Unit = child match {
-        case _:Terminal =>
-        case _:List     => 
-        case _:Struct   => child.data.b.set(child.data.asInstanceOf[StcData].o,child)
+      def onEnd(e:Elt): Unit           = e match {
+        case _:Struct  => val d = e.data.asInstanceOf[StcData]
+                          for (x <- d.seqs) x._2.close(e)
+                          if (e.parent!=null) e.data.b.set(d.o,e)
+        case _:List    => e.data.b.close(e)
+        case _         =>
       }
+      def onChild(e:Elt,child: Elt, r: Unit): Unit = {}
 
       def onInit():Unit = {}
       def onExit():AnyRef = on

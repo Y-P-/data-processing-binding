@@ -23,6 +23,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     def isSeq      = false
     def isList     = false
     def isFld      = false
+    def depth      = 0
     def check      = ""
     def valid      = ""
     def param      = ""
@@ -95,6 +96,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     final def isStruct = loader!=null
     final def isList   = annot.isList
     final def isSeq    = annot.isSeq
+    final def depth    = annot.depth
     final def inName   = annot.inName
     final def ctx      = Context.this
     //transforms this list Mapping into a seq mapping ; this is used to manage the internal sequence forming the actual list.
@@ -112,6 +114,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
         def isList:Boolean = false
         def isSeq:Boolean  = true
         def isFld:Boolean  = false
+        def depth:Int      = annot.depth-1
         def loader:String  = annot.loader
         def convert:String = annot.convert     
       })

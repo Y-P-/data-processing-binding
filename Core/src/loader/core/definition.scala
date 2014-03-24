@@ -188,12 +188,12 @@ object definition {
       /** When handling Callbacks, we will want to reach the parent behaviour. */
       val cb: callbacks.Callback[Elt,Status,Ret,Key,Value] //the callback for the current element
       val cbx = cb(this)
-      abstract override protected def onName(key: Key): Status              = if (cbx==null) super.onName(key) else cbx.onName(key, super.onName)
-      abstract override protected def onBeg(): Unit                         = if (cbx==null) super.onBeg() else cbx.onBeg(super.onBeg)
-      abstract override protected def onVal(v: Value): Ret                  = if (cbx==null) super.onVal(v) else cbx.onVal(v,super.onVal)
-      abstract override protected def onSolver(v: Value, x: ()=>Ret): Ret   = if (cbx==null) super.onSolver(v,x) else cbx.onSolver(v, x, super.onSolver)
-      abstract override protected def onEnd(): Ret                          = if (cbx==null) super.onEnd() else cbx.onEnd(super.onEnd)
-      abstract override protected def onChild(child: Elt, r: Ret): Unit     = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
+      abstract override protected def onName(key: Key): Status            = if (cbx==null) super.onName(key)      else cbx.onName(key, super.onName)
+      abstract override protected def onBeg(): Unit                       = if (cbx==null) super.onBeg()          else cbx.onBeg(super.onBeg)
+      abstract override protected def onVal(v: Value): Ret                = if (cbx==null) super.onVal(v)         else cbx.onVal(v,super.onVal)
+      abstract override protected def onSolver(v: Value, x: ()=>Ret): Ret = if (cbx==null) super.onSolver(v,x)    else cbx.onSolver(v, x, super.onSolver)
+      abstract override protected def onEnd(): Ret                        = if (cbx==null) super.onEnd()          else cbx.onEnd(super.onEnd)
+      abstract override protected def onChild(child: Elt, r: Ret): Unit   = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
     }
     /** Modifies the current element to manage a callback tree
      *  Children are built according to the following rules:

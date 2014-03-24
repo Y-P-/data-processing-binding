@@ -29,7 +29,6 @@ trait CtxCore extends definition.Impl {
     def data: Data
     def idx: Int
     def fd: Context#FieldMapping
-    def kind:Int
     /** gets the previous Struct layer */
     def parentStc:Struct = parent match {
       case s:Struct  => s
@@ -65,7 +64,6 @@ trait CtxCore extends definition.Impl {
     /** Tells whether that Struct can ask for fast forward to the parser */
     val canFast = eltCtx.fast && fd.loader.annot.fast
     val doFast  = canFast && !tags.hasNonContig
-    final def kind=CtxCore.struct
     
     protected[this] trait Copy extends super.Copy { this:Struct=>
       override val tags = Struct.this.tags 
@@ -95,7 +93,6 @@ trait CtxCore extends definition.Impl {
     }
   }
   trait List extends EltBase {
-    final def kind=CtxCore.list
     protected val innerFd: Context#FieldMapping = fd.asSeq
     protected[this] var index0: Int
     def index = index0
@@ -112,7 +109,6 @@ trait CtxCore extends definition.Impl {
     }
   }
   trait Terminal extends EltBase {
-    final def kind=CtxCore.terminal
     override protected def onName(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
@@ -185,10 +181,6 @@ trait CtxCore extends definition.Impl {
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
-
-  val struct=0
-  val list=1
-  val terminal=2
   
   /** Using Abstract prevents code bloating due to trait expansion
    *  You need to implement:
