@@ -39,26 +39,26 @@ object ObjTest {
     @TagList(loader=classOf[Cz])  val czL:List[Cz] = null                 //collection of objects
     @TagList(loader=classOf[Cz], depth=2) val cz2:Array[List[Cz]] = null  //deep collection of objects
     
-    def p1 = if (idA!=null) s"[${idA.mkString(",")}]" else ""
-    def p2 = if (idL!=null) s"$idL" else ""
-    def p3 = if (id2!=null) s"[${id2.deep.mkString(",")}]" else ""
-    def p4(x:Indent) = if (cz==null) "" else s"${cz.p(x)}"
-    def p5(x:Indent):String = if (czA==null) "" else {
+    def p1 = if (idA!=null && idA.length!=0) s"[${idA.mkString(",")}], " else ""
+    def p2 = if (idL!=null && !idL.isEmpty) s"$idL, " else ""
+    def p3 = if (id2!=null && id2.length!=0) s"[${id2.deep.mkString(",")}], " else ""
+    def p4(x:Indent) = if (cz==null) "" else s"${cz.p(x)}, "
+    def p5(x:Indent):String = if (czA==null || czA.length==0) "" else {
       val b = new StringBuffer
       for (v<-czA) b.append(v.p(x))
-      b.toString
+      b.append(", ").toString
     }
-    def p6(x:Indent):String = if (czL==null) "" else {
+    def p6(x:Indent):String = if (czL==null || czL.isEmpty) "" else {
       val b = new StringBuffer
       for (v<-czL) b.append(v.p(x))
-      b.toString
+      b.append(", ").toString
     }
-    def p7(x:Indent):String = if (cz2==null) "" else {
+    def p7(x:Indent):String = if (cz2==null || cz2.length==0) "" else {
       val b = new StringBuffer
       for (v1<-cz2; v<-v1) b.append(v.p(x))
-      b.toString
+      b.append(", ").toString
     }
-    def p(x:Indent):String = s"$x$id, ${if(ok)"true, "else""}$p1, ${if(idL!=null) s"$idL, " else ""}$p3${p4(x(2))}${p5(x(2))}${p6(x(2))}${p7(x(2))}"
+    def p(x:Indent):String = s"$x{$id, ${if(ok)"true, "else""}$p1$p2${if(idL!=null && !idL.isEmpty) s"$idL, " else ""}$p3${p4(x(2))}${p5(x(2))}${p6(x(2))}${p7(x(2))}}"
     override def toString = p(new Indent(0))
   }
   
