@@ -1,57 +1,5 @@
 package loader.motors
 
-/*
-/**
- * @param root, a method that gives an initial item to work on
- */
-class ObjectMotor[+R](val root:()=>AnyRef) extends Motor[R,AnyRef] with Cloneable {
-  final def apply(stc:StructField):RootEngine[R] = stc.stk.auditRecorder match {
-    case null => new ObjectEngine(root(),stc)
-    case a    => new AuditedObjectEngine(root(),stc,a.audit)
-  }
-  def apply(ld:Loader,pr:utils.ParamReader):EngineBuilder[AnyRef] =
-    new ObjectMotor(()=>ld.binding.newItem)
-}
-
-/** The Engine without auditing capabilities */
-private final class ObjectEngine[+R](override val item:AnyRef, override val stc:StructField) extends BaseObjectEngine(stc,item) with RootEngine[R] {
-  final def builder(stc:StructField,parent:E) = new BaseObjectEngine(stc,parent.getChildItem(stc),parent) with Sub
-}
-
-/** The Engine with auditing capabilities */
-private final class AuditedObjectEngine[+R](override val item:AnyRef, override val stc:StructField, val audit:Auditer) extends BaseObjectEngine(stc,item) with AuditedRootEngine[R] {
-  final def builder(stc:StructField,parent:E) = new BaseObjectEngine(stc,parent.getChildItem(stc),parent) with Sub
-}
-
-protected abstract class BaseObjectEngine(val stc:StructField,val item:AnyRef,val parent:BaseObjectEngine) extends Engine { self=>
-  final protected val loader:Context#StructMapping = stc.fd.loader
-  final type Stc = AnyRef
-  def this(stc:StructField,item:AnyRef) = this(stc,stc.getItemOrElse(item),stc.getParentOrNull[BaseObjectEngine])
-  final type E = BaseObjectEngine
-  final def getChildItem(child:StructField):AnyRef = {     //read preexisting field or create brand new one
-    val b = child.binding
-    val x = b.get(item).asInstanceOf[AnyRef]
-    if (x==null) b.newItem else x
-  }
-  final def parentMotor = stc.parent.motor.asInstanceOf[this.type]  //only one engine active in a given stack!
-  //List elements are NOT named ; only the whole list can be.
-  //Doing otherwise requires a deeper analysis of the generic declaration, and there really is little gain.
-  def onNewElt(ld:Loader):Unit              = ()
-  final override def getSeq(ld:Loader):Seq  = ld.binding.seq(ld.fd)
-  def onString(fld:Loader,value:String):Any = fld.binding.namedString(fld,value)
-  def onListEnd(lst:ListField):Any          = lst.binding.namedAny(lst,onSeqEnd(lst,lst.seq))
-  final override def onValidStr(ld:Loader)  = identity[String]  //check is done on assignment by the binder cv method
-  def onStructEnd():Any = {
-    if (item.isInstanceOf[Named]) item.asInstanceOf[Named].name_=(stc.name)
-    stc.endSeqs
-    if (parent!=null) stc.binding.namedStruct(stc,item)  //send completed data to parent
-    else              item                               //stc.fd.binding(null).finalValue(item)    would invoke terminal tagEnd, but it doesn't seem smart to do so: leave it to the user
-  }
-  final def onInit(ld:Loader):Unit = ()
-  override def onStcField(child:Loader,value:Any) = child.binding.set(item,value)
-}
-*/
-
 import java.io.{Writer,FileWriter,File,OutputStreamWriter}
 import loader.core._
 import loader.core.definition._
@@ -59,20 +7,41 @@ import loader.core.ParserBuilder
 import loader.reflect._
 import loader.core.context.Context
 
+/** This processor is used to spawn new objects.
+ *  A.k.a Data Binding.
+ *  
+ *  The processor itself is rather simple, but it relies heavily on the loader.reflect package
+ *  which contains the basic API for filling an object field dynamically.
+ */
 object ObjectMotor extends ProcessorImpl {
 
-  class Data(val b:Binder[CtxCore#Elt]#I)
-  class StcData(val o:AnyRef,b:Binder[CtxCore#Elt]#I,val seqs:scala.collection.mutable.HashMap[String,Binder[CtxCore#Elt]#I]) extends Data(b)
+  /** The Data component for building objects is a bit more convoluted than for most other processors.
+   *  It has to keep track of things such as the current object we work on, the binder to upper layer object, and for structures, known sequences
+   */
+  sealed class Data protected (private[this] val b:Binder[CtxCore#Elt]#I) {
+    final def subData(e:CtxCore#Elt)      = Data(e,b)   //build a new data on this binder ; useful only when dealing with lists
+    final def set(x:AnyRef,e:CtxCore#Elt) = b.set(x,e)  //show the set method
+    def close(e:CtxCore#Elt)              = b.close(e)  //show the close method : this assigns the data to the bound object (lists)
+  }
+  private class StcData (val on:AnyRef,b:Binder[CtxCore#Elt]#I,private[this] var seqs:Map[String,Binder[CtxCore#Elt]#I]) extends Data(b) {
+    //we use a variable to store an immutable map. We could have used a mutable map, but we expect few sequences per element and small immutable maps have a low memory footprint and are faster
+    final def getOrElseUpdate(name:String, b: =>Binder[CtxCore#Elt]#I) = seqs.get(name) match {
+      case Some(x) => x
+      case None    => val x=b; seqs = seqs + ((name,x)); x
+    }
+    //close all current sequences and assign structure to its owner
+    override final def close(e:CtxCore#Elt) = {
+      for (x <- seqs) x._2.close(e)
+      if (e.parent!=null) set(on,e)
+    }
+  }
   
-  object Data {
-    def apply(e:CtxCore#Elt,i:Binder[CtxCore#EltBase]#I) = e match {
-      case _:CtxCore#Terminal =>
-        new Data(i)
-      case _:CtxCore#Struct =>
-        //we need: a new object for the structure, the binder to attach that object to the parent, a map to manage sequences
-        new StcData(i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance,i,scala.collection.mutable.HashMap.empty)
-      case _:CtxCore#List =>
-        new Data(i.subInstance)
+  /** factory for Data */
+  protected object Data {
+    def apply(e:CtxCore#Elt,i:Binder[CtxCore#EltBase]#I):Data = e match {
+      case _:CtxCore#Terminal => new Data(i)
+      case _:CtxCore#Struct   => new StcData(i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance,i,Map.empty)
+      case _:CtxCore#List     => new Data(i.subInstance)  //let us enter the sub layer for the binder
     }
   }
   
@@ -105,30 +74,23 @@ object ObjectMotor extends ProcessorImpl {
      */    
     abstract class DlgBase(on:AnyRef) extends super.DlgBase {this:Dlg=>
       type Result = AnyRef
+      final def binder(e:Elt,on:AnyRef) = Binder(DataActor(on.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, e.fd.isSeq || e.fd.depth>0)(on)
+      //building the data: we must first examine the kind of parent we have
       def getData(e:Elt):Data = e.parent match {
-        //this is the top object we are filling/building
-        case null => new StcData(on,null,scala.collection.mutable.HashMap.empty)
-        //parent is an object: we must bind one of its field
-        case s:Struct =>
-          val d0 = s.data.asInstanceOf[StcData]
-          val o = d0.o
-          if (e.fd.isSeq)  //for a seq, find or create the appropriate binder
-            Data(e,d0.seqs.getOrElseUpdate(e.name, Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, true)(o).subInstance))
-          else             //otherwise, bind the field
-            Data(e,Binder(DataActor(o.getClass,e.name,"bsfm").get, StandardSolver(), e.fd, e.fd.depth>0)(o))
-        case l:List => Data(e,l.data.b)
+        case null     => new StcData(on,null,Map.empty)                                          //this is the top object we are filling/building
+        case s:Struct => val d = s.data.asInstanceOf[StcData]                                    //parent is an object: we must bind one of its field
+                         Data(e,
+                           if (e.fd.isSeq) d.getOrElseUpdate(e.name, binder(e,d.on).subInstance) //for a sequence, find or create the appropriate binder
+                           else            binder(e,d.on)                                        //otherwise, simply bind the field
+                         )
+        case l:List   => l.data.subData(e)                                                       //use the binder defined for the list
       }
   
+      //pretty simple processor here: actual complexity is in Data
       def onInit(e:Elt):Unit           = {}
       def onBeg(e:Elt): Unit           = {}
-      def onVal(e:Elt,v: String): Unit = e.data.b.set(v,e)
-      def onEnd(e:Elt): Unit           = e match {
-        case _:Struct  => val d = e.data.asInstanceOf[StcData]
-                          for (x <- d.seqs) x._2.close(e)
-                          if (e.parent!=null) e.data.b.set(d.o,e)
-        case _:List    => e.data.b.close(e)
-        case _         =>
-      }
+      def onVal(e:Elt,v:String): Unit  = e.data.set(v,e)  //set terminal field
+      def onEnd(e:Elt): Unit           = e.data.close(e)  //'close' container (list/struct) and assign result to upper layer
       def onChild(e:Elt,child: Elt, r: Unit): Unit = {}
 
       def onInit():Unit = {}

@@ -24,7 +24,8 @@ import loader.annotations._
 
 object ObjTest {
   
-  /** A minimal class to test most object spawning cases, including collections, deep collections, object nesting
+  /** A minimal class to test most object spawning cases, including collections, deep collections,
+   *  object nesting, empty lists
    */
   class Cz {
     import utils.Indent
@@ -38,27 +39,53 @@ object ObjTest {
     @TagSeq(loader=classOf[Cz])   val czA:Array[Cz] = null                //array of objects
     @TagList(loader=classOf[Cz])  val czL:List[Cz] = null                 //collection of objects
     @TagList(loader=classOf[Cz], depth=2) val cz2:Array[List[Cz]] = null  //deep collection of objects
+    @TagSeq(loader=classOf[Cz], depth=2)  val cz3:Array[List[Array[Cz]]] = null  //deep sequence of objects
     
-    def p1 = if (idA!=null && idA.length!=0) s"[${idA.mkString(",")}], " else ""
-    def p2 = if (idL!=null && !idL.isEmpty) s"$idL, " else ""
-    def p3 = if (id2!=null && id2.length!=0) s"[${id2.deep.mkString(",")}], " else ""
+    def p1 = if (idA==null) "" else if (idA.length==0) "-, " else s"[${idA.mkString(",")}], "
+    def p2 = if (idL==null) "" else if (idL.isEmpty) "-, "   else s"$idL, "
+    def p3 = if (id2==null) "" else if (id2.length==0) "-, " else s"[${id2.deep.mkString(",")}], "
     def p4(x:Indent) = if (cz==null) "" else s"${cz.p(x)}, "
-    def p5(x:Indent):String = if (czA==null || czA.length==0) "" else {
+    def p5(x:Indent):String = if (czA==null) "" else if (czA.length==0) "-, " else {
       val b = new StringBuffer
-      for (v<-czA) b.append(v.p(x))
-      b.append(", ").toString
+      b.append(s"${x}czA=[")
+      for (v<-czA) b.append(v.p(x(2)))
+      b.append(s"${x},").toString
     }
-    def p6(x:Indent):String = if (czL==null || czL.isEmpty) "" else {
+    def p6(x:Indent):String = if (czL==null) "" else if (czL.isEmpty) "-, " else {
       val b = new StringBuffer
-      for (v<-czL) b.append(v.p(x))
-      b.append(", ").toString
+      b.append(s"${x}czL=[")
+      for (v<-czL) b.append(v.p(x(2)))
+      b.append(s"${x}],").toString
     }
-    def p7(x:Indent):String = if (cz2==null || cz2.length==0) "" else {
+    def p7(x:Indent):String = if (cz2==null) "" else if (cz2.length==0) "-, " else {
       val b = new StringBuffer
-      for (v1<-cz2; v<-v1) b.append(v.p(x))
-      b.append(", ").toString
+      b.append(s"${x}cz2=[")
+      for (v1<-cz2) {
+        b.append(s"${x(2)}[")
+        for (v<-v1) {
+          b.append(v.p(x(4)))
+        }
+        b.append(s"${x(2)}]")
+      }
+      b.append(s"${x}],").toString
     }
-    def p(x:Indent):String = s"$x{$id, ${if(ok)"true, "else""}$p1$p2${if(idL!=null && !idL.isEmpty) s"$idL, " else ""}$p3${p4(x(2))}${p5(x(2))}${p6(x(2))}${p7(x(2))}}"
+    def p8(x:Indent):String = if (cz3==null || cz3.length==0) "" else {
+      val b = new StringBuffer
+      b.append(s"${x}cz3=[")
+      for (v1<-cz3) {
+        b.append(s"${x(2)}[")
+        for (v2<-v1) {
+          b.append(s"${x(4)}[")
+          for (v<-v2) {
+            b.append(v.p(x(6)))
+          }
+          b.append(s"${x(4)}]")
+        }
+        b.append(s"${x(2)}]")
+      }
+      b.append(s"${x},").toString
+    }
+    def p(x:Indent):String = s"$x{$id, ${if(ok)"true, "else""}$p1$p2$p3${p4(x(2))}${p5(x(2))}${p6(x(2))}${p7(x(2))}${p8(x(2))}}"
     override def toString = p(new Indent(0))
   }
   
@@ -79,14 +106,30 @@ object ObjTest {
   }
   val p = new parsers.Struct(256,40,false)
     
-  /** Test to verify that DataActors are correctly found */
+  /** Test to verify that an object is correctly filled up ; it tests most cases and ends up with some deep nesting */
   @Test class ObjBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Unit = {
       import loader.motors.ObjectMotor.ctx
+      val buf = new java.io.StringWriter
       val on = new Cz
       val m = ctx(on)
-      val r=run(p,m)(userCtx(out),_(ClassContext(classOf[Cz]),DefaultCtxEventsCbk(m)),_.read(load("objTest.txt"), "UTF-8"))._2
-      println(on)
+      val r=run(p,m)(userCtx(new PrintWriter(buf)),_(ClassContext(classOf[Cz]),DefaultCtxEventsCbk(m)),_.read(load("objTest.txt"), "UTF-8"))._2
+      out.println(on)
+      out.print(buf)
     }
   }
 }
+
+
+//TODO
+//Named
+//Inner objects
+//Dynamic
+//Default loader
+//Update mode
+//tagEnd
+//maps
+//Cache for binders
+//External conf for solver and field kind choice
+
+//remove onChild ? (but not Ret=Unit)
