@@ -12,7 +12,7 @@ import loader.core.events.Event
 //      context of the framework, it is of no importance here.
 //      actually, constraints here are counter-productive (types UCtx cannot be well defined)
 //      of course, contexts built with no regards with these constraint won't be of any real use...
-abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
+trait UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   protected[this] type Proc = M
   protected[this] type Pars = P
   type EltCtx<:EltCtxBase
@@ -24,12 +24,13 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
    *  Each element can define its own special actions: these do not have to be defined globally.
    *  However, if you need global actions, the previous method just has to return a constant. 
    */
-  protected[this] abstract class EltCtxBase(elt:M#Elt) extends ECtx[P,M](elt) {this:EltCtx=>
+  protected[this] trait EltCtxBase extends ECtx[P,M] {this:EltCtx=>
+    protected[this] val elt:Proc#Elt
     def usrCtx:UsrCtx.this.type = UsrCtx.this
   }
 }
 
-abstract class ECtx[P<:ParserBuilder,M<:Processor](elt:M#Elt) {
+abstract class ECtx[P<:ParserBuilder,M<:Processor] {
   /** Solving an include for e with data K */
   def keyMap(s:P#Key):M#Key
   /** Solving an include for e with data K */

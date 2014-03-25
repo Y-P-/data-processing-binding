@@ -154,9 +154,12 @@ object ObjectMotor extends ProcessorImpl {
   /** This cannot be implemented: we have to maintain a context. */
   def cre = ???
   
-  abstract class UCtx[-P<:ParserBuilder,-M<:DefImpl] extends UsrCtx[P,M] {
+  /** We define a specific UserType here.
+   *  This processor indeed requires specific information to work, and these can be tuned by the end user.
+   */
+  trait UCtx[-P<:ParserBuilder,-M<:DefImpl] extends UsrCtx[P,M] {
     type EltCtx <: EltCtxBase
-    protected[this] abstract class EltCtxBase(elt:M#Elt) extends super.EltCtxBase(elt) { this:EltCtx=>
+    protected[this] trait EltCtxBase extends super.EltCtxBase { this:EltCtx=>
       /** Converters to use */
       def converters = StandardSolver()
       /** Solving dynamic mappings */

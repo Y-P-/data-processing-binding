@@ -38,11 +38,11 @@ object CtxTest {
       case _                             => new EltCtx(e)
     }
     
-    class EltCtx(e:Proc#Elt) extends super.EltCtxBase(e) {
+    class EltCtx(val elt:Proc#Elt) extends super.EltCtxBase {
       override def eventHandler = self.eventHandler 
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null
-        ()=>run.includeX(p,e,false)(self,_.read(load("verysmall1"), "UTF-8"))._2
+        ()=>run.includeX(p,elt,false)(self,_.read(load("verysmall1"), "UTF-8"))._2
       }
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s

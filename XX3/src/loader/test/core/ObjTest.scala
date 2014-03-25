@@ -98,7 +98,8 @@ object ObjTest {
   //a generic context that works with any parser for a string processor
   def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
     override def apply(e:Proc#Elt) = eltCtx
-    class EltCtx extends super.EltCtxBase(null) {
+    class EltCtx extends super.EltCtxBase {
+      val elt:Proc#Elt = null
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
       override def solver(s:Proc#Value):()=>Proc#Ret = null
       def keyMap(s:Pars#Key):Proc#Key = s

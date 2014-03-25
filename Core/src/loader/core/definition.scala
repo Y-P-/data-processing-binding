@@ -65,12 +65,12 @@ object definition {
      *  it accordingly to the processor's requirements.
      */
     trait EltBase extends Traversable[Elt] { self:Elt=>
-      final def myself:Elt { type Builder=self.Builder} = self //self cast
+      final def myself:Elt { type Builder=self.Builder } = self //self cast
       type Builder <: BaseParser with Singleton
-      val parser:Builder#Parser { type Proc=proc.type }
+      val parser:Builder#Parser
       /** Context for use */
-      val userCtx:UCtx[Builder]
-      val eltCtx = parser.userCtx(this)
+      def userCtx:UCtx[Builder]
+      val eltCtx = userCtx(this)
       /** Fields */
       def parent : Elt      //parent item
       def key    : Key      //element key
