@@ -26,7 +26,7 @@
     [
       {211, [7.0], }
     ]
-  ,
+  ],
   cz3=[
     [
       [
@@ -48,8 +48,15 @@
       ]
       [
         {411, }
-        {412, }
-        {413, }
+        {412, -, }
+        {413, -, 
+          cz2=[
+            [
+            ]
+            [
+              {4131, }
+            ]
+          ],}
       ]
     ]
   ,}
@@ -369,7 +376,7 @@ D  4 [16] cz3.2.2.1.czA : was set to it's default value
 R  5 [16] cz3.2.2.1 : was read
 f+ 5 [16] cz3.2.2.2 : fast skipping will prevent out of sequence detection
 R  5 [16] cz3.2.2.2.id : '412' was read
-D  4 [16] cz3.2.2.2.cz2 : was set to it's default value
+R  5 [16] cz3.2.2.2.cz2 : was read
 D  4 [16] cz3.2.2.2.czL : was set to it's default value
 D  4 [16] cz3.2.2.2.idL : was set to it's default value
 D  4 [16] cz3.2.2.2.ok : was set to it's default value
@@ -381,8 +388,22 @@ D  4 [16] cz3.2.2.2.czA : was set to it's default value
 R  5 [16] cz3.2.2.2 : was read
 f+ 5 [16] cz3.2.2.3 : fast skipping will prevent out of sequence detection
 R  5 [16] cz3.2.2.3.id : '413' was read
-D  4 [16] cz3.2.2.3.cz2 : was set to it's default value
-D  4 [16] cz3.2.2.3.czL : was set to it's default value
+R  5 [16] cz3.2.2.3.czL : was read
+R  5 [16] cz3.2.2.3.cz2.1 : was read
+f+ 5 [16] cz3.2.2.3.cz2.2.1 : fast skipping will prevent out of sequence detection
+R  5 [16] cz3.2.2.3.cz2.2.1.id : '4131' was read
+D  4 [16] cz3.2.2.3.cz2.2.1.cz2 : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.czL : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.idL : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.ok : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.cz3 : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.idA : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.cz : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.id2 : was set to it's default value
+D  4 [16] cz3.2.2.3.cz2.2.1.czA : was set to it's default value
+R  5 [16] cz3.2.2.3.cz2.2.1 : was read
+R  5 [16] cz3.2.2.3.cz2.2 : was read
+R  5 [16] cz3.2.2.3.cz2 : was read
 D  4 [16] cz3.2.2.3.idL : was set to it's default value
 D  4 [16] cz3.2.2.3.ok : was set to it's default value
 D  4 [16] cz3.2.2.3.cz3 : was set to it's default value
