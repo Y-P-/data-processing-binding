@@ -18,19 +18,19 @@ object ObjectMotor extends ProcessorImpl {
   /** The Data component for building objects is a bit more convoluted than for most other processors.
    *  It has to keep track of things such as the current object we work on, the binder to upper layer object, and for structures, known sequences
    */
-  sealed class Data protected (private[this] val b:Binder[Processor#EltBase]#I) {
-    final def subData(d:EClass, e:Processor#EltBase) = Data(d,e,b)   //build a new data on this binder ; useful only when dealing with lists
-    final def set(x:AnyRef,e:Processor#EltBase)      = b.set(x,e)  //show the set method
-    def close(e:Processor#EltBase)                   = b.close(e)  //show the close method : this assigns the data to the bound object (lists)
+  sealed class Data protected (private[this] val b:Binder[DefImpl#EltBase]#I) {
+    final def subData(d:EClass, e:DefImpl#EltBase) = Data(d,e,b)   //build a new data on this binder ; useful only when dealing with lists
+    final def set(x:AnyRef,e:DefImpl#EltBase)      = b.set(x,e)    //show the set method
+    def close(e:DefImpl#EltBase)                   = b.close(e)    //show the close method : this assigns the data to the bound object (lists)
   }
-  private class StcData (val on:AnyRef,b:Binder[Processor#EltBase]#I,private[this] var seqs:Map[String,Binder[Processor#EltBase]#I]) extends Data(b) {
+  private class StcData (val on:AnyRef,b:Binder[DefImpl#EltBase]#I,private[this] var seqs:Map[String,Binder[DefImpl#EltBase]#I]) extends Data(b) {
     //we use a variable to store an immutable map. We could have used a mutable map, but we expect few sequences per element and small immutable maps have a low memory footprint and are faster
-    final def getOrElseUpdate(name:String, b: =>Binder[Processor#EltBase]#I) = seqs.get(name) match {
+    final def getOrElseUpdate(name:String, b: =>Binder[DefImpl#EltBase]#I) = seqs.get(name) match {
       case Some(x) => x
       case None    => val x=b; seqs = seqs + ((name,x)); x
     }
     //close all current sequences and assign structure to its owner
-    override final def close(e:Processor#EltBase) = {
+    override final def close(e:DefImpl#EltBase) = {
       for (x <- seqs) x._2.close(e)
       if (e.parent!=null) set(on,e)
     }
@@ -42,14 +42,22 @@ object ObjectMotor extends ProcessorImpl {
   
   /** returns the kind of data managed by an Elt */
   protected trait EClass {
-    def eClass(e:Processor#EltBase):Int
+    def eClass(e:DefImpl#EltBase):Int
   }
   
   /** factory for Data */
   protected object Data {
-    def apply(d:EClass, e:Processor#EltBase, i:Binder[Processor#EltBase]#I):Data = d.eClass(e) match {
+    protected def getObject(e:DefImpl#EltBase, i:Binder[DefImpl#EltBase]#I):AnyRef = {
+      val x = e.eltCtx
+      if (x.update) {
+        val o = i.read.asInstanceOf[AnyRef]
+        if (o!=null) return o
+      }
+      x.spawn(i)
+    }
+    def apply(d:EClass, e:DefImpl#EltBase, i:Binder[DefImpl#EltBase]#I):Data = d.eClass(e) match {
       case `term`     => new Data(i)
-      case `struct`   => new StcData(i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance,i,Map.empty)
+      case `struct`   => new StcData(getObject(e,i),i,Map.empty)
       case `list`     => new Data(i.subInstance)  //let us enter the sub layer for the binder
     }
   }
@@ -75,7 +83,7 @@ object ObjectMotor extends ProcessorImpl {
       protected def depth(e:Elt):Int
       protected def acd(e:Elt):AutoConvertData
       protected def data(e:Elt):Data
-      def eClass(e:Processor#EltBase):Int      
+      def eClass(e:DefImpl#EltBase):Int      
       final def binder(e:Elt,on:AnyRef) = Binder(DataActor(on.getClass,e.name,"bsfm").get, e.eltCtx.converters, acd(e), isSeq(e) || depth(e)>0)(on)
       //building the data: we must first examine the kind of parent we have
       def getData(e:Elt):Data = e.parent match {
@@ -116,7 +124,7 @@ object ObjectMotor extends ProcessorImpl {
       protected final def isSeq(e:Elt):Boolean       = e.fd.isSeq
       protected final def depth(e:Elt):Int           = e.fd.depth
       protected final def acd(e:Elt):AutoConvertData = e.fd
-      final def eClass(e:Processor#EltBase):Int = e match {
+      final def eClass(e:DefImpl#EltBase):Int        = e match {
         case _:Terminal => term
         case _:Struct   => struct
         case _:List     => list
@@ -145,7 +153,7 @@ object ObjectMotor extends ProcessorImpl {
       //depth inferred from the returned type
       protected final def depth(e:Elt):Int     = 0
       //type inferred from the returned type
-      final def eClass(e:Processor#EltBase):Int = struct
+      final def eClass(e:DefImpl#EltBase):Int  = struct
     }
     def apply(pr: utils.ParamReader):Dlg   = ???
     def apply(on:AnyRef):Dlg = new Dlg(on:AnyRef)
@@ -160,10 +168,16 @@ object ObjectMotor extends ProcessorImpl {
   trait UCtx[-P<:ParserBuilder,-M<:DefImpl] extends UsrCtx[P,M] {
     type EltCtx <: EltCtxBase
     protected[this] trait EltCtxBase extends super.EltCtxBase { this:EltCtx=>
+      /** if true, a current field (object) will be updated rather than created from scratch */
+      def update:Boolean = false
       /** Converters to use */
       def converters = StandardSolver()
       /** Solving dynamic mappings */
       def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
+      /** Spawning new elements ; note that this can be overridden to create inner objects if necessary */
+      def spawn(i:Binder[DefImpl#EltBase]#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
+      /** Merging collections ; the current collection will be evaluated only if you need it */
+      def merge[B<:scala.collection.mutable.Builder[Any,Any]](cur: =>B,read: B) = cur  //wrong signature
     }
   }
 }

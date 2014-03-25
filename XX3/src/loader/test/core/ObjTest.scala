@@ -126,10 +126,8 @@ object ObjTest {
 
 //TODO
 //Named
-//Inner objects
 //Dynamic
 //Default loader
-//Update mode
 //tagEnd
 //maps
 //Cache for binders
