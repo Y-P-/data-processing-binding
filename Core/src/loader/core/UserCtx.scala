@@ -15,6 +15,7 @@ import loader.core.events.Event
 abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   protected[this] type Proc = M
   protected[this] type Pars = P
+  type EltCtx<:EltCtxBase
 
   /** builds an element context */
   def apply(e:M#Elt):EltCtx
@@ -23,7 +24,7 @@ abstract class UsrCtx[-P<:ParserBuilder,-M<:Processor] {
    *  Each element can define its own special actions: these do not have to be defined globally.
    *  However, if you need global actions, the previous method just has to return a constant. 
    */
-  protected[this] abstract class EltCtx(elt:M#Elt) extends ECtx[P,M](elt) {
+  protected[this] abstract class EltCtxBase(elt:M#Elt) extends ECtx[P,M](elt) {this:EltCtx=>
     def usrCtx:UsrCtx.this.type = UsrCtx.this
   }
 }
@@ -40,8 +41,6 @@ abstract class ECtx[P<:ParserBuilder,M<:Processor](elt:M#Elt) {
   val fast = true
   /** Solving an 'include' for e with data K */
   def solver(s:M#Value):()=>M#Ret = null
-  /** Solving dynamic mappings */
-  def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
   /** error handler */
   def errHandler(p:P#BaseImpl):PartialFunction[Throwable,Unit] = {
     import p._

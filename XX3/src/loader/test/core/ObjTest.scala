@@ -21,6 +21,7 @@ import loader.test.Data
 import loader.core.events.EventHandler
 import loader.core.definition.Processor
 import loader.annotations._
+import loader.motors.ObjectMotor
 
 object ObjTest {
   
@@ -95,21 +96,22 @@ object ObjTest {
   }
   
   //a generic context that works with any parser for a string processor
-  def userCtx(out:PrintWriter) = new loader.core.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
+  def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
     override def apply(e:Proc#Elt) = eltCtx
-    object eltCtx extends super.EltCtx(null) {
+    class EltCtx extends super.EltCtxBase(null) {
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
       override def solver(s:Proc#Value):()=>Proc#Ret = null
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s
     }
+    val eltCtx = new EltCtx
   }
   val p = new parsers.Struct(256,40,false)
     
   /** Test to verify that an object is correctly filled up ; it tests most cases and ends up with some deep nesting */
   @Test class ObjBaseTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Unit = {
-      import loader.motors.ObjectMotor.ctx
+      import ObjectMotor.ctx
       val buf = new java.io.StringWriter
       val on = new Cz
       val m = ctx(on)
@@ -130,6 +132,7 @@ object ObjTest {
 //tagEnd
 //maps
 //Cache for binders
-//External conf for solver and field kind choice
+//External conf for field kind choice
 
-//remove onChild ? (but not Ret=Unit)
+//remove/simplify onChild ? (but do not make Ret=Unit ?)
+//finish the ObjectMotor.ext implementation

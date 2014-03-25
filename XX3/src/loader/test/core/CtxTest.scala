@@ -38,7 +38,7 @@ object CtxTest {
       case _                             => new EltCtx(e)
     }
     
-    class EltCtx(e:Proc#Elt) extends super.EltCtx(e) {
+    class EltCtx(e:Proc#Elt) extends super.EltCtxBase(e) {
       override def eventHandler = self.eventHandler 
       override def solver(s:Proc#Value):()=>Proc#Ret = {
         if (!s.startsWith("@include:")) return null

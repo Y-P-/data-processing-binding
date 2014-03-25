@@ -67,10 +67,10 @@ object definition {
     trait EltBase extends Traversable[Elt] { self:Elt=>
       final def myself:Elt { type Builder=self.Builder} = self //self cast
       type Builder <: BaseParser with Singleton
-      val parser:Builder#Parser   //parser creating that element: Beware => this can change in case of includes
+      val parser:Builder#Parser { type Proc=proc.type }
       /** Context for use */
-      def userCtx:UCtx[Builder]
-      val eltCtx:ECtx[Builder,Processor.this.type] = userCtx(this)
+      val userCtx:UCtx[Builder]
+      val eltCtx = parser.userCtx(this)
       /** Fields */
       def parent : Elt      //parent item
       def key    : Key      //element key
@@ -323,9 +323,9 @@ object definition {
     }
     //Here you instantiate your processor for all modes that it supports.
     //It doesn't (and often will not) have to support all modes!
-    val ctx:CtxCore with DefImpl
-    val ext:ExtCore with DefImpl
-    val cre:Core    with DefImpl
+    def ctx:CtxCore with DefImpl
+    def ext:ExtCore with DefImpl
+    def cre:Core    with DefImpl
     //Here you provide a common way to read your specific parameters.
     protected def readParams(pr: utils.ParamReader):Product
   }
