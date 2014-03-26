@@ -96,9 +96,10 @@ object ObjTest {
   }
   
   //a generic context that works with any parser for a string processor
-  def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
+  def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore]
+                                    with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
     override def apply(e:Proc#Elt) = eltCtx
-    class EltCtx extends super.EltCtxBase {
+    class EltCtx extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase {
       val elt:Proc#Elt = null
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
       override def solver(s:Proc#Value):()=>Proc#Ret = null
@@ -131,7 +132,7 @@ object ObjTest {
 //tagEnd
 //maps
 //Cache for binders
-//External conf for field kind choice
+//External conf for field kind choice "fmsj"
 
 //remove/simplify onChild ? (but do not make Ret=Unit ?)
 //finish the ObjectMotor.ext implementation

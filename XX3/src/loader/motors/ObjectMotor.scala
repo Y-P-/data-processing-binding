@@ -47,13 +47,17 @@ object ObjectMotor extends ProcessorImpl {
     }
   }
   
-  protected val struct   = 1
-  protected val term     = 0
-  protected val list     = 2
+  /** possible status for broken data */
+  object EltClass extends Enumeration {
+    type EltClass = Value
+    val struct  = Value
+    val term    = Value
+    val list    = Value
+  }  
   
   /** returns the kind of data managed by an Elt */
   protected trait EClass {
-    def eClass(e:DefImpl#EltBase):Int
+    def eClass(e:DefImpl#EltBase):EltClass.Value
   }
   
   /** factory for Data */
@@ -67,9 +71,9 @@ object ObjectMotor extends ProcessorImpl {
       x.spawn(i)
     }
     def apply(d:EClass, e:DefImpl#EltBase, i:Binder[DefImpl#EltBase]#I):Data = d.eClass(e) match {
-      case `term`     => new Data(i)
-      case `struct`   => new StcData(getObject(e,i),i,Map.empty)
-      case `list`     => new Data(i.subInstance)  //let us enter the sub layer for the binder
+      case EltClass.term     => new Data(i)
+      case EltClass.struct   => new StcData(getObject(e,i),i,Map.empty)
+      case EltClass.list     => new Data(i.subInstance)  //let us enter the sub layer for the binder
     }
   }
   
@@ -79,9 +83,8 @@ object ObjectMotor extends ProcessorImpl {
     type Ret        = Unit
     //override type Data = ObjectMotor.Data
     type BaseParser = ParserBuilder //any parser
-    type UCtx[-p<:BaseParser] = ObjectMotor.UCtx[p,this.type]
+    type UCtx[-p<:BaseParser]>:Null<:ObjectMotor.UCtx[p,this.type]
     final def baseParserClass = classOf[BaseParser]
-    final def baseUCtxClass   = classOf[UCtx[_]]
     
     val noKey = ""
   
@@ -94,17 +97,17 @@ object ObjectMotor extends ProcessorImpl {
       protected def depth(e:Elt):Int
       protected def acd(e:Elt):AutoConvertData
       protected def data(e:Elt):Data
-      def eClass(e:DefImpl#EltBase):Int      
+      def eClass(e:DefImpl#EltBase):EltClass.Value      
       final def binder(e:Elt,on:AnyRef) = Binder(DataActor(on.getClass,e.name,"bsfm").get, e.eltCtx.converters, acd(e), isSeq(e) || depth(e)>0)(on)
       //building the data: we must first examine the kind of parent we have
       def getData(e:Elt):Data = e.parent match {
-        case null                   => new StcData(on,null,Map.empty)                            //this is the top object we are filling/building
-        case s if eClass(s)==struct => val d = data(s).asInstanceOf[StcData]                     //parent is an object: we must bind one of its field
-                         Data(this,e,
-                           if (isSeq(e)) d.getOrElseUpdate(e.name, binder(e,d.on).subInstance)   //for a sequence, find or create the appropriate binder
-                           else          binder(e,d.on)                                          //otherwise, simply bind the field
-                         )
-        case l if eClass(l)==list   => data(l).subData(this,e)                                   //use the binder defined for the list
+        case null                            => new StcData(on,null,Map.empty)                            //this is the top object we are filling/building
+        case s if eClass(s)==EltClass.struct => val d = data(s).asInstanceOf[StcData]                     //parent is an object: we must bind one of its field
+                                                Data(this,e,
+                                                  if (isSeq(e)) d.getOrElseUpdate(e.name, binder(e,d.on).subInstance)   //for a sequence, find or create the appropriate binder
+                                                  else          binder(e,d.on)                                          //otherwise, simply bind the field
+                                                )
+        case l if eClass(l)==EltClass.list   => data(l).subData(this,e)                                   //use the binder defined for the list
       }
   
       //pretty simple processor here: actual complexity is in Data
@@ -124,6 +127,8 @@ object ObjectMotor extends ProcessorImpl {
   /** Actual implementation for CtxCore.
    */
   object ctx extends loader.core.CtxCore.Abstract[Data] with DefImpl {
+    type UCtx[-p<:BaseParser] = ObjectMotor.UCtx[p,this.type] with CtxCore.UsrCtx[p,this.type]
+    final def baseUCtxClass   = null //XXX classOf[UCtx[_]]
     implicit final class ToACD(val fd:Context#FieldMapping) extends AutoConvertData {
       final def convert: String = fd.annot.convert
       final def check: String   = fd.annot.check
@@ -135,10 +140,10 @@ object ObjectMotor extends ProcessorImpl {
       protected final def isSeq(e:Elt):Boolean       = e.fd.isSeq
       protected final def depth(e:Elt):Int           = e.fd.depth
       protected final def acd(e:Elt):AutoConvertData = e.fd
-      final def eClass(e:DefImpl#EltBase):Int        = e match {
-        case _:Terminal => term
-        case _:Struct   => struct
-        case _:List     => list
+      final def eClass(e:DefImpl#EltBase):EltClass.Value = e match {
+        case _:Terminal => EltClass.term
+        case _:Struct   => EltClass.struct
+        case _:List     => EltClass.list
       }
     }
     def apply(pr: utils.ParamReader):Dlg   = ???
@@ -149,7 +154,10 @@ object ObjectMotor extends ProcessorImpl {
    *  As we have no context, we will have to infer the properties of each element.
    *  This processor can spawn any class.
    */
+  //TODO
   object ext extends loader.core.ExtCore.Abstract[Data] with DefImpl {
+    type UCtx[-p<:BaseParser] = ObjectMotor.UCtx[p,this.type]
+    final def baseUCtxClass   = classOf[UCtx[_]]
     val dummy = new AutoConvertData {  //no data for conversions
       def convert: String = ""
       def check: String = ""
@@ -164,7 +172,7 @@ object ObjectMotor extends ProcessorImpl {
       //depth inferred from the returned type
       protected final def depth(e:Elt):Int     = 0
       //type inferred from the returned type
-      final def eClass(e:DefImpl#EltBase):Int  = struct
+      final def eClass(e:DefImpl#EltBase):EltClass.Value = EltClass.struct
     }
     def apply(pr: utils.ParamReader):Dlg   = ???
     def apply(on:AnyRef):Dlg = new Dlg(on:AnyRef)
@@ -183,8 +191,6 @@ object ObjectMotor extends ProcessorImpl {
       def update:Boolean = false
       /** Converters to use */
       def converters = StandardSolver()
-      /** Solving dynamic mappings */
-      def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
       /** Spawning new elements ; note that this can be overridden to create inner objects if necessary */
       def spawn(i:Binder[DefImpl#EltBase]#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
       /** Merging collections; called only if update is true.

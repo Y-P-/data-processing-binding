@@ -15,9 +15,7 @@ object StructMotor extends ProcessorImpl {
     type Key        = String
     type Ret        = Int
     type BaseParser = ParserBuilder //any parser
-    type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
     final def baseParserClass = classOf[BaseParser]
-    final def baseUCtxClass   = classOf[UCtx[_]]
     
     val noKey = ""
   
@@ -57,6 +55,8 @@ object StructMotor extends ProcessorImpl {
    *  Implementation 'ext' doesn't bring anything more than 'cre', except it's a bit slower!
    */
   object ctx extends loader.core.CtxCore.Abstract[Null] with DefImpl {
+    type UCtx[-p<:BaseParser] = CtxCore.UsrCtx[p,this.type]
+    final def baseUCtxClass   = classOf[UCtx[_]]
     class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super[Abstract].DlgBase {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
@@ -64,6 +64,8 @@ object StructMotor extends ProcessorImpl {
     def apply(out:Writer,indent:Int=0):Dlg = new Dlg(out,indent)
   }
   object ext extends loader.core.ExtCore.Abstract[Null] with DefImpl {
+    type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
+    final def baseUCtxClass   = classOf[UCtx[_]]
     class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super[Abstract].DlgBase {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }
@@ -71,6 +73,8 @@ object StructMotor extends ProcessorImpl {
     def apply(out:Writer, indent:Int=0):Dlg = new Dlg(out,indent)
   }
   object cre extends loader.core.Core.Abstract with DefImpl {
+    type UCtx[-p<:BaseParser] = UsrCtx[p,this.type]
+    final def baseUCtxClass   = classOf[UCtx[_]]
     class Dlg(out:Writer,indent:Int=0) extends DlgBase(out,indent) with super[Abstract].DlgBase {
       def this(p:(Writer,Int)) = this(p._1,p._2)
     }

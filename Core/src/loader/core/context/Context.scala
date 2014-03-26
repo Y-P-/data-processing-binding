@@ -100,7 +100,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     final def ctx      = Context.this
     //transforms this list/seq Mapping into a seq mapping ; this is used to manage the internal sequence forming the actual list.
     final def asSeq:FieldMapping = {
-      if (annot.depth<=0) throw new IllegalStateException
+      if (annot.depth<=0) throw new IllegalStateException("it is not legal to use asSeq on a FieldMapping that is not a list/sequence")
       new FieldMapping(new FieldAnnot {
         def inName:String  = ""
         def min:Int        = annot.min

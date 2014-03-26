@@ -39,7 +39,7 @@ object definition {
     val noKey:Key
     //used for dynamic checks
     def baseParserClass:Class[BaseParser]
-    def baseUCtxClass:Class[UCtx[_]]
+    def baseUCtxClass:Class[UCtx[_]]  //XXX can be a list of interfaces
     
     
   /** This implementation does a cast.

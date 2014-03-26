@@ -20,6 +20,7 @@ import context.Context
 trait CtxCore extends definition.Impl {
   type Status = CtxCore.Status[Key]
   type Dlg>:Null<:DlgBase
+  type UCtx[-p<:BaseParser]>:Null<:CtxCore.UsrCtx[p,this.type]
   type Elt = EltBase
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
@@ -66,10 +67,10 @@ trait CtxCore extends definition.Impl {
     val doFast  = canFast && !tags.hasNonContig
     
     protected[this] trait Copy extends super.Copy { this:Struct=>
-      override val tags = Struct.this.tags 
-      override val seen = Struct.this.seen 
+      override val tags    = Struct.this.tags 
+      override val seen    = Struct.this.seen 
       override val canFast = Struct.this.canFast
-      override val doFast = Struct.this.doFast
+      override val doFast  = Struct.this.doFast
       override protected def previous=Struct.this.previous
       override protected def previous_=(fd:Context#FieldMapping) = Struct.this.previous=fd
     }
@@ -80,14 +81,13 @@ trait CtxCore extends definition.Impl {
         case None     =>
           if (seen.size == tags.size && doFast) throw ParserBuilder.skipEnd
           else                                  throw ParserBuilder.skip
-        case Some(fd) =>
-          val fd1 = if (fd.annot.loader==null || fd.annot.loader.length>0) fd else null //XXX userCtx.solveDynamic(this,fd)
+        case Some(fd) =>  //XXX problem with eq compare on spawned fd1
+          val fd1 = if (fd.annot.loader==null || fd.annot.loader.length>0) fd else eltCtx.solveDynamic(fd)
           val idx = seen.getOrElse(name, 0) + 1
           seen.update(name, idx)
           var broken: Boolean = idx != 1 //for non seq, idx!=1 indicates a multiple occurence ; for a seq, the possibility that the seq is broken
           if (fd1.isSeq) broken &&= fd1.isSeq && previous != null && previous != fd1 //check last fd to see if the current seq has been broken
           previous = fd1
-          //XXX manage broken data (keep it ? discard it ?)
           new Status(key, idx, fd1, broken)
       }
     }
@@ -142,7 +142,14 @@ trait CtxCore extends definition.Impl {
   //concrete class definitions
   protected abstract class Element[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, key:Key, parent:Elt, val fd:Context#FieldMapping, val idx:Int) extends ElementBase[X](parser,userCtx,dlg,key,parent) with Elt {
     val data = dlg.getData(this)
-    def this(parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt) = this(parser,userCtx,dlg,s.key,parent,s.fd,s.idx)
+    def this(parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt) = {
+      this(parser,userCtx,dlg,s.key,parent,s.fd,s.idx)
+      if (s.broken) eltCtx.brokenPolicy match {
+        case CtxCore.Broken.append =>                           //default mode
+        case CtxCore.Broken.first  => throw ParserBuilder.skip  //avoid this element
+        case CtxCore.Broken.last   => //XXX manage last policy for seqs
+      }
+    }
   }
   protected class XStruct[X<:BaseParser with Singleton](parser:X#Parser,userCtx:UCtx[X],dlg:Dlg,s:Status,parent:Elt) extends Element(parser,userCtx,dlg,s,parent) with Struct {
     protected var previous0:Context#FieldMapping=null
@@ -181,6 +188,25 @@ trait CtxCore extends definition.Impl {
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
+  
+  /** possible status for broken data */
+  object Broken extends Enumeration {
+    type Broken = Value
+    val first  = Value  /** keep the first read     */
+    val last   = Value  /** keep the last read      */
+    val append = Value  /** append (sequences only); equivalent to last for simple fields */
+  }  
+  
+  
+  trait UsrCtx[-P<:ParserBuilder,-M<:definition.Processor] extends loader.core.UsrCtx[P,M] {
+    type EltCtx <: EltCtxBase
+    protected[this] trait EltCtxBase extends super.EltCtxBase { this:EltCtx=>
+      /** Solving dynamic mappings : this is called at any time a loader is found as null (Unknown) */
+      def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
+      /** Policy regarding broken data */
+      def brokenPolicy:Broken.Value = Broken.last
+    }
+  }
   
   /** Using Abstract prevents code bloating due to trait expansion
    *  You need to implement:

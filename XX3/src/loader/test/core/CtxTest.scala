@@ -28,7 +28,7 @@ object CtxTest {
   }
   
   //a generic context that works with any parser for a string processor
-  val userCtx = new loader.core.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
+  val userCtx = new loader.core.CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},CtxCore {type Value=String; type Key=String}] {self=>
     val buf = new java.io.StringWriter
     val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
     override def apply(e:Proc#Elt) = e.names match {
