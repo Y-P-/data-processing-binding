@@ -187,8 +187,14 @@ object ObjectMotor extends ProcessorImpl {
       def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
       /** Spawning new elements ; note that this can be overridden to create inner objects if necessary */
       def spawn(i:Binder[DefImpl#EltBase]#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
-      /** Merging collections; called only if update is true. Return 'cur' if you keep the old (not null) value, 'read' if you keep the new, or a Traversable for the merge */
-      def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = read
+      /** Merging collections; called only if update is true.
+       *  If you don't return either 'cur' or 'read' or a simple operation such as cur ++ read, and the
+       *  collection is more than one level deep, you're probably asking for problems.
+       *  You had better know exactly what you are doing.
+       *  By default, we concatenate the old and the new values.
+       *  @returns 'cur' if you keep the old (not null) value, 'read' if you keep the new, or a new Traversable for the merge
+       */
+      def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = cur ++ read
     }
   }
 }
