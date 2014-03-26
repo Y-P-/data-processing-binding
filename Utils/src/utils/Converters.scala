@@ -7,7 +7,7 @@ import validator.BorderFactory
 import java.text.ParseException
 import java.util.regex.Pattern
 import validator.Formatter
-import utils.Reflect.RichClass
+import utils.reflect.Reflect.RichClass
 import java.lang.reflect.InvocationTargetException
 
 

@@ -1,6 +1,6 @@
 package utils
 
-import utils.Reflect.RichClass
+import utils.reflect.Reflect.RichClass
 import scala.collection.mutable.HashMap
 
 /** Adds a cache to a function, which prevents recomputing values that are already known.

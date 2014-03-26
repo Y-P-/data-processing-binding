@@ -2,12 +2,12 @@ package loader.reflect
 
 
 import java.lang.reflect.{Field,Method,Type}
-import utils.Reflect.RichClass
+import utils.reflect.Reflect.RichClass
 import scala.annotation.tailrec
 
 
 abstract class DataActor {
-  def name:String                     //'name' for the data (usually the filed name, but usually not the method name)
+  def name:String                     //'name' for the data (usually the field name, could be a method name)
   def set(on:AnyRef,v:Any):Unit       //the method that sets 'name' in on
   def get(from:AnyRef):Any            //the method that gets 'name' from on  
   def expected:Type                   //expected class
@@ -51,13 +51,9 @@ object DataActor {
     val name = f.getName
     f.setAccessible(true)
     def set(on:AnyRef,a:Any):Unit = f.set(on,a)
-    def get(on:AnyRef):Any = f.get(on)
-    def expected = {
-      //println(f)
-      //println(f.getGenericType)
-      f.getGenericType
-    }
-    override def toString = s"field ${f}"
+    def get(on:AnyRef):Any        = f.get(on)
+    def expected                  = f.getGenericType
+    override def toString         = s"field ${f}"
   }
   final private class BeanElt(set:Method) extends DataActor {
     set.setAccessible(true)
@@ -86,23 +82,23 @@ object DataActor {
       g
     }
     def set(on:AnyRef,a:Any):Unit = set.invoke(on,a.asInstanceOf[AnyRef])
-    def get(on:AnyRef):Any = if (get!=null) get.invoke(on) else null
-    def expected = set.getGenericParameterTypes()(0)
-    override def toString = s"scala field ${name}"
+    def get(on:AnyRef):Any        = if (get!=null) get.invoke(on) else null
+    def expected                  = set.getGenericParameterTypes()(0)
+    override def toString         = s"scala field ${name}"
   }
   final private class MethodElt(set:Method) extends DataActor {
     set.setAccessible(true)
     val name = set.getName
     def set(on:AnyRef,a:Any):Unit = set.invoke(on,a.asInstanceOf[AnyRef])
-    def get(on:AnyRef):Any = null
-    def expected = set.getGenericParameterTypes()(0)
-    override def toString = s"method ${name}"
+    def get(on:AnyRef):Any        = null
+    def expected                  = set.getGenericParameterTypes()(0)
+    override def toString         = s"method ${name}"
   }
   final object DummyElt extends DataActor {
     val name = null
     def set(on:AnyRef,a:Any):Unit = ()
-    def get(on:AnyRef):Any = null
-    def expected = classOf[AnyRef]
-    override def toString = s"dummy field"
+    def get(on:AnyRef):Any        = null
+    def expected                  = classOf[AnyRef]
+    override def toString         = s"dummy field"
   }
 }

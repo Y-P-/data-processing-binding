@@ -1,11 +1,13 @@
-package utils
+package utils.reflect
 
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Constructor
 import java.lang.reflect.AccessibleObject
-import scala.reflect.ClassTag
 import java.lang.reflect.Field
+import scala.reflect.runtime.{currentMirror => cm}
+import scala.reflect.runtime.universe.Symbol
+import scala.reflect.runtime.universe.newTermName
 
 object Reflect {
   

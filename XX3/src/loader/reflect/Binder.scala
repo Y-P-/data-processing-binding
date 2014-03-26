@@ -84,15 +84,17 @@ sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected
     /** The instance class actually binds an object with a DataActor.
      */
     class Instance protected[Analyze] (val on:AnyRef) {
-      final def binder                 = Binder.this
-      final def read():Any             = what.get(on)
-      def eltClass                     = Analyze.this.eClass
-      def set(x:Any,e:E):Unit          = rcv(convert(x,e),e)
-      def close(e:E):Unit              = throw new IllegalStateException("cannot close a field instance")
-      def close(key:Any,e:E):Unit      = throw new IllegalStateException("cannot close a field instance")
-      def subInstance:I                = throw new IllegalStateException("sub instance are only allowed on collections")
-      protected[reflect] def rcv(x:Any,e:E):Unit          = what.set(on,x)
-      protected[reflect] def rcv(key:Any,x:Any,e:E):Unit  = throw new IllegalStateException("only a Map instance can receive a (key,value)")
+      final def binder            = Binder.this
+      final def read():Any        = what.get(on)
+      def eltClass                = Analyze.this.eClass
+      def set(x:Any,e:E):Unit     = rcv(convert(x,e),e)
+      def asT:Traversable[Any]    = throw new IllegalStateException("cannot cast a field instance as a Traversable")
+      def close(e:E):Unit         = throw new IllegalStateException("cannot close a field instance")
+      def close(key:Any,e:E):Unit = throw new IllegalStateException("cannot close a field instance")
+      def subInstance:I           = throw new IllegalStateException("sub instance are only allowed on collections")
+      //use with care: this is direct access to the underlying collection WITHOUT conversion
+      def rcv(x:Any,e:E):Unit          = what.set(on,x)
+      def rcv(key:Any,x:Any,e:E):Unit  = throw new IllegalStateException("only a Map instance can receive a (key,value)")
     }
   }
 
@@ -140,21 +142,21 @@ object Binder {
         }
       }
     }
-    private class Col(adapt:CollectionAdapter[_,E]#BaseAdapter[_],depth:Int,parent:Analyze) extends Analyze(depth,parent) {
+    private class Col[C](adapt:CollectionAdapter[C]#BaseAdapter[_],depth:Int,parent:Analyze) extends Analyze(depth,parent) {
       override final def eType = adapt.czElt
       final override def isCol = true
       final override def isMap = adapt.isMap
       override def newInstance(on:AnyRef,parent:I):Instance = new Instance(on,parent)
       class Instance(on:AnyRef,parent:I) extends super.Instance(on,parent) {
-        final var stack:Builder[Any,Any] = _
-        private def checkStack(e:E)                = if (stack==null) stack = adapt.newBuilder(e).asInstanceOf[Builder[Any,Any]]
-        final override def close(e:E):Unit         = { checkStack(e); parent.rcv(stack.result,e) }
-        final override def close(key:Any,e:E):Unit = { checkStack(e); parent.rcv(key,stack.result,e) }
-        override def rcv(x:Any,e:E):Unit           = { checkStack(e); stack+=x }
+        final val stack:Builder[Any,Any]           = adapt.newBuilder.asInstanceOf[Builder[Any,Any]]
+        final override def close(e:E):Unit         = parent.rcv(stack.result,e)
+        final override def close(key:Any,e:E):Unit = parent.rcv(key,stack.result,e)
+        override def rcv(x:Any,e:E):Unit           = stack+=x
+        override def asT                           = { val r=read().asInstanceOf[C]; if (r==null) null else adapt.asTraversable(r) }
       }
     }
-    private class Map(adapt:CollectionAdapter[_,E]#BaseAdapter[_],depth:Int,parent:Analyze) extends Col(adapt,depth,parent) {  //used for mapped collection
-      final val kType = adapt.asInstanceOf[CollectionAdapter[_,E]#MapAdapter[_,_]].czKey
+    private class Map[C](adapt:CollectionAdapter[C]#BaseAdapter[_],depth:Int,parent:Analyze) extends Col(adapt,depth,parent) {  //used for mapped collection
+      final val kType = adapt.asInstanceOf[CollectionAdapter[_]#MapAdapter[_,_]].czKey
       protected[this] var kConvert:(Any,E)=>Any = null
       override def newInstance(on:AnyRef,parent:I):Instance = new Instance(on,parent)
       class Instance(on:AnyRef,parent:I) extends super.Instance(on,parent) {

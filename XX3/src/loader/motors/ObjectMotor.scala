@@ -21,7 +21,18 @@ object ObjectMotor extends ProcessorImpl {
   sealed class Data protected (private[this] val b:Binder[DefImpl#EltBase]#I) {
     final def subData(d:EClass, e:DefImpl#EltBase) = Data(d,e,b)   //build a new data on this binder ; useful only when dealing with lists
     final def set(x:AnyRef,e:DefImpl#EltBase)      = b.set(x,e)    //show the set method
-    def close(e:DefImpl#EltBase)                   = b.close(e)    //show the close method : this assigns the data to the bound object (lists)
+    def close(e:DefImpl#EltBase)                   = if (e.eltCtx.update) { //this assigns the data to the bound object (lists)
+      val old = b.read()
+      val t1  = b.asT
+      val t2  = {b.close(e); b.asT}
+      val r = e.eltCtx.merge(t1,t2)
+      if      (r eq t2) {}                 //t2 is already inside the field: do nothing
+      else if (r eq t1) b.set(old, e)    //reset old value
+      else {             
+        for (x<-r) b.rcv(x,e)            //rebuild collection using underlying Builder ; bypass conversions (already done!)
+        b.close(e)                       //set the result
+      }
+    } else b.close(e)    
   }
   private class StcData (val on:AnyRef,b:Binder[DefImpl#EltBase]#I,private[this] var seqs:Map[String,Binder[DefImpl#EltBase]#I]) extends Data(b) {
     //we use a variable to store an immutable map. We could have used a mutable map, but we expect few sequences per element and small immutable maps have a low memory footprint and are faster
@@ -176,8 +187,8 @@ object ObjectMotor extends ProcessorImpl {
       def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null
       /** Spawning new elements ; note that this can be overridden to create inner objects if necessary */
       def spawn(i:Binder[DefImpl#EltBase]#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
-      /** Merging collections ; the current collection will be evaluated only if you need it */
-      def merge[B<:scala.collection.mutable.Builder[Any,Any]](cur: =>B,read: B) = cur  //wrong signature
+      /** Merging collections; called only if update is true. Return 'cur' if you keep the old (not null) value, 'read' if you keep the new, or a Traversable for the merge */
+      def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = read
     }
   }
 }

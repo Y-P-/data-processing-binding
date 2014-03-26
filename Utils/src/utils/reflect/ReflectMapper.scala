@@ -1,4 +1,4 @@
-package utils
+package utils.reflect
 
 import java.lang.reflect.Field
 import scala.collection.mutable.ListBuffer

@@ -395,7 +395,7 @@ object CollectionBinderTest extends Helper {
       assert(w.a32.contains(7))
       assert(w.a32.contains(3))
       assert(!w.a32.contains(4))
-      get("a51",w).u(o((Ex.ex1,null),(Ex.ex3,Ex.ex1),(Ex.ex2,Ex.ex1)))
+      get("a51",w).u(o((null,Ex.ex1),(Ex.ex1,Ex.ex3),(Ex.ex1,Ex.ex2)))
       assert(w.a51.iterator.corresponds(Array(Ex.ex1,Ex.ex3,Ex.ex2))(_._2==_))  //for some reason, history inverts the parameters
       val l=new java.util.LinkedList[MyEnum](); l.add(MyEnum.a1); l.add(MyEnum.b1); l.add(MyEnum.c1)
       assert(w.a19.containsAll(l))
@@ -405,7 +405,7 @@ object CollectionBinderTest extends Helper {
       val h1 = new Histo("h1")
       val h2 = new Histo("h2")
       val h3 = new Histo("h2")
-      get("a48",w).u(o((h1,Ex.ex1),(h2,Ex.ex2),(h3,Ex.ex3)))
+      get("a48",w).u(o((Ex.ex1,h1),(Ex.ex2,h2),(Ex.ex3,h3)))
       assert(w.a48.iterator.corresponds(Array(Ex.ex1,Ex.ex2,Ex.ex3))(_._1==_))  //for some reason, history inverts the parameters
       out0.println(w)
     }

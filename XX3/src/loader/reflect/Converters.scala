@@ -3,7 +3,7 @@ package loader.reflect
 import java.lang.reflect.{Constructor,Method,Modifier}
 import scala.reflect.ClassTag
 import utils.StringConverter._
-import utils.Reflect._
+import utils.reflect.Reflect._
 import loader.core.definition.Processor
 import loader.annotations.Convert
 
@@ -233,18 +233,18 @@ object Converters {
       val l:Array[(Array[Int],java.lang.reflect.AccessibleObject)] = name match {
         case null if isDst    => in.methods.flatMap(checkMethod) ++ in.constructors.flatMap(checkConstructor)
         case null             => in.methods.flatMap(checkMethod)
-        case n if n.length==0 => if (isDst) in.constructors.flatMap(checkConstructor) else throw utils.Reflect.AccessibleElement.nonComparable
+        case n if n.length==0 => if (isDst) in.constructors.flatMap(checkConstructor) else throw utils.reflect.Reflect.AccessibleElement.nonComparable
         case n if n.length>0  => in.methods.filter(_.getName==name).flatMap(checkMethod)
       }
-      val min = utils.Reflect.AccessibleElement.min(l)(_._2)
+      val min = utils.reflect.Reflect.AccessibleElement.min(l)(_._2)
       min._2 match {
         case c:Constructor[_]  => Some(new ConstructorConverter[U,V,E](min._1,c.asInstanceOf[Constructor[_<:V]],src,dst))
         case m:Method if isSrc => Some(new MethodConverter1[U,V,E](min._1,m,src,dst))
         case m:Method          => Some(new MethodConverter2[U,V,E](in,min._1,m,src,dst))
       }
     } catch {
-      case utils.Reflect.AccessibleElement.nonComparable => None
-      case utils.Reflect.AccessibleElement.nonUniqueMin  => None
+      case utils.reflect.Reflect.AccessibleElement.nonComparable => None
+      case utils.reflect.Reflect.AccessibleElement.nonUniqueMin  => None
     }
   }
 }
