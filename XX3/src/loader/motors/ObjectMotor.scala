@@ -97,8 +97,9 @@ object ObjectMotor extends ProcessorImpl {
       protected def depth(e:Elt):Int
       protected def acd(e:Elt):AutoConvertData
       protected def data(e:Elt):Data
-      def eClass(e:DefImpl#EltBase):EltClass.Value      
-      final def binder(e:Elt,on:AnyRef) = Binder(DataActor(on.getClass,e.name,"bsfm").get, e.eltCtx.converters, acd(e), isSeq(e) || depth(e)>0)(on)
+      def eClass(e:DefImpl#EltBase):EltClass.Value
+      //note: the binder for e is established in regard to its parent. Hence we use the parents converters!
+      final def binder(e:Elt,on:AnyRef) = Binder(DataActor(on.getClass,e.name,"bsfm").get, e.parent.eltCtx.converters, acd(e), isSeq(e) || depth(e)>0)(on)
       //building the data: we must first examine the kind of parent we have
       def getData(e:Elt):Data = e.parent match {
         case null                            => new StcData(on,null,Map.empty)                            //this is the top object we are filling/building
@@ -190,9 +191,9 @@ object ObjectMotor extends ProcessorImpl {
       /** if true, a current field (object) will be updated rather than created from scratch */
       def update:Boolean = false
       /** Converters to use */
-      def converters = StandardSolver()
+      def converters:ConversionSolver[DefImpl#EltBase] = StandardSolver()
       /** Spawning new elements ; note that this can be overridden to create inner objects if necessary */
-      def spawn(i:Binder[DefImpl#EltBase]#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
+      def spawn(i:Binder[M#EltBase]#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
       /** Merging collections; called only if update is true.
        *  If you don't return either 'cur' or 'read' or a simple operation such as cur ++ read, and the
        *  collection is more than one level deep, you're probably asking for problems.
