@@ -1,9 +1,13 @@
-package loader.reflect
+package utils.reflect
 
 import java.lang.reflect.{Type,GenericArrayType,ParameterizedType,Modifier}
 import scala.reflect.ClassTag
 import scala.collection.mutable.Builder
 import scala.collection.Map
+import scala.collection.JavaConversions.asScalaSet
+import scala.collection.JavaConversions.collectionAsScalaIterable
+import scala.collection.JavaConversions.mapAsScalaMap
+import scala.collection.JavaConversions.propertiesAsScalaMap
 import utils.reflect.Reflect._
 
 /** This defines how to to spawn a collection C in an homogeneous way.
@@ -46,7 +50,6 @@ abstract class CollectionAdapter[C:ClassTag] {
 }
 
 object CollectionAdapter {
-  import Binder._
   /** Type of the underlying contained element.
    *  can only be called when t is associated with a container of some sort.
    *  Classes wich are not generic can get away with this if they declare a Method 'dummyElt' that exactly returns the appropriate element type. The value doesn't matter.
@@ -82,7 +85,7 @@ object CollectionAdapter {
   object MUnrolledBuffer extends CollectionAdapter[scala.collection.mutable.UnrolledBuffer[_]] {
     class Inner(p:ParameterizedType) extends SeqAdapter(p.getActualTypeArguments()(0)) {
       val czCol = czzCol
-      def newBuilder = new scala.collection.mutable.UnrolledBuffer()(ClassTag(Binder.findClass(czElt)))
+      def newBuilder = new scala.collection.mutable.UnrolledBuffer()(ClassTag(findClass(czElt)))
       //XXX
       def asTraversable(c:scala.collection.mutable.UnrolledBuffer[_]):Traversable[Nothing] = c.asInstanceOf[Traversable[Nothing]]
     }

@@ -1,15 +1,26 @@
 package utils.reflect
 
-import java.lang.reflect.Method
-import java.lang.reflect.Modifier
-import java.lang.reflect.Constructor
-import java.lang.reflect.AccessibleObject
-import java.lang.reflect.Field
+import java.lang.reflect.{Method,Field,Constructor,AccessibleObject,Modifier,Type,GenericArrayType,ParameterizedType,TypeVariable,WildcardType}
 import scala.reflect.runtime.{currentMirror => cm}
 import scala.reflect.runtime.universe.Symbol
 import scala.reflect.runtime.universe.newTermName
 
 object Reflect {
+  
+  /** underlying class for a given type.
+   *  Class             => that object
+   *  GenericArrayType  => the underlying array class (stripped of genericity)
+   *  ParameterizedType => the underlying class (stripped of genericity)
+   *  TypeVariable      => is unexpected
+   *  WildcardType      => is unexpected
+   */
+  implicit def findClass[U](gType:Type):Class[_<:U] = (gType match {  //exhaustive check
+    case c:Class[_]          => c
+    case g:GenericArrayType  => java.lang.reflect.Array.newInstance(g.getGenericComponentType,0).getClass
+    case p:ParameterizedType => p.getRawType
+    case t:TypeVariable[_]   => throw new IllegalStateException(s"Real types are expected ; found $t")
+    case w:WildcardType      => throw new IllegalStateException(s"Non wilcard types are expected ; found $w")
+  }).asInstanceOf[Class[_<:U]]
   
   abstract class AccessibleElement {
     type Kind>:Null<:AccessibleObject

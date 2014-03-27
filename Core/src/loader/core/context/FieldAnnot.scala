@@ -19,7 +19,7 @@ package loader.core.context
  *  We also add information for auditing, since this is a frequent requirement. Of course, this also ties
  *  the info to the kind of auditer used.
  */
-abstract class FieldAnnot {
+abstract class FieldAnnot extends utils.reflect.AutoConvertData {
   def inName:String        //the name for the field in the parser (it is meaningful for the TagMap to recognized which entry names match this Field)
   def loader:String        //the id to a StructAnnot ; null if not mapped to a structure ; "" if the structure is unknown (dynamic)
   def isSeq:Boolean        //indicates that the field can be repeated

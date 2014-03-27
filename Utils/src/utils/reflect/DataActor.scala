@@ -1,17 +1,16 @@
-package loader.reflect
+package utils.reflect
 
 
 import java.lang.reflect.{Field,Method,Type}
-import utils.reflect.Reflect.RichClass
 import scala.annotation.tailrec
-
+import Reflect._
 
 abstract class DataActor {
   def name:String                     //'name' for the data (usually the field name, could be a method name)
   def set(on:AnyRef,v:Any):Unit       //the method that sets 'name' in on
   def get(from:AnyRef):Any            //the method that gets 'name' from on  
   def expected:Type                   //expected class
-  def underlying = Binder.findClass(expected)   //the expected java class
+  def underlying = findClass(expected)   //the expected java class
 }
 
 object DataActor {

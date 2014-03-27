@@ -1,7 +1,5 @@
 package object loader {
-//  type Element = core.CtxCore#Element
   
-  type Assoc[+k,+t]  = commons.Assoc[k,t]
   type Named         = commons.Named
   
   type Context = loader.core.context.Context

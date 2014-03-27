@@ -1,0 +1,117 @@
+Some(MethodConverter1 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$S.toV1(utils.reflect.ConvertData))
+invoked S.toV1
+Some(MethodConverter1 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$S.toV2())
+invoked S.toV2
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$V$.toV1(utils.tests.reflect.ReflectiveConvertersTest$S,utils.reflect.ConvertData))
+invoked V.toV1
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$V$.toV2(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked V.toV2
+Some(MethodConverter1 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$S.toV1(utils.reflect.ConvertData))
+None
+Some(MethodConverter1 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$S.toV1(utils.reflect.ConvertData))
+Some(MethodConverter1 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$S.toV2())
+---- constructors ----
+Some(ConstructorConverter with public utils.tests.reflect.ReflectiveConvertersTest$D0(utils.tests.reflect.ReflectiveConvertersTest$S))
+Some(ConstructorConverter with public utils.tests.reflect.ReflectiveConvertersTest$D0(utils.tests.reflect.ReflectiveConvertersTest$S))
+None
+Some(ConstructorConverter with public utils.tests.reflect.ReflectiveConvertersTest$D1(utils.tests.reflect.ReflectiveConvertersTest$T))
+None
+None
+None
+Some(ConstructorConverter with public utils.tests.reflect.ReflectiveConvertersTest$D1(utils.tests.reflect.ReflectiveConvertersTest$T))
+---- S to V ----
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$W$.toV1(utils.tests.reflect.ReflectiveConvertersTest$S,utils.reflect.ConvertData))
+invoked W.toV1
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$W$.toV2(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked W.toV2
+None
+None
+---- T to W ----
+None
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$W$.toV2(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked W.toV2
+None
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$W$.toV4(utils.tests.reflect.ReflectiveConvertersTest$T))
+invoked W.toV4
+---- S to W ----
+None
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$W$.toV2(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked W.toV2
+None
+None
+---- T to V ----
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$W$.toV1(utils.tests.reflect.ReflectiveConvertersTest$S,utils.reflect.ConvertData))
+invoked W.toV1
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$W$.toV2(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked W.toV2
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$W$.toV3(utils.tests.reflect.ReflectiveConvertersTest$T,utils.reflect.ConvertData))
+invoked W.toV3
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$W$.toV4(utils.tests.reflect.ReflectiveConvertersTest$T))
+invoked W.toV4
+---- S to V in X1 instancied with fd0 ----
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$X1.toV1(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked X1.toV1
+None
+None
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$X1.toV2(utils.tests.reflect.ReflectiveConvertersTest$T))
+invoked X1.toV2
+---- S to V in X0 instancied with fd0 ----
+None
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$X0.toV3(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked X0.toV3
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$X0.toV4(utils.tests.reflect.ReflectiveConvertersTest$T))
+invoked X0.toV4
+None
+---- S to V in Y1 instancied with fd0 ----
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 1 Y1.fromX
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 1 Y1.fromX
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 1 Y1.fromX
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 1 Y1.fromX
+---- S to V in Y0 instancied with fd0 ----
+None
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$Y0.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 3 Y0.fromX
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$Y0.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 3 Y0.fromX
+None
+---- S to V in Y1 instancied with fd0 ----
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 1 Y1.fromX
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 1 Y1.fromX
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromY(utils.tests.reflect.ReflectiveConvertersTest$T))
+invoked 2 Y1.fromY
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$W utils.tests.reflect.ReflectiveConvertersTest$Y1.fromY(utils.tests.reflect.ReflectiveConvertersTest$T))
+invoked 2 Y1.fromY
+---- S to V in Y0 instancied with fd0 ----
+None
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$Y0.fromX(utils.tests.reflect.ReflectiveConvertersTest$S))
+invoked 3 Y0.fromX
+Some(MethodConverter2 with public utils.tests.reflect.ReflectiveConvertersTest$V utils.tests.reflect.ReflectiveConvertersTest$Y0.fromY(utils.tests.reflect.ReflectiveConvertersTest$T))
+invoked 4 Y0.fromY
+None
+---- Standard Java classes, compatibility with static methods, classes without ConvertData, deep nested classes ----
+Some(MethodConverter1 with public java.lang.String java.lang.Integer.toString())
+654
+Some(MethodConverter2 with public static int java.lang.Integer.parseInt(java.lang.String) throws java.lang.NumberFormatException)
+12345
+Some(MethodConverter2 with public java.lang.String utils.tests.reflect.ReflectiveConvertersTest$A$AA$X.cv(java.lang.Integer))
+7896
+Some(MethodConverter2 with public java.lang.String utils.tests.reflect.ReflectiveConvertersTest$A$AA$Y$.cv(java.lang.Integer))
+5648
+Some(MethodConverter2 with public java.lang.String utils.tests.reflect.ReflectiveConvertersTest$A$AA$Z.cv(java.lang.Integer))
+8931
+Some(MethodConverter2 with public java.lang.String utils.tests.reflect.ReflectiveConvertersTest$A1$AA$X.cv(java.lang.Integer))
+78960
+Some(MethodConverter2 with public java.lang.String utils.tests.reflect.ReflectiveConvertersTest$A1$AA$Y$.cv(java.lang.Integer))
+56480
+Some(MethodConverter2 with public java.lang.String utils.tests.reflect.ReflectiveConvertersTest$A1$AA$Z.cv(java.lang.Integer))
+89310
+Some(MethodConverter2 with public java.lang.String utils.tests.reflect.ReflectiveConvertersTest$A1$AA$Y$.cv(java.lang.Integer))
+564801
+Some(ConstructorConverter with public java.util.Date(long))
+Thu Jan 01 04:05:11 CET 1970

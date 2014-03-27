@@ -1,17 +1,9 @@
-package loader.reflect
+package utils.reflect
 
 import utils.reflect.Reflect._
-import utils.ClassMap
-import loader.reflect.Converters.StringConverter
-import loader.core.definition.Processor
-import scala.reflect.ClassTag
+import utils.reflect.Converters.StringConverter
+import utils.reflect._
 
-
-abstract class ConversionSolver[-E<:Processor#EltBase] {
-  def collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_]]
-  def get[U<:Any,V<:Any](src:Class[U],dst:Class[V],fd:ConvertData,name:String):Either[String,(U,E)=>V]
-  def apply(src:Class[_],dst:Class[_],fd:ConvertData,name:String):Either[String,(Any,E)=>Any] = get[Any,Any](src.asInstanceOf[Class[Any]],dst.asInstanceOf[Class[Any]],fd,name)
-}
 
 /** A class used to invoke the method used to return the correct value upon completion.
  *  For example, upon reading a data object containing year/month/day, you may want to return
@@ -25,7 +17,11 @@ abstract class ConversionSolver[-E<:Processor#EltBase] {
  *    class and the second compatible with the Element class used.
  *  - by default, if nothing is specified, the created object is returned.
  */
-class StandardSolver[-E<:Processor#EltBase:ClassTag](defaultString:(Class[_]=>Option[StringConverter[_]]),named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]],val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_]]) extends ConversionSolver[E] {
+class ConversionSolver(
+    val stringSolver:(Class[_]=>Option[StringConverter[_]])                  = Converters.defaultMap,
+    val namedSolver:Map[String,Converter[_,_]]                               = null,
+    val registeredSolver:Seq[Converter[_,_]]                                 = null,
+    val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_]] = CollectionAdapter.defaultMap) {
   /** Finds an appropriate converter from one of the sources by following these exclusive rules (in order):
    *  - if the name is significant (not null or "")
    *  -   o name starts with @    : take the appropriate entry (e.g. '@xyz') from the named list (no check done: it has to work)
@@ -38,13 +34,13 @@ class StandardSolver[-E<:Processor#EltBase:ClassTag](defaultString:(Class[_]=>Op
    *  - otherwise check within registered converters for an appropriate converter (heuristic algorithm based on raw class for src and dst)
    *  !!! This works by examining raw types. Generics must not be used!
    */
-  def get[U,V](src:Class[U],dst:Class[V],fd:ConvertData,name:String):Either[String,(U,E)=>V] = {
+  def get[U,V](src:Class[U],dst:Class[V],fd:ConvertData,name:String):Either[String,U=>V] = {
     if (name!=null && name.length>0) {
       if (name.charAt(0)=='@') {
-        if (named==null)
+        if (namedSolver==null)
           Left(s"no named converters registered: $name cannot be solved")
         else
-          named.get(name).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no conversion named $name found")
+          namedSolver.get(name).map(_(fd).asInstanceOf[U=>V]).toRight(s"no conversion named $name found")
       } else try {
         val idx    = name.lastIndexOf('.')
         val fName  = name.substring(idx+1) match {
@@ -55,36 +51,37 @@ class StandardSolver[-E<:Processor#EltBase:ClassTag](defaultString:(Class[_]=>Op
           case "_" => null              //local method in class src or dst
           case  s  => Class.forName(s)  //class for conversion is given
         }
-        (if (in==null) Converters(src,src,dst,fName).orElse(Converters(dst,src,dst,fName)) else Converters(in,src,dst,fName)).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
+        (if (in==null) Converters(src,src,dst,fName).orElse(Converters(dst,src,dst,fName)) else Converters(in,src,dst,fName)).map(_(fd).asInstanceOf[U=>V]).toRight(s"no Converter from $src => $dst named $name available in either $src or $dst")
       } catch {  //many reasons for failure here!
         case e:Throwable => Left(s"failed to fetch converter $name for $src => $dst: $e")
       }
     } else if (src<dst) {
       //src is subclass of dst ? coerce it and return it
-      Right((u:U,e:E)=>u.asInstanceOf[V])
+      Right(_.asInstanceOf[V])
     } else if (checkPrimitive(src,dst)) {
-      Right((u:U,e:E)=>u.asInstanceOf[V])
+      Right(_.asInstanceOf[V])
     } else if (src eq classOf[String]) {
       //src is String ? find a default String conversion to dst
-      defaultString(dst).map(_(fd).asInstanceOf[(U,E)=>V]).toRight(s"no default String conversion found for $dst")
-    } else if (registered==null) {
+      stringSolver(dst).map(_(fd).asInstanceOf[U=>V]).toRight(s"no default String conversion found for $dst")
+    } else if (registeredSolver==null) {
       Left(s"no registered conversion found for $src => $dst")
     } else {
       //otherwise find a registered conversion from src to dst
-      var found:Converter[_,_,E] = null
-      for (c <- registered if c.src>src && c.dst<dst) {
+      var found:Converter[_,_] = null
+      for (c <- registeredSolver if c.src>src && c.dst<dst) {
         //take c if dst is at least smaller than the current one and either is not equal or src is smaller and not equal 
         if ((found==null) || (c.dst<found.dst && (!(found.dst<c.dst) || (found.src>c.src && !(c.src<found.src))))) found=c
       }
-      if (found==null) Right(found(fd).asInstanceOf[(U,E)=>V]) else Left(s"no registered conversion found for $src => $dst")
+      if (found==null) Right(found(fd).asInstanceOf[U=>V]) else Left(s"no registered conversion found for $src => $dst")
     }
   }
-}
-
-object StandardSolver {
-  def apply[E<:Processor#EltBase:ClassTag](defaultString:Class[_]=>Option[StringConverter[_]],named:Map[String,Converter[_,_,E]],registered:Seq[Converter[_,_,E]]):ConversionSolver[E] =
-    new StandardSolver(defaultString,named,registered,null)
-  def apply[E<:Processor#EltBase:ClassTag]() = new StandardSolver[E](Converters.defaultMap,null,null,CollectionAdapter.defaultMap)
+  
+  /** The usual way to find the appropriate conversion from src to dst
+   *  @param src,  the source class to convert from
+   *  @param dst,  the destination class to convert to
+   *  @param name, if provided, only this named conversion is fetched ; otherwise, you can use null
+   */
+  def apply(src:Class[_],dst:Class[_],fd:ConvertData,name:String):Either[String,Any=>Any] = get[Any,Any](src.asInstanceOf[Class[Any]],dst.asInstanceOf[Class[Any]],fd,name)  
 }
 
 

@@ -1,20 +1,14 @@
-package loader.test.reflect
+package utils.tests.reflect
 
-import java.util.Date
-import loader.reflect.Binder
-import loader.reflect.StandardSolver
-import loader.core.context.FieldAnnot
-import loader.reflect.AutoConvertData
-import loader.reflect.DataActor
-import utils.ByteArrayReader
-import utils.LogTester._
-import java.io.PrintWriter
 import org.junit.Test
-import org.junit.runner.RunWith
-import org.junit.runners.JUnit4
-import scala.reflect.ClassTag
-import loader.reflect.ConvertData
-import loader.reflect.Converters
+import java.io.PrintWriter
+import utils.reflect._
+import utils.LogTester._
+import scala.collection.JavaConversions.asScalaBuffer
+import scala.collection.JavaConversions.asScalaSet
+import scala.collection.JavaConversions.collectionAsScalaIterable
+import scala.collection.JavaConversions.mapAsScalaMap
+import scala.collection.JavaConversions.propertiesAsScalaMap
 
 /*
 
@@ -192,7 +186,6 @@ object CollectionBinderTest extends Helper {
     }
     def apply(file:Solver,out0:PrintWriter) = {
       import Helper._
-      import loader.commons._
       val w = new V2()
       //builds a 'map' ex3->ex1,ex1->ex2,ex2->ex3 => checks that the collection works and that the correct converters are called (scala collections)
       def basicSTest(nom:String,ordered:Boolean):Unit = {
@@ -415,7 +408,6 @@ object CollectionBinderTest extends Helper {
   @Test class BinderMixedEncapTest extends StandardTester {
     //nasty multi-encapsulation of several layers of maps/seqs
     class W(val a1:Map[Integer,List[String]], val a2:Array[Map[Integer,java.util.EnumMap[MyEnum,List[java.util.Properties]]]])
-    import loader.commons._  //make --> visible
     def apply(file:Solver,out0:PrintWriter) = {
       import Helper._
       val w = new W(null,null)

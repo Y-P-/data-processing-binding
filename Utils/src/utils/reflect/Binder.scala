@@ -1,21 +1,11 @@
-package loader.reflect
+package utils.reflect
 
 import java.lang.reflect.{Field,Method,Type,ParameterizedType,WildcardType,GenericArrayType,TypeVariable}
-import loader.core.definition.Processor
-import loader.core.context.FieldAnnot
-import loader.commons._
 import scala.collection.mutable.Builder
+import Reflect.findClass
 
 trait AutoConvertData extends ConvertData {
   def convert:String
-}
-object AutoConvertData {
-  implicit def apply(fd:FieldAnnot) = new AutoConvertData {
-    val convert = fd.convert
-    val param   = fd.param
-    val check   = fd.check
-    val valid   = fd.valid
-  }
 }
   
 /** A Binder ties an AccessibleObject (Field, Method with one argument, which is hidden in a DataActor) with a ConversionSolver and
@@ -55,7 +45,7 @@ object AutoConvertData {
  *  The top class (which cannot be instancied because the constructor is private) is used for binding to a DataActor.
  *  Derived classes (which are also hidden) are used to bind sub-collections. 
  */
-sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected[this] val solver:ConversionSolver[E],protected[this] val fd:AutoConvertData) {
+sealed class Binder private (val what:DataActor,protected[this] val solver:ConversionSolver,protected[this] val fd:AutoConvertData) {
   final type I = Analyze#Instance
   private[this] var cached:Analyze = null
   protected[this] def build(on:AnyRef):I = {
@@ -69,13 +59,13 @@ sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected
   protected class Analyze private[Binder] {              //Binder instance for a pair (object/field or object/method)
     def isCol:Boolean = false                            //indicates whether this is a Collection
     def isMap:Boolean = false                            //indicates whether this is a map
-    private[this] var eConvert:(Any, E) => Any = null
+    private[this] var eConvert:Any => Any = null
     protected[this] def eType:Type = what.expected
-    val eClass:Class[_] = Binder.findClass(eType)
-    final protected[this] def convert(src:Any,e:E):Any = { //builds the actual value for x as expected from the container
+    val eClass:Class[_] = findClass(eType)
+    final protected[this] def convert(src:Any):Any = { //builds the actual value for x as expected from the container
       //finds the converter for source class src; will only be defined on the first invocation (when a value is actually set)
       if (eConvert==null) eConvert=getSolver(src.getClass,eType)
-      eConvert(src,e)
+      eConvert(src)
     }
    
     def subAnalyze():Analyze = throw new IllegalStateException("sub instance are only allowed on collections")
@@ -87,46 +77,47 @@ sealed class Binder[-E<:Processor#EltBase] private (val what:DataActor,protected
       final def binder            = Binder.this
       final def read():Any        = what.get(on)
       def eltClass                = Analyze.this.eClass
-      def set(x:Any,e:E):Unit     = rcv(convert(x,e),e)
+      def set(x:Any):Unit         = rcv(convert(x))
       def asT:Traversable[Any]    = throw new IllegalStateException("cannot cast a field instance as a Traversable")
-      def close(e:E):Unit         = throw new IllegalStateException("cannot close a field instance")
-      def close(key:Any,e:E):Unit = throw new IllegalStateException("cannot close a field instance")
+      def close():Unit            = throw new IllegalStateException("cannot close a field instance")
+      def close(key:Any):Unit     = throw new IllegalStateException("cannot close a field instance")
       def subInstance:I           = throw new IllegalStateException("sub instance are only allowed on collections")
       //use with care: this is direct access to the underlying collection WITHOUT conversion
-      def rcv(x:Any,e:E):Unit          = what.set(on,x)
-      def rcv(key:Any,x:Any,e:E):Unit  = throw new IllegalStateException("only a Map instance can receive a (key,value)")
+      def rcv(x:Any):Unit         = what.set(on,x)
+      def rcv(key:Any,x:Any):Unit = throw new IllegalStateException("only a Map instance can receive a (key,value)")
     }
   }
 
   final def apply(on:AnyRef):I = build(on)
   
-  protected[this] final def adapter(t:Type) = solver.collectionSolver(Binder.findClass(t))(t)
-  protected[this] final def getSolver(cz:Class[_],t:Type) = solver(cz,Binder.findClass(t),fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
+  protected[this] final def adapter(t:Type) = solver.collectionSolver(findClass(t))(t)
+  protected[this] final def getSolver(cz:Class[_],t:Type) = solver(cz,findClass(t),fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
 
 }
 
 object Binder {
   
-  /** underlying class for a given type.
-   *  Class             => that object
-   *  GenericArrayType  => the underlying array class (stripped of genericity)
-   *  ParameterizedType => the underlying class (stripped of genericity)
-   *  TypeVariable      => is unexpected
-   *  WildcardType      => is unexpected
+  trait Assoc[+K,+T] {
+    def key:K
+    def value:T
+    final override def toString = "Assoc("+key+" -> "+value+")"
+  }   
+  /** Used to map a pair key/value to store maps.
+   *  Use this as the return type of an end method for items stored as maps.
    */
-  implicit def findClass[U](gType:Type):Class[_<:U] = (gType match {  //exhaustive check
-    case c:Class[_]          => c
-    case g:GenericArrayType  => java.lang.reflect.Array.newInstance(g.getGenericComponentType,0).getClass
-    case p:ParameterizedType => p.getRawType
-    case t:TypeVariable[_]   => throw new IllegalStateException(s"Real types are expected ; found $t")
-    case w:WildcardType      => throw new IllegalStateException(s"Non wilcard types are expected ; found $w")
-  }).asInstanceOf[Class[_<:U]]
-   
+  final case class AssocElt[+K,+T](final val key:K, final val value:T) extends Assoc[K,T] {
+    final protected def this() = this(null.asInstanceOf[K],null.asInstanceOf[T])
+  }
+  /** Use --> instead of -> for building Assoc as a shortcut
+   */
+  final implicit class AssocLeft[K](final val key:K) {
+    @inline def -->[T] (t:T) = new AssocElt(key,t)
+  }
   
   /** Binder for a collection element. It can not be assigned until all elements have been first collected.
    *  Furthermore, the conversion process occurs on the elements themselves, not the container.
    */
-  private class CollectionBinder[-E<:Processor#EltBase](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData) extends Binder[E](what,solver,fd) {
+  private class CollectionBinder(what:DataActor,solver:ConversionSolver,fd:AutoConvertData) extends Binder(what,solver,fd) {
     private[this] val deepCache = new Array[super.Analyze](6)   //Do we expect deep collection of more than this depth ?
     
     class Analyze(val depth:Int,val parent:super.Analyze) extends super.Analyze {
@@ -148,26 +139,26 @@ object Binder {
       final override def isMap = adapt.isMap
       override def newInstance(on:AnyRef,parent:I):Instance = new Instance(on,parent)
       class Instance(on:AnyRef,parent:I) extends super.Instance(on,parent) {
-        final val stack:Builder[Any,Any]           = adapt.newBuilder.asInstanceOf[Builder[Any,Any]]
-        final override def close(e:E):Unit         = parent.rcv(stack.result,e)
-        final override def close(key:Any,e:E):Unit = parent.rcv(key,stack.result,e)
-        override def rcv(x:Any,e:E):Unit           = stack+=x
-        override def asT                           = { val r=read().asInstanceOf[C]; if (r==null) null else adapt.asTraversable(r) }
+        final val stack:Builder[Any,Any]       = adapt.newBuilder.asInstanceOf[Builder[Any,Any]]
+        final override def close():Unit        = parent.rcv(stack.result)
+        final override def close(key:Any):Unit = parent.rcv(key,stack.result)
+        override def rcv(x:Any):Unit           = stack+=x
+        override def asT                       = { val r=read().asInstanceOf[C]; if (r==null) null else adapt.asTraversable(r) }
       }
     }
     private class Map[C](adapt:CollectionAdapter[C]#BaseAdapter[_],depth:Int,parent:Analyze) extends Col(adapt,depth,parent) {  //used for mapped collection
       final val kType = adapt.asInstanceOf[CollectionAdapter[_]#MapAdapter[_,_]].czKey
-      protected[this] var kConvert:(Any,E)=>Any = null
+      protected[this] var kConvert:(Any)=>Any = null
       override def newInstance(on:AnyRef,parent:I):Instance = new Instance(on,parent)
       class Instance(on:AnyRef,parent:I) extends super.Instance(on,parent) {
-        override def set(x:Any,e:E) = x match {
-          case a:Assoc[_,_] => rcv(a.key,convert(a.value,e),e)
+        override def set(x:Any) = x match {
+          case a:Assoc[_,_] => rcv(a.key,convert(a.value))
           case _ => throw new IllegalStateException(s"a map must receive a ${classOf[Assoc[_,_]]} as data")
         }
-        override def rcv(x:Any,e:E) = throw new IllegalStateException()
-        override def rcv(key:Any,value:Any,e:E):Unit = {
+        override def rcv(x:Any) = throw new IllegalStateException()
+        override def rcv(key:Any,value:Any):Unit = {
           if (kConvert==null) kConvert = getSolver(key.getClass,kType)
-          super.rcv(kConvert(key,e) -> value,e)
+          super.rcv(kConvert(key) -> value)
         }
       }
     }
@@ -176,7 +167,7 @@ object Binder {
   }
 
   /** Factory that builds a Binder with a given DataActor */
-  final def apply[E<:Processor#EltBase](what:DataActor,solver:ConversionSolver[E],fd:AutoConvertData,isCol:Boolean):Binder[E] = {
+  final def apply(what:DataActor,solver:ConversionSolver,fd:AutoConvertData,isCol:Boolean):Binder = {
     if (isCol) new CollectionBinder(what,solver,fd)
     else       new Binder(what,solver,fd)
   }
@@ -186,15 +177,15 @@ object Binder {
    *  - method o is for specifying final inputs
    *  - method u is for specifying layers
    */
-  implicit final class Helper(val x: Binder[Processor#Elt]#Analyze#Instance) {
+  implicit final class Helper(val x: Binder#Analyze#Instance) {
     @inline private def sub(f: Helper=>Unit*)                  = { val c:Helper=x.subInstance; f.foreach(_(c)); c.x }
-    @inline final def u(f: Helper=>Unit*):Unit                 = sub(f:_*).close(null)
+    @inline final def u(f: Helper=>Unit*):Unit                 = sub(f:_*).close()
     @inline final def read                                     = x.read()
   }
   object Helper {
-    @inline final def o(v:Any*):Helper=>Unit                   = xh=>v.foreach(xh.x.set(_,null))
+    @inline final def o(v:Any*):Helper=>Unit                   = xh=>v.foreach(xh.x.set(_))
     @inline final def u(f:Helper=>Unit*):Helper=>Unit          = _.u(f:_*)
-    @inline final def u(key:Any)(f:Helper=>Unit*):Helper=>Unit = _.sub(f:_*).close(key,null)
+    @inline final def u(key:Any)(f:Helper=>Unit*):Helper=>Unit = _.sub(f:_*).close(key)
   }
   
 }

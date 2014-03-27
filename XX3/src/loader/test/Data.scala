@@ -14,6 +14,7 @@ object Data {
   import loader._
   import test._
   import scala.collection.mutable.{HashMap,ListBuffer}
+  import utils.reflect.Binder._
   
   type Element = loader.core.CtxCore#Elt
 
