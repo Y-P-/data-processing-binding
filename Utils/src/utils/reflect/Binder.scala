@@ -77,6 +77,7 @@ sealed class Binder private (val what:DataActor,protected[this] val solver:Conve
       final def binder            = Binder.this
       final def read():Any        = what.get(on)
       def eltClass                = Analyze.this.eClass
+      def endClass                = Analyze.this.eType
       def set(x:Any):Unit         = rcv(convert(x))
       def asT:Traversable[Any]    = throw new IllegalStateException("cannot cast a field instance as a Traversable")
       def close():Unit            = throw new IllegalStateException("cannot close a field instance")

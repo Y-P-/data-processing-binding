@@ -15,7 +15,7 @@ import loader.core.events.Event
 trait UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   protected[this] type Proc = M
   protected[this] type Pars = P
-  type EltCtx<:EltCtxBase
+  type EltCtx>:Null<:EltCtxBase
 
   /** builds an element context */
   def apply(e:M#Elt):EltCtx

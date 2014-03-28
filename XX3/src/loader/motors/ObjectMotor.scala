@@ -1,11 +1,11 @@
 package loader.motors
 
 import java.io.{Writer,FileWriter,File,OutputStreamWriter}
+import utils.reflect._
 import loader.core._
 import loader.core.definition._
 import loader.core.ParserBuilder
 import loader.core.context.Context
-import utils.reflect._
 
 /** This processor is used to spawn new objects.
  *  A.k.a Data Binding.
@@ -16,53 +16,47 @@ import utils.reflect._
 object ObjectMotor extends ProcessorImpl {
 
   /** The Data component for building objects is a bit more convoluted than for most other processors.
-   *  It has to keep track of things such as the current object we work on, the binder to upper layer object, and for structures, known sequences
+   *  It has to keep track of things such as the current object we work on, the binder to upper layer object, and for structures, known sequences.
    */
-  sealed class Data protected (private[this] val b:Binder#I) {
-    final def subData(d:EClass, e:DefImpl#EltBase) = Data(d,e,b)   //build a new data on this binder ; useful only when dealing with lists
-    final def set(x:AnyRef)                        = b.set(x)    //show the set method
-    def close(e:DefImpl#EltBase)                   = if (!e.eltCtx.update) b.close() else { //this assigns the data to the bound object (lists)
+  sealed class Data protected (private[this] val b:Binder#I) { //default implementation, used for Terminal
+    final def set(x:AnyRef)       = b.set(x)                   //show the set method
+    def close(e:DefImpl#EltBase)  = ()                         //no close for element
+    def apply(kind:Int,d:DefImpl#DlgBase)(e:d.EX):Data = ???   //data factory for a sub-object, obviously an error for Terminal
+  }
+  private class ListData (b:Binder#I) extends Data(b) {
+    override def close(e:DefImpl#EltBase) = if (e.eltCtx.update) { //this assigns the data to the bound object (lists)
       val old = b.read()
       val t1  = b.asT
       val t2  = {b.close(); b.asT}
       val r = e.eltCtx.merge(t1,t2)
-      if      (r eq t2) {}                 //t2 is already inside the field: do nothing
-      else if (r eq t1) b.set(old)         //reset old value
+      if      (r eq t2) {}          //t2 is already inside the field: do nothing
+      else if (r eq t1) b.set(old)  //reset old value
       else {             
-        for (x<-r) b.rcv(x)                //rebuild collection using underlying Builder ; bypass conversions (already done!)
-        b.close()                          //set the result
+        for (x<-r) b.rcv(x)         //rebuild collection using underlying Builder ; bypass conversions (already done!)
+        b.close()                   //set the result
       }
-    }    
+    } else b.close()    
+    override def apply(kind:Int,d:DefImpl#DlgBase)(e:d.EX):Data = Data(kind,e,b)
   }
   private class StcData (val on:AnyRef,b:Binder#I,private[this] var seqs:Map[String,Binder#I]) extends Data(b) {
-    //we use a variable to store an immutable map. We could have used a mutable map, but we expect few sequences per element and small immutable maps have a low memory footprint and are faster
-    final def getOrElseUpdate(name:String, b: =>Binder#I) = seqs.get(name) match {
-      case Some(x) => x
-      case None    => val x=b; seqs = seqs + ((name,x)); x
-    }
-    //close all current sequences and assign structure to its owner
-    override final def close(e:DefImpl#EltBase) = {
-      for (x <- seqs) x._2.close()
-      if (e.parent!=null) set(on)
+    protected final def localClose() = for (x <- seqs) x._2.close()    //close all current sequences
+    override def close(e:DefImpl#EltBase) = { localClose(); set(on) }  //and assign structure to its owner
+    override def apply(kind:Int,d:DefImpl#DlgBase)(e:d.EX):Data = {
+      val b = d.binder(e,on)
+      Data(kind,e,  //seqs are kept in an immutable map (we expect it to stay small) stored in a local var which we update when needed 
+        if (d.isSeq(e)) seqs.getOrElse(e.name,{val x=b.subInstance; seqs=seqs+((e.name,x)); x})
+        else            b //otherwise, simply bind the field
+      )      
     }
   }
-  
-  /** possible status for broken data */
-  object EltClass extends Enumeration {
-    type EltClass = Value
-    val struct  = Value
-    val term    = Value
-    val list    = Value
-  }  
-  
-  /** returns the kind of data managed by an Elt */
-  protected trait EClass {
-    def eClass(e:DefImpl#EltBase):EltClass.Value
-  }
+  private class RootData (on:AnyRef) extends StcData(on,null,Map.empty) {
+    override final def close(e:DefImpl#EltBase) = localClose()  //no owner to assign to
+  }    
   
   /** factory for Data */
   protected object Data {
-    protected def getObject(e:DefImpl#EltBase, i:Binder#I):AnyRef = {
+    //gets the AnyRef associated with a field of a structure e through the binder i
+    private def getObject(e:DefImpl#EltBase, i:Binder#I):AnyRef = {
       val x = e.eltCtx
       if (x.update) {
         val o = i.read.asInstanceOf[AnyRef]
@@ -70,18 +64,21 @@ object ObjectMotor extends ProcessorImpl {
       }
       x.spawn(i)
     }
-    def apply(d:EClass, e:DefImpl#EltBase, i:Binder#I):Data = d.eClass(e) match {
-      case EltClass.term     => new Data(i)
-      case EltClass.struct   => new StcData(getObject(e,i),i,Map.empty)
-      case EltClass.list     => new Data(i.subInstance)  //let us enter the sub layer for the binder
+    def apply(kind:Int, e:DefImpl#EltBase, i:Binder#I):Data = kind match {
+      case CtxCore.term   => new Data(i)
+      case CtxCore.struct => new StcData(getObject(e,i),i,Map.empty)
+      case CtxCore.list   => new ListData(i.subInstance)  //let us enter the sub layer for the binder
     }
   }
   
+  
+  /** We make a common implementation for ctx and ext, even though it is likely marginally less efficient
+   *  It is a bit more complex too, but this makes only one algorithm to maintain.
+   */
   trait DefImpl extends super.DefImpl {
     type Value      = String
     type Key        = String
     type Ret        = Unit
-    //override type Data = ObjectMotor.Data
     type BaseParser = ParserBuilder //any parser
     type UCtx[-p<:BaseParser]>:Null<:ObjectMotor.UCtx[p,this.type]
     final def baseParserClass = classOf[BaseParser]
@@ -91,30 +88,35 @@ object ObjectMotor extends ProcessorImpl {
     /**
      * @param on, the object to fill up
      */    
-    abstract class DlgBase(on:AnyRef) extends super.DlgBase with EClass {this:Dlg=>
+    abstract class DlgBase(on:AnyRef) extends super.DlgBase {this:Dlg=>
       type Result = AnyRef
-      protected def isSeq(e:Elt):Boolean
-      protected def depth(e:Elt):Int
-      protected def acd(e:Elt):AutoConvertData
-      protected def data(e:Elt):Data
-      def eClass(e:DefImpl#EltBase):EltClass.Value
+      type EX = Elt
+      //these abstract methods replace what we could get directly from CtxCore ; they will have to be filled up in ext
+      def isSeq(e:Elt):Boolean
+      def isSeq(parent:Elt,s:Status):Boolean
+      def depth(parent:Elt,s:Status):Int
+      def acd(parent:Elt,s:Status):AutoConvertData
+      def data(e:Elt):Data
+      def eClass(parent:Elt,s:Status):Int
+      protected[this] var kind:Int = -1           //perf cache to avoid two expensive calls
+      protected[this] var actor:DataActor = null  //perf cache to avoid two expensive calls
       //note: the binder for e is established in regard to its parent. Hence we use the parents converters!
-      final def binder(e:Elt,on:AnyRef) = Binder(DataActor(on.getClass,e.name,"bsfm").get, e.parent.eltCtx.converters, acd(e), isSeq(e) || depth(e)>0)(on)
-      //building the data: we must first examine the kind of parent we have
-      def getData(e:Elt):Data = e.parent match {
-        case null                            => new StcData(on,null,Map.empty)                            //this is the top object we are filling/building
-        case s if eClass(s)==EltClass.struct => val d = data(s).asInstanceOf[StcData]                     //parent is an object: we must bind one of its field
-                                                Data(this,e,
-                                                  if (isSeq(e)) d.getOrElseUpdate(e.name, binder(e,d.on).subInstance)   //for a sequence, find or create the appropriate binder
-                                                  else          binder(e,d.on)                                          //otherwise, simply bind the field
-                                                )
-        case l if eClass(l)==EltClass.list   => data(l).subData(this,e)                                   //use the binder defined for the list
+      final def binder(e:Elt,on:AnyRef) = try {
+        if (actor==null) dactor(e.name,on)
+        Binder(actor, e.parent.eltCtx.converters, acd(e.parent,e.status), isSeq(e.parent,e.status) || depth(e.parent,e.status)>0)(on)
+      } finally {
+        actor=null
       }
+      final protected def dactor(name:String,on:AnyRef):Unit = actor = DataActor(on.getClass,name,"bsfm").get
+      //building the data: we must first examine the kind of parent we have
+      def getData(e:Elt):Data = (try { data(e.parent) } catch {
+        case _:NullPointerException => return new RootData(on)  //not beautiful, but efficient : don't test for each element, but catch exception for the top element that doesn't follow the same logic
+      })(kind,this)(e)
   
       //pretty simple processor here: actual complexity is in Data
       def onInit(e:Elt):Unit           = {}
       def onBeg(e:Elt): Unit           = {}
-      def onVal(e:Elt,v:String): Unit  = data(e).set(v)  //set terminal field
+      def onVal(e:Elt,v:String): Unit  = data(e).set(v)    //set terminal field
       def onEnd(e:Elt): Unit           = data(e).close(e)  //'close' container (list/struct) and assign result to upper layer
       def onChild(e:Elt,child: Elt, r: Unit): Unit = {}
 
@@ -128,8 +130,8 @@ object ObjectMotor extends ProcessorImpl {
   /** Actual implementation for CtxCore.
    */
   object ctx extends loader.core.CtxCore.Abstract[Data] with DefImpl {
-    type UCtx[-p<:BaseParser] = ObjectMotor.UCtx[p,this.type] with CtxCore.UsrCtx[p,this.type]
-    final def baseUCtxClass   = null //XXX classOf[UCtx[_]]
+    override type UCtx[-p<:BaseParser] = ObjectMotor.UCtx[p,this.type] with CtxCore.UsrCtx[p,this.type]
+    final def baseUCtxClass   = null //XXX classOf[UCtx[_]] => use TypeTags for dynamic class checking
     implicit final class ToACD(val fd:Context#FieldMapping) extends AutoConvertData {
       final def convert: String = fd.annot.convert
       final def check: String   = fd.annot.check
@@ -137,14 +139,26 @@ object ObjectMotor extends ProcessorImpl {
       final def valid: String   = fd.annot.valid
     }
     class Dlg(on:AnyRef) extends DlgBase(on) with super[Abstract].DlgBase {
-      protected final def data(e:Elt):Data           = e.data
-      protected final def isSeq(e:Elt):Boolean       = e.fd.isSeq
-      protected final def depth(e:Elt):Int           = e.fd.depth
-      protected final def acd(e:Elt):AutoConvertData = e.fd
-      final def eClass(e:DefImpl#EltBase):EltClass.Value = e match {
-        case _:Terminal => EltClass.term
-        case _:Struct   => EltClass.struct
-        case _:List     => EltClass.list
+      final def data(e:Elt):Data                         = e.data
+      final def isSeq(e:Elt):Boolean                     = e.fd.isSeq
+      final def isSeq(parent:Elt,s:Status):Boolean       = s.fd.isSeq
+      final def depth(parent:Elt,s:Status):Int           = s.fd.depth
+      final def acd(parent:Elt,s:Status):AutoConvertData = s.fd
+      override def eClass(parent:Elt,s:Status):Int = {
+        kind=super.eClass(parent,s)
+        //we don't believe the upper layer for terminals ; possibly we have to guess:
+        //if the Terminal has no String -> X converter, we'd be screwed!
+        //in that case we assume that the user wants us to guess by looking at X and using it as the next layer
+        //this only works if the structure ids are indeed class names!
+        if (parent!=null && kind==CtxCore.term) parent.data match {
+          case d:StcData => dactor(s.key,d.on)
+                            val ec:ObjectMotor.UCtx[parent.Builder,ctx.type]#EltCtx = parent.eltCtx
+                            val b = Binder(actor, ec.converters, acd(parent,s), isSeq(parent,s) || depth(parent,s)>0)(d.on)
+                            println(b.endClass)
+                            //if (ec.converters.stringSolver(b.eltClass)==None) kind=CtxCore.struct 
+          case _ =>
+        }
+        kind
       }
     }
     def apply(pr: utils.ParamReader):Dlg   = ???
@@ -156,6 +170,7 @@ object ObjectMotor extends ProcessorImpl {
    *  This processor can spawn any class.
    */
   //TODO
+  /*
   object ext extends loader.core.ExtCore.Abstract[Data] with DefImpl {
     type UCtx[-p<:BaseParser] = ObjectMotor.UCtx[p,this.type]
     final def baseUCtxClass   = classOf[UCtx[_]]
@@ -173,12 +188,13 @@ object ObjectMotor extends ProcessorImpl {
       //depth inferred from the returned type
       protected final def depth(e:Elt):Int     = 0
       //type inferred from the returned type
-      final def eClass(e:DefImpl#EltBase):EltClass.Value = EltClass.struct
+      final def eClass(e:DefImpl#EltBase):Int = CtxCore.struct
     }
     def apply(pr: utils.ParamReader):Dlg   = ???
     def apply(on:AnyRef):Dlg = new Dlg(on:AnyRef)
   }
-  
+  */
+  def ext = ???
   /** This cannot be implemented: we have to maintain a context. */
   def cre = ???
   
@@ -186,7 +202,7 @@ object ObjectMotor extends ProcessorImpl {
    *  This processor indeed requires specific information to work, and these can be tuned by the end user.
    */
   trait UCtx[-P<:ParserBuilder,-M<:DefImpl] extends UsrCtx[P,M] {
-    type EltCtx <: EltCtxBase
+    type EltCtx>:Null<:EltCtxBase
     protected[this] trait EltCtxBase extends super.EltCtxBase { this:EltCtx=>
       /** if true, a current field (object) will be updated rather than created from scratch */
       def update:Boolean = false

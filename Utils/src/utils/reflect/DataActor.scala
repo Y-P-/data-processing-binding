@@ -10,7 +10,7 @@ abstract class DataActor {
   def set(on:AnyRef,v:Any):Unit       //the method that sets 'name' in on
   def get(from:AnyRef):Any            //the method that gets 'name' from on  
   def expected:Type                   //expected class
-  def underlying = findClass(expected)   //the expected java class
+  def underlying = findClass[Any](expected)   //the expected java class
 }
 
 object DataActor {

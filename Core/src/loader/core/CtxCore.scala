@@ -25,7 +25,7 @@ trait CtxCore extends definition.Impl {
   protected[this] def noStatus(fd:Context#FieldMapping) = new Status(noKey,1,fd,false)
 
   protected[this] type Data>:Null
-    
+
   trait EltBase extends super.EltBase {
     def data: Data
     def idx: Int
@@ -39,6 +39,7 @@ trait CtxCore extends definition.Impl {
     //the 'official' list of names that uniquely identify that loader ; seq numbers or list index are used where necessary.
     def nameSeq:Traversable[String] = for (e<-this) yield e.rankedName
     def status = new Status(key,idx,fd,false)
+    def eClass:Int
    
     //the name of this element, accounting for the fact that is can be anonymous, in which case its name becomes its rank
     def rankedName = if (fd.isSeq) s"${if(!name.isEmpty) s"$name." else ""}${idx.toString}" else name
@@ -56,6 +57,7 @@ trait CtxCore extends definition.Impl {
   
   //parent is undefined here
   trait Struct extends EltBase {
+    final def eClass = CtxCore.struct
     /** the known tags for that struct */
     val tags = fd.loader.fields
     /** tags seen count */
@@ -93,6 +95,7 @@ trait CtxCore extends definition.Impl {
     }
   }
   trait List extends EltBase {
+    final def eClass = CtxCore.list
     protected val innerFd: Context#FieldMapping = fd.asSeq
     protected[this] var index0: Int
     def index = index0
@@ -109,6 +112,7 @@ trait CtxCore extends definition.Impl {
     }
   }
   trait Terminal extends EltBase {
+    final def eClass = CtxCore.term
     override protected def onName(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
     override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
@@ -120,20 +124,30 @@ trait CtxCore extends definition.Impl {
     def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd),cbks:_*)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping): UCtx[X] => X#Parser=>Element[X] = apply(_,fd)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping,cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,fd,cbks:_*)
+    
+    def eClass(parent:Elt,s:Status):Int = { //a default implementation ; you might override this if fd is not sufficient (see ObjectMotor)
+      if      (s.fd.depth>0)  CtxCore.list
+      else if (s.fd.isStruct) CtxCore.struct 
+      else                    CtxCore.term
+    }
   
     val builder = new EltBuilder {
-      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status) =
-        if      (s.fd.depth>0)  new XList(parser, userCtx, dlg, s, parent)
-        else if (s.fd.isStruct) new XStruct(parser, userCtx, dlg, s, parent)
-        else                    new XTerminal(parser, userCtx, dlg, s, parent)
-      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*) =
-        if      (s.fd.depth>0)  new XListCbks(parser, userCtx, dlg, s, parent, cbks:_*)
-        else if (s.fd.isStruct) new XStructCbks(parser, userCtx, dlg, s, parent, cbks:_*)
-        else                    new XTerminalCbks(parser, userCtx, dlg, s, parent, cbks:_*)
-      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) =
-        if      (s.fd.depth>0)  new XListCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
-        else if (s.fd.isStruct) new XStructCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
-        else                    new XTerminalCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+      import scala.annotation.switch
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status) = (eClass(parent,s): @switch) match {
+        case CtxCore.list   => new XList(parser, userCtx, dlg, s, parent)
+        case CtxCore.struct => new XStruct(parser, userCtx, dlg, s, parent)
+        case CtxCore.term   => new XTerminal(parser, userCtx, dlg, s, parent)
+      }
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*) = (eClass(parent,s): @switch) match {
+        case CtxCore.list   => new XListCbks(parser, userCtx, dlg, s, parent, cbks:_*)
+        case CtxCore.struct => new XStructCbks(parser, userCtx, dlg, s, parent, cbks:_*)
+        case CtxCore.term   => new XTerminalCbks(parser, userCtx, dlg, s, parent, cbks:_*)
+      }
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) = (eClass(parent,s): @switch) match {
+        case CtxCore.list   => new XListCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+        case CtxCore.struct => new XStructCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+        case CtxCore.term   => new XTerminalCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
+      }
     }
   }
 
@@ -188,6 +202,11 @@ trait CtxCore extends definition.Impl {
 }
 object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
+
+  /** possible category for elements */
+  final val list    = 0
+  final val struct  = 1
+  final val term    = 2
   
   /** possible status for broken data */
   object Broken extends Enumeration {
@@ -199,7 +218,7 @@ object CtxCore {
   
   
   trait UsrCtx[-P<:ParserBuilder,-M<:definition.Processor] extends loader.core.UsrCtx[P,M] {
-    type EltCtx <: EltCtxBase
+    type EltCtx>:Null<:EltCtxBase
     protected[this] trait EltCtxBase extends super.EltCtxBase { this:EltCtx=>
       /** Solving dynamic mappings : this is called at any time a loader is found as null (Unknown) */
       def solveDynamic(fd:Context#FieldMapping):Context#FieldMapping = null

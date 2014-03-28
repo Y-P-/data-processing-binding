@@ -251,7 +251,7 @@ object definition {
    */
   trait Impl extends Processor {self=>
     //the delegate type which will be used as the processor logic
-    type ThisDlg = Delegate[Elt,Key,Value,Status,UsrCtx[BaseParser,this.type],Ret]
+    type ThisDlg = Delegate[Elt,Key,Value,Status,UCtx[BaseParser],Ret]
     //a factory for reading textual parameters
     //there will be other, specific factories
     def apply(pr: utils.ParamReader):Dlg
