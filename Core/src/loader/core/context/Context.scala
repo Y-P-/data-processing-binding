@@ -91,12 +91,16 @@ abstract class Context(tagMapBuilder: =>TagMap) {
    *  Note that this has no relationship to objects fields/methods, even though we may get this information by reading from such items.
    *  When we have to connect to such an item, we have to use the binding method.
    */
-  final class FieldMapping(val annot:FieldAnnot) {
+  final class FieldMapping(val annot:FieldAnnot) extends utils.reflect.AutoConvertData {
     final lazy val loader = build(annot.loader)
     final def isStruct = loader!=null
     final def isSeq    = annot.isSeq
     final def depth    = annot.depth
     final def inName   = annot.inName
+    final def check    = annot.check
+    final def param    = annot.param
+    final def valid    = annot.valid
+    final def convert  = annot.convert
     final def ctx      = Context.this
     //transforms this list/seq Mapping into a seq mapping ; this is used to manage the internal sequence forming the actual list.
     final def asSeq:FieldMapping = {

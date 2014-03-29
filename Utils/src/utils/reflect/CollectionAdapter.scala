@@ -188,7 +188,7 @@ object CollectionAdapter {
       case p:ParameterizedType => new Inner(p)
     }
   }
-  object RevertibleHistoryAdapter extends CollectionAdapter[scala.collection.mutable.RevertibleHistory[_,_]] {
+  object RevertibleHistoryAdapter extends CollectionAdapter[scala.collection.mutable.RevertibleHistory[_<:scala.collection.mutable.Undoable,_]] {
     class Inner[X<:scala.collection.mutable.Undoable,Y](p:ParameterizedType) extends SeqAdapter[(Y,X)](classOf[Pair[Y,X]]) {
       val czCol = p
       def newBuilder = new Builder[(Y,X),scala.collection.mutable.RevertibleHistory[X,Y]] {
@@ -197,7 +197,7 @@ object CollectionAdapter {
         def clear(): Unit = tmp.clear
         def result(): scala.collection.mutable.RevertibleHistory[X,Y] = tmp
       }
-      def asTraversable(c:scala.collection.mutable.RevertibleHistory[_,_]):Traversable[(Y,X)] = c.asInstanceOf[scala.collection.mutable.RevertibleHistory[X,Y]]
+      def asTraversable(c:scala.collection.mutable.RevertibleHistory[_<:scala.collection.mutable.Undoable,_]):Traversable[(Y,X)] = c.asInstanceOf[scala.collection.mutable.RevertibleHistory[X,Y]]
     }
     def apply(t:Type) = t match {
       case p:ParameterizedType => new Inner(p)
