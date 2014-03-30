@@ -92,6 +92,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
    *  When we have to connect to such an item, we have to use the binding method.
    */
   final class FieldMapping(val annot:FieldAnnot) extends utils.reflect.AutoConvertData {
+    final val ctx:Context.this.type = Context.this
     final lazy val loader = build(annot.loader)
     final def isStruct = loader!=null
     final def isSeq    = annot.isSeq
@@ -101,7 +102,6 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     final def param    = annot.param
     final def valid    = annot.valid
     final def convert  = annot.convert
-    final def ctx      = Context.this
     //transforms this list/seq Mapping into a seq mapping ; this is used to manage the internal sequence forming the actual list.
     final def asSeq:FieldMapping = {
       if (annot.depth<=0) throw new IllegalStateException("it is not legal to use asSeq on a FieldMapping that is not a list/sequence")

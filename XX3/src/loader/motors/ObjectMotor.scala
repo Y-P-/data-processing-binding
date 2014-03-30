@@ -149,16 +149,16 @@ object ObjectMotor extends ProcessorImpl {
   }
   
   /*-----------------------------------------------------------------------*/
-  /*       SECTION III: Field analysis                                     */
+  /*       SECTION III: Dynamic Field analysis, Dynami fd building         */
   /*-----------------------------------------------------------------------*/
   
-  /**
+  /** Analyzes a type to determine if it is a collection, and in that case the relevant information.
    * @param t, the type to analyze
    * @param cv, the conversion solver in use
    * @param n, the depth for the analysis (0 is all the way to the bottom of encapsulated seqs/lists)
    * @returns  the actual depth if less than n, then None if the type can be converted or Some(class found)
    */
-  def analyzeType(t:java.lang.reflect.Type, cv:ConversionSolver, n:Int) = {
+  def analyzeType(t:java.lang.reflect.Type, cv:ConversionSolver, n:Int):(Int, Option[java.lang.reflect.Type]) = {
     import Reflect._
     val l = cv.collectionSolver(t)
     if (l!=null) {
@@ -169,6 +169,27 @@ object ObjectMotor extends ProcessorImpl {
       val isConvertible = cv.stringSolver(t)
       (0,if (isConvertible==None) Some(t) else None)
     }
+  }
+  
+  /** Rebuilds a fd using a specified loader.
+   *  This is usually called when the initial fd loader was blank (i.e. left for inferrence.)
+   */
+  def rebuild(fd:Context#FieldMapping, loader0:String, isSeq0:Boolean, depth0:Int):Context#FieldMapping = {
+    val annot = new loader.core.context.FieldAnnot {
+      def inName:String      = fd.annot.inName
+      def loader:String      = loader0
+      def isSeq:Boolean      = isSeq0
+      def depth:Int          = depth0
+      def contiguous:Boolean = fd.annot.contiguous
+      def min:Int            = fd.annot.min
+      def max:Int            = fd.annot.max
+      def audit:String       = fd.annot.audit
+      def check:String       = fd.annot.check
+      def valid:String       = fd.annot.valid
+      def param:String       = fd.annot.param
+      def convert:String     = fd.annot.convert
+    }
+    new fd.ctx.FieldMapping(annot)
   }
   
   
@@ -198,7 +219,8 @@ object ObjectMotor extends ProcessorImpl {
         if (s.kind==CtxCore.term) parent.data match {
           case d:StcData => val da = DataActor(d.on.getClass,s.key,"bsfm").get
                             analyzeType(da.expected,parent.eltCtx.converters,0) match {
-                              case (_,Some(x)) => s  //rebuild s1 (fd.loader,struct)
+                              case (_,Some(x)) =>
+                                return new CtxCore.Status(key,s.idx,rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,s.fd.depth),s.broken,CtxCore.struct)
                               case _           =>
                             }
           case _ =>
