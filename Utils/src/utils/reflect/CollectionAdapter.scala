@@ -29,10 +29,21 @@ abstract class CollectionAdapter[C:ClassTag] {
   
   sealed trait BaseAdapter[X] {
     def isMap:Boolean
-    def czCol:Type                               //the actual collection full type
-    def czElt:Type                               //the element in the collection
-    def newBuilder:Builder[X,C]                  //the builder for the collection
-    def asTraversable(c:C):Traversable[X]        //making C an Traversable (useful when reading)
+    def czCol:Type                                  //the actual collection full type
+    def czElt:Type                                  //the element in the collection
+    def newBuilder:Builder[X,C]                     //the builder for the collection
+    def asTraversable(c:C):Traversable[X]           //making C an Traversable (useful when reading)
+    final def depth(n:Int):(Int,BaseAdapter[_]) = { //go to the nth level (starting level is 1) and find the corresponding embedded adapter; all the way down if n=0
+      var last:BaseAdapter[_] = this
+      var depth:Int           = 1
+      do {
+        val d=apply(last.czElt)
+        if (d==null || depth==n) return (depth,last)
+        last   = d
+        depth += 1
+      } while (true)
+      return null
+    }
   }
   abstract class SeqAdapter[X](val czElt:Type) extends BaseAdapter[X] {
     if (czElt==classOf[AnyRef]) throw new IllegalArgumentException(s"type $czElt is not precise enough as a collection element type: this error usually occurs when using scala primitive types (e.g. List[Int])")
@@ -50,17 +61,21 @@ abstract class CollectionAdapter[C:ClassTag] {
 }
 
 object CollectionAdapter {
+  
+  final class Info(depth:Int,eltClass:Class[_])
+  
   /** Type of the underlying contained element.
-   *  can only be called when t is associated with a container of some sort.
-   *  Classes wich are not generic can get away with this if they declare a Method 'dummyElt' that exactly returns the appropriate element type. The value doesn't matter.
+   *  Can only be called when t is associated with a container of some sort.
+   *  Classes wich are not generic can get away with this if they declare a Method 'containedElementClass' that exactly returns the appropriate element type. The implementation doesn't matter.
+   *  For Generic classes, the last parameter is assumed to be the contained element
    */
   final protected def eltType(t:Type):Type = {
-    def error = throw new IllegalArgumentException(s"type $t cannot be identified as a workable collection")
+    def error = null //throw new IllegalArgumentException(s"type $t cannot be identified as a workable collection")
     t match {
       case p:ParameterizedType     => val args = p.getActualTypeArguments; args(args.length-1)
       case g:GenericArrayType      => g.getGenericComponentType
       case a:Class[_] if a.isArray => a.getComponentType
-      case c:Class[_]              => try { c.getMethod("czElt").getReturnType } catch { case _:Exception => error }
+      case c:Class[_]              => try { c.getMethod("containedElementClass").getReturnType } catch { case _:Exception => error }
       //note: Java classes will have methods with Object as signature. Not usable.
       case _ => error
     }
@@ -83,11 +98,10 @@ object CollectionAdapter {
     def apply(p:Type) = a
   }
   object MUnrolledBuffer extends CollectionAdapter[scala.collection.mutable.UnrolledBuffer[_]] {
-    class Inner(p:ParameterizedType) extends SeqAdapter(p.getActualTypeArguments()(0)) {
+    class Inner[X](p:ParameterizedType) extends SeqAdapter[X](p.getActualTypeArguments()(0)) {
       val czCol = czzCol
       def newBuilder = new scala.collection.mutable.UnrolledBuffer()(ClassTag(findClass(czElt)))
-      //XXX
-      def asTraversable(c:scala.collection.mutable.UnrolledBuffer[_]):Traversable[Nothing] = c.asInstanceOf[Traversable[Nothing]]
+      def asTraversable(c:scala.collection.mutable.UnrolledBuffer[_]):Traversable[X] = c.asInstanceOf[Traversable[X]]
     }
     def apply(t:Type) = t match {
       case p:ParameterizedType => new Inner(p)
@@ -204,38 +218,37 @@ object CollectionAdapter {
     }
   }
     
-  /** factory to fill up the Collection adapter map */
+  /** factory to fill up the Collection adapter map ; it defaults to reflexion. */
   def apply(a:CollectionAdapter[_]*):Map[Class[_],CollectionAdapter[_]] = {
     val self = scala.collection.mutable.HashMap[Class[_],CollectionAdapter[_]]()
     for (x<-a) self += x.czzCol -> x
-    self.withDefault(cz=>new ReflexiveAdapter(cz))
+    self.withDefault(new ReflexiveAdapter(_))
   }
   
-  
-  object ReflexiveAdapter {
-    def apply(t:Type) = new ReflexiveAdapter(t)(t)
-  }
   
   /** Same as above, but defined by reflection where possible.
    *  This is the default when the collection class is not found in the map.
+   *  @returns null if no appropriate adapter can be found
    */
   protected class ReflexiveAdapter(cz:Class[_]) extends CollectionAdapter[Any]()(ClassTag(cz)) { self=>
-    //checks if expected is a Map
-    
     def apply(t:Type):BaseAdapter[_] = {
       t match {
-        case p:ParameterizedType if p.getActualTypeArguments().length==2 =>
-          new MapAdapter[Any,Any](p.getActualTypeArguments()(0),eltType(p)) {
+        case p:ParameterizedType if p.getActualTypeArguments().length==2 => eltType(p) match {
+          case null => null
+          case x    => new MapAdapter[Any,Any](p.getActualTypeArguments()(0),x) {
             val czCol = t
             def newBuilder:Builder[Any,Any] = self.newBuilder
             def asTraversable(c:Any):Traversable[(Any,Any)] = self.asTraversable(c).asInstanceOf[Traversable[(Any,Any)]]
           }
-        case x =>
-          new SeqAdapter[Any](eltType(t)) {
+        }
+        case _ => eltType(t) match {
+          case null => null          
+          case x => new SeqAdapter[Any](x) {
             val czCol = t
             def newBuilder:Builder[Any,Any] = self.newBuilder
             def asTraversable(c:Any):Traversable[Any] = self.asTraversable(c)
           }
+        }
       }
     }
 
@@ -280,8 +293,8 @@ object CollectionAdapter {
           val tmp = getJInstance[java.util.Map[Any,Any]]
           def +=(elem: Any):this.type = {
             elem match {
-              case a:Pair[_,_] => tmp.put(a._1,a._2); this
-              case _           => throw new IllegalArgumentException(s"a ${classOf[Pair[_,_]]} is expected when filling up a map")        
+              case a:(_,_) => tmp.put(a._1,a._2); this
+              case _       => throw new IllegalArgumentException(s"a ${classOf[Pair[_,_]]} is expected when filling up a map")        
             }
           }
           def clear(): Unit = tmp.clear()
@@ -320,6 +333,10 @@ object CollectionAdapter {
         throw new IllegalArgumentException("Unsupported container class")
     }
   }
+  
+  //the Type => Adapt function is what the user really wants ; the map is only an intermediate container
+  implicit def wrap(m:Map[Class[_],CollectionAdapter[_]]):Type=>Adapt = (t:Type) => m(t)(t)
+  type Adapt = CollectionAdapter[_]#BaseAdapter[_]
   
   val defaultMap = CollectionAdapter(BitSetAdapter,JBitSetAdapter,JEnumSetAdapter,IntMapAdapter,LongMapAdapter,MBitSetAdapter,MUnrolledBuffer,HistoryAdapter,JEnumMapAdapter,JPropertiesAdapter,RevertibleHistoryAdapter)
 }

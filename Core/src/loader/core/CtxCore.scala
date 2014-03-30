@@ -44,6 +44,7 @@ trait CtxCore extends definition.Impl {
     //the name of this element, accounting for the fact that is can be anonymous, in which case its name becomes its rank
     def rankedName = if (fd.isSeq) s"${if(!name.isEmpty) s"$name." else ""}${idx.toString}" else name
     override def print(out:java.io.Writer):Unit = foreach(e=>out.write(s".${e.rankedName}"))
+    protected[CtxCore] def onNameBase(key: Key):Status
     
     /** This trait is used to create copies of the current Elt for changing parser and userCtx.
      *  It must refer to the same fields as the copied item.
@@ -77,7 +78,7 @@ trait CtxCore extends definition.Impl {
       override protected def previous_=(fd:Context#FieldMapping) = Struct.this.previous=fd
     }
   
-    override protected def onName(key: Key):Status = {
+    protected[CtxCore] def onNameBase(key: Key):Status = {
       val name = key.toString
       tags.fetch(name) match {
         case None     =>
@@ -104,7 +105,7 @@ trait CtxCore extends definition.Impl {
       override protected[this] def index0:Int = List.this.index0
       override protected[this] def index0_=(i:Int):Unit = List.this.index0=i
     }
-    override protected def onName(key: Key):Status = {
+    protected[CtxCore] def onNameBase(key: Key):Status = {
       val name = key.toString
       if (!name.isEmpty) throw new IllegalStateException(s"illegal field $name in a list")
       index0 += 1
@@ -113,37 +114,36 @@ trait CtxCore extends definition.Impl {
   }
   trait Terminal extends EltBase {
     final def eClass = CtxCore.term
-    override protected def onName(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
-    override protected def onEnd():Ret              = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
+    protected[CtxCore] def onNameBase(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
+    override protected def onEnd():Ret                  = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
   trait DlgBase extends super.DlgBase { dlg:Dlg=>
     def getData(parent:Elt):Data
-    final def onName(e:Elt,key:Key): Nothing  = ???  //a default stub ; it is overriden by the Struct/List/Terminal implementation
     def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd))
     def apply[X<:BaseParser with Singleton](u:UCtx[X],fd:Context#FieldMapping,cbks:Cbks*): X#Parser=>Element[X]  = builder(_,u,null,noStatus(fd),cbks:_*)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping): UCtx[X] => X#Parser=>Element[X] = apply(_,fd)
     def apply[X<:BaseParser with Singleton](fd:Context#FieldMapping,cbks:Cbks*): UCtx[X] => X#Parser=>Element[X] = apply(_,fd,cbks:_*)
     
-    def eClass(parent:Elt,s:Status):Int = { //a default implementation ; you might override this if fd is not sufficient (see ObjectMotor)
-      if      (s.fd.depth>0)  CtxCore.list
-      else if (s.fd.isStruct) CtxCore.struct 
-      else                    CtxCore.term
-    }
+    /** This method allows rebuilding a new Status,
+     *  which is very usefull for dynamic analysis.
+     *  It is based on each element kind own implementation, which should usually be called.
+     */
+    override def onName(parent:Elt,key:Key):Status = parent.onNameBase(key)
   
     val builder = new EltBuilder {
       import scala.annotation.switch
-      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status) = (eClass(parent,s): @switch) match {
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status) = (s.kind: @switch) match {
         case CtxCore.list   => new XList(parser, userCtx, dlg, s, parent)
         case CtxCore.struct => new XStruct(parser, userCtx, dlg, s, parent)
         case CtxCore.term   => new XTerminal(parser, userCtx, dlg, s, parent)
       }
-      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*) = (eClass(parent,s): @switch) match {
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cbks: Cbks*) = (s.kind: @switch) match {
         case CtxCore.list   => new XListCbks(parser, userCtx, dlg, s, parent, cbks:_*)
         case CtxCore.struct => new XStructCbks(parser, userCtx, dlg, s, parent, cbks:_*)
         case CtxCore.term   => new XTerminalCbks(parser, userCtx, dlg, s, parent, cbks:_*)
       }
-      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) = (eClass(parent,s): @switch) match {
+      def apply[X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], parent: Elt, s: Status, cb:Cbk, cbks: Cbks*) = (s.kind: @switch) match {
         case CtxCore.list   => new XListCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
         case CtxCore.struct => new XStructCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
         case CtxCore.term   => new XTerminalCbk(parser, userCtx, dlg, s, parent, cb, cbks:_*)
@@ -201,7 +201,13 @@ trait CtxCore extends definition.Impl {
   }
 }
 object CtxCore {
-  class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean) extends ExtCore.Status(key)
+  class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean, val kind:Int) extends ExtCore.Status(key) {
+    def this(key:K, idx: Int, fd: Context#FieldMapping, broken: Boolean) =
+      this(key,idx,fd,broken,
+             if      (fd.depth>0)  CtxCore.list
+             else if (fd.isStruct) CtxCore.struct
+             else                  CtxCore.term)
+  }
 
   /** possible category for elements */
   final val list    = 0

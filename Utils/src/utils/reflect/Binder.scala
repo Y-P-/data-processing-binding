@@ -91,7 +91,6 @@ sealed class Binder private (val what:DataActor,protected[this] val solver:Conve
 
   final def apply(on:AnyRef):I = build(on)
   
-  protected[this] final def adapter(t:Type) = solver.collectionSolver(findClass(t))(t)
   protected[this] final def getSolver(cz:Class[_],t:Type) = solver(cz,findClass(t),fd,fd.convert).fold(s=>throw new IllegalStateException(s), identity)
 
 }
@@ -122,7 +121,8 @@ object Binder {
     private[this] val deepCache = new Array[super.Analyze](6)   //Do we expect deep collection of more than this depth ?
     
     class Analyze(val depth:Int,val parent:super.Analyze) extends super.Analyze {
-      override def subAnalyze:Analyze = adapter(eType) match {
+      override def subAnalyze:Analyze = solver.collectionSolver(eType) match {
+        case null         => throw new IllegalArgumentException(s"type $eType cannot be identified as a workable collection")
         case a if a.isMap => new Map(a,depth+1,this)
         case a            => new Col(a,depth+1,this)
       }

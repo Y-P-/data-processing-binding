@@ -1,7 +1,7 @@
 package utils.reflect
 
-import utils.reflect.Reflect._
 import utils.reflect.Converters.StringConverter
+import utils.reflect.Reflect._
 import utils.reflect._
 
 
@@ -18,10 +18,11 @@ import utils.reflect._
  *  - by default, if nothing is specified, the created object is returned.
  */
 class ConversionSolver(
-    val stringSolver:(Class[_]=>Option[StringConverter[_]])                  = Converters.defaultMap,
-    val namedSolver:Map[String,Converter[_,_]]                               = null,
-    val registeredSolver:Seq[Converter[_,_]]                                 = null,
-    val collectionSolver:scala.collection.Map[Class[_],CollectionAdapter[_]] = CollectionAdapter.defaultMap) {
+    val stringSolver:(Class[_]=>Option[StringConverter[_]])              = Converters.defaultMap,
+    val namedSolver:Map[String,Converter[_,_]]                           = null,
+    val registeredSolver:Seq[Converter[_,_]]                             = null,
+    val collectionSolver:java.lang.reflect.Type=>CollectionAdapter.Adapt = CollectionAdapter.defaultMap) {
+  
   /** Finds an appropriate converter from one of the sources by following these exclusive rules (in order):
    *  - if the name is significant (not null or "")
    *  -   o name starts with @    : take the appropriate entry (e.g. '@xyz') from the named list (no check done: it has to work)

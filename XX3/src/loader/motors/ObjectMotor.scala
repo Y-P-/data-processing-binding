@@ -88,6 +88,24 @@ object ObjectMotor extends ProcessorImpl {
     def depth:Int            //if element being built is a list, depth
   }
   
+  /** These are the methods used when buildind a Data.
+   */
+  trait EltCtx {
+    /** if true, a current field (object) will be updated rather than created from scratch */
+    def update:Boolean = false
+    /** Converters to use */
+    def converters:ConversionSolver = new ConversionSolver()
+    /** Spawning new elements ; note that this can be overridden to create inner objects if necessary */
+    def spawn(i:Binder#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
+    /** Merging collections; called only if update is true.
+     *  If you don't return either 'cur' or 'read' or a simple operation such as cur ++ read, and the
+     *  collection is more than one level deep, you're probably asking for problems.
+     *  You had better know exactly what you are doing.
+     *  By default, we concatenate the old and the new values.
+     *  @returns 'cur' if you keep the old (not null) value, 'read' if you keep the new, or a new Traversable for the merge
+     */
+    def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = cur ++ read    
+  }  
   /*-----------------------------------------------------------------------*/
   /*       SECTION II: Define DefImpl                                      */
   /*-----------------------------------------------------------------------*/
@@ -101,7 +119,7 @@ object ObjectMotor extends ProcessorImpl {
     type Ret        = Unit
     type BaseParser = ParserBuilder //any parser
     type Data       = ObjectMotor.Data
-    type UCtx[-p<:BaseParser]>:Null<:ObjectMotor.UCtx[p,this.type] with CtxCore.UsrCtx[p,this.type]
+    type UCtx[-p<:BaseParser]>:Null<:CtxCore.UsrCtx[p,this.type] with ObjectMotor.UCtx[p,this.type]
     final def baseParserClass = classOf[BaseParser]
     
     val noKey = ""
@@ -115,9 +133,8 @@ object ObjectMotor extends ProcessorImpl {
       type Result = AnyRef
       type EX = Elt
       
-      protected[this] var kind = -1
       //building the data: we must first examine the kind of parent we have
-      def getData(e:Elt):Data = if (e.parent==null) new RootData(on) else e.parent.data(kind,e.name,info(e))
+      def getData(e:Elt):Data = if (e.parent==null) new RootData(on) else e.parent.data(e.eClass,e.name,info(e))
   
       //pretty simple processor here: actual complexity is in Data
       def onInit(e:Elt):Unit           = {}
@@ -131,17 +148,39 @@ object ObjectMotor extends ProcessorImpl {
     }
   }
   
-  protected def readParams(pr: utils.ParamReader) = ???
+  /*-----------------------------------------------------------------------*/
+  /*       SECTION III: Field analysis                                     */
+  /*-----------------------------------------------------------------------*/
+  
+  /**
+   * @param t, the type to analyze
+   * @param cv, the conversion solver in use
+   * @param n, the depth for the analysis (0 is all the way to the bottom of encapsulated seqs/lists)
+   * @returns  the actual depth if less than n, then None if the type can be converted or Some(class found)
+   */
+  def analyzeType(t:java.lang.reflect.Type, cv:ConversionSolver, n:Int) = {
+    import Reflect._
+    val l = cv.collectionSolver(t)
+    if (l!=null) {
+      val x = l.depth(n)
+      val isConvertible = cv.stringSolver(x._2.czElt)
+      (x._1, if (isConvertible==None) Some(x._2.czElt) else None)
+    } else {
+      val isConvertible = cv.stringSolver(t)
+      (0,if (isConvertible==None) Some(t) else None)
+    }
+  }
+  
   
   /*-----------------------------------------------------------------------*/
-  /*       SECTION III: Define ctx implementation                          */
+  /*       SECTION IV: Define ctx implementation                           */
   /*-----------------------------------------------------------------------*/
   
   /** Actual implementation for CtxCore.
    */
   object ctx extends loader.core.CtxCore.Abstract[Data] with DefImpl {self=>
     override type Data                 = ObjectMotor.Data
-    override type UCtx[-p<:BaseParser] = ObjectMotor.UCtx[p,ctx.type] with CtxCore.UsrCtx[p,this.type]
+    override type UCtx[-p<:BaseParser] = CtxCore.UsrCtx[p,this.type] with ObjectMotor.UCtx[p,ctx.type] 
     final def baseUCtxClass   = null //XXX classOf[UCtx[_]] => use TypeTags for dynamic class checking
     def info(e:Elt) = new Info {
       def eltCtx              = e.eltCtx
@@ -150,19 +189,21 @@ object ObjectMotor extends ProcessorImpl {
       def depth:Int           = e.fd.depth
     }
     class Dlg(on:AnyRef) extends DlgBase(on) with super[Abstract].DlgBase {
-      override def eClass(parent:Elt,s:Status):Int = {
-        kind=super.eClass(parent,s)
+      override def onName(parent:Elt,key:Key):Status = {
+        val s=super.onName(parent,key)
         //we don't believe the upper layer for terminals ; the default impl relies on fd, but it may be uncomplete
         //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
         //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
         //In that case, we assume a struct with X used to load.
-        if (kind==CtxCore.term) parent.data match {
-          case d:StcData => val ec:ObjectMotor.UCtx[parent.Builder,ctx.type]#EltCtx = parent.eltCtx //compiler needs help: doesn't find parent.eltCtx.converters otherwise
-                            //println(s"${s.key} = ${b.eltClass}")
-                            //if (ec.converters.stringSolver(b.eltClass)==None) kind=CtxCore.struct 
+        if (s.kind==CtxCore.term) parent.data match {
+          case d:StcData => val da = DataActor(d.on.getClass,s.key,"bsfm").get
+                            analyzeType(da.expected,parent.eltCtx.converters,0) match {
+                              case (_,Some(x)) => s  //rebuild s1 (fd.loader,struct)
+                              case _           =>
+                            }
           case _ =>
         }
-        kind
+        s
       }
     }
     def apply(pr: utils.ParamReader):Dlg   = ???
@@ -207,23 +248,9 @@ object ObjectMotor extends ProcessorImpl {
    */
   trait UCtx[-P<:ParserBuilder,-M<:DefImpl] extends UsrCtx[P,M] {
     type EltCtx>:Null<:EltCtxBase
-    protected[this] trait EltCtxBase extends super.EltCtxBase { this:EltCtx=>
-      /** if true, a current field (object) will be updated rather than created from scratch */
-      def update:Boolean = false
-      /** Converters to use */
-      def converters:ConversionSolver = new ConversionSolver()
-      /** Spawning new elements ; note that this can be overridden to create inner objects if necessary */
-      def spawn(i:Binder#I):AnyRef = i.eltClass.asInstanceOf[Class[_<:AnyRef]].newInstance
-      /** Merging collections; called only if update is true.
-       *  If you don't return either 'cur' or 'read' or a simple operation such as cur ++ read, and the
-       *  collection is more than one level deep, you're probably asking for problems.
-       *  You had better know exactly what you are doing.
-       *  By default, we concatenate the old and the new values.
-       *  @returns 'cur' if you keep the old (not null) value, 'read' if you keep the new, or a new Traversable for the merge
-       */
-      def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = cur ++ read
+    protected[this] trait EltCtxBase extends super.EltCtxBase with ObjectMotor.EltCtx { this:EltCtx=>
     }
   }
   
-  protected type EltCtx = UCtx[Nothing,Nothing]#EltCtx
+  protected def readParams(pr: utils.ParamReader) = ???
 }

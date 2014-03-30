@@ -36,6 +36,11 @@ object ObjTest {
     @TagSeq            val idL:List[Integer] = null             //collection of scalars
     @TagList(depth=2)  val id2:Array[Array[Double]] = null      //deep collection of scalars
     
+    //@TagField(loader=classOf[Cz]) val cz:Cz = null                        //object
+    //@TagSeq(loader=classOf[Cz])   val czA:Array[Cz] = null                //array of objects
+    //@TagList(loader=classOf[Cz])  val czL:List[Cz] = null                 //collection of objects
+    //@TagList(loader=classOf[Cz], depth=2) val cz2:Array[List[Cz]] = null  //deep collection of objects
+    //@TagSeq(loader=classOf[Cz], depth=2)  val cz3:Array[List[Array[Cz]]] = null  //deep sequence of objects
     @TagField(loader=classOf[Cz]) val cz:Cz = null                        //object
     @TagSeq(loader=classOf[Cz])   val czA:Array[Cz] = null                //array of objects
     @TagList(loader=classOf[Cz])  val czL:List[Cz] = null                 //collection of objects
@@ -132,7 +137,7 @@ object ObjTest {
 //tagEnd
 //maps
 //Cache for binders
-//External conf for field kind choice "fmsj"
+//External conf for field kind choice "bsfm"
 
 //remove/simplify onChild ? (but do not make Ret=Unit ?)
 //finish the ObjectMotor.ext implementation
