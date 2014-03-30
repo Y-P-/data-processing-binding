@@ -92,7 +92,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
    *  When we have to connect to such an item, we have to use the binding method.
    */
   final class FieldMapping(val annot:FieldAnnot) extends utils.reflect.AutoConvertData {
-    final val ctx:Context.this.type = Context.this
+    final def ctx:Context.this.type = Context.this
     final lazy val loader = build(annot.loader)
     final def isStruct = loader!=null
     final def isSeq    = annot.isSeq

@@ -46,11 +46,11 @@ object ObjectMotor extends ProcessorImpl {
     protected final def localClose() = for (x <- seqs) x._2.close()    //close all current sequences
     override def close(eltCtx:EltCtx) = { localClose(); set(on) }  //and assign structure to its owner
     override def apply(kind:Int, name:String, info:Info):Data = {
-      val b = Binder(DataActor(on.getClass,name,"bsfm").get, info.eltCtx.converters, info.fd, info.isSeq || info.depth>0)(on)
+      val b = Binder(DataActor(on.getClass,name,"bsfm").get, info.eltCtx.converters, info.fd, info.depth>0)(on)
       Data(kind, info.eltCtx,  //seqs are kept in an immutable map (we expect it to stay small) stored in a local var which we update when needed 
         if (info.isSeq) seqs.getOrElse(name,{val x=b.subInstance; seqs=seqs+((name,x)); x})
         else            b //otherwise, simply bind the field
-      )      
+      )
     }
   }
   private class RootData (on:AnyRef) extends StcData(on,null,Map.empty) {
@@ -105,7 +105,8 @@ object ObjectMotor extends ProcessorImpl {
      *  @returns 'cur' if you keep the old (not null) value, 'read' if you keep the new, or a new Traversable for the merge
      */
     def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = cur ++ read    
-  }  
+  }
+  
   /*-----------------------------------------------------------------------*/
   /*       SECTION II: Define DefImpl                                      */
   /*-----------------------------------------------------------------------*/
@@ -193,7 +194,6 @@ object ObjectMotor extends ProcessorImpl {
     new fd.ctx.FieldMapping(annot)
   }
   
-  
   /*-----------------------------------------------------------------------*/
   /*       SECTION IV: Define ctx implementation                           */
   /*-----------------------------------------------------------------------*/
@@ -213,6 +213,7 @@ object ObjectMotor extends ProcessorImpl {
     class Dlg(on:AnyRef) extends DlgBase(on) with super[Abstract].DlgBase {
       override def onName(parent:Elt,key:Key):Status = {
         val s=super.onName(parent,key)
+        return s
         //we don't believe the upper layer for terminals ; the default impl relies on fd, but it may be uncomplete
         //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
         //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
@@ -225,24 +226,25 @@ object ObjectMotor extends ProcessorImpl {
               analyzeType(da.expected,parent.eltCtx.converters,n) match {
                 case (_,None)    =>  //OK, can be converted : don't change anything
                 case (i,Some(x)) =>  //Can't be converted
-                   println(s"+ ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
+                   println(s"+${s.key} ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
                    val s1 = new CtxCore.Status(key,s.idx,
                      rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,i-(if (s.fd.isSeq) 1 else 0)),
                      s.broken,
                      CtxCore.list)
-                   println(s"+ ${s1.fd.loader.id} ${s1.fd.depth}")
+                   println(s"+${s.key} ${s1.fd.loader.id} ${s1.fd.depth}")
                    return s1
               }
             case CtxCore.term =>
-              analyzeType(da.expected,parent.eltCtx.converters,s.fd.depth+1) match {
+              val n = s.fd.depth+(if (s.fd.isSeq) 1 else 0)
+              analyzeType(da.expected,parent.eltCtx.converters,n) match {
                 case (_,None)    =>  //OK, can be converted : don't change anything
                 case (i,Some(x)) =>  //Can't be converted
-                   println(s"* ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
+                   println(s"*${s.key} ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
                    val s1 = new CtxCore.Status(key,s.idx,
-                     rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,i-1),
+                     rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,i-(if (s.fd.isSeq) 1 else 0)),
                      s.broken,
                      CtxCore.struct)
-                   println(s"* ${s1.fd.loader.id} ${s1.fd.depth}")
+                   println(s"*${s.key} ${s1.fd.loader.id} ${s1.fd.depth}")
                    return s1
               }
           }
