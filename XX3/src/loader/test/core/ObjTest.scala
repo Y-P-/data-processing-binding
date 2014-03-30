@@ -69,6 +69,18 @@ object ObjTest {
       out.print(buf)
     }
   }
+  /** Test to verify that an object is correctly filled up ; it tests most cases and ends up with some deep nesting */
+  @Test class ObjBaseFullInferTest extends StandardTester {
+    def apply(file:Solver,out:PrintWriter):Unit = {
+      import ObjectMotor.ctx
+      val buf = new java.io.StringWriter
+      val on = new CzBase.FullInferAnnot
+      val m = ctx(on)
+      val r=run(p,m)(userCtx(new PrintWriter(buf)),_(ClassContext(classOf[CzBase.FullInferAnnot]),DefaultCtxEventsCbk(m)),_.read(load("objTest.txt"), "UTF-8"))._2
+      out.println(on)
+      out.print(buf)
+    }
+  }
 }
 
 

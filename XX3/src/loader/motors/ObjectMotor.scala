@@ -23,9 +23,9 @@ object ObjectMotor extends ProcessorImpl {
    *  It has to keep track of things such as the current object we work on, the binder to upper layer object, and for structures, known sequences.
    */
   sealed class Data protected (private[this] val b:Binder#I) { //default implementation, used for Terminal
-    final def set(x:AnyRef)       = b.set(x)                   //show the set method
+    final def set(x:AnyRef)   = b.set(x)                   //show the set method
     def close(eltCtx:EltCtx)  = ()                         //no close for element
-    def apply(kind:Int, name:String, info:Info):Data = ???   //data factory for a sub-object, obviously an error for Terminal
+    def apply(kind:Int, name:String, info:Info):Data = ??? //data factory for a sub-object, obviously an error for Terminal
   }
   private class ListData (b:Binder#I) extends Data(b) {
     override def close(eltCtx:EltCtx) = if (eltCtx.update) { //this assigns the data to the bound object (lists)
@@ -164,6 +164,7 @@ object ObjectMotor extends ProcessorImpl {
     if (l!=null) {
       val x = l.depth(n)
       val isConvertible = cv.stringSolver(x._2.czElt)
+      println(x)
       (x._1, if (isConvertible==None) Some(x._2.czElt) else None)
     } else {
       val isConvertible = cv.stringSolver(t)
@@ -216,14 +217,35 @@ object ObjectMotor extends ProcessorImpl {
         //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
         //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
         //In that case, we assume a struct with X used to load.
-        if (s.kind==CtxCore.term) parent.data match {
-          case d:StcData => val da = DataActor(d.on.getClass,s.key,"bsfm").get
-                            analyzeType(da.expected,parent.eltCtx.converters,0) match {
-                              case (_,Some(x)) =>
-                                return new CtxCore.Status(key,s.idx,rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,s.fd.depth),s.broken,CtxCore.struct)
-                              case _           =>
-                            }
-          case _ =>
+        if (s.kind!=CtxCore.struct && parent.eClass==CtxCore.struct) {
+          val da = DataActor(parent.data.asInstanceOf[StcData].on.getClass,s.key,"bsfm").get
+          s.kind match {
+            case CtxCore.list =>
+              val n = s.fd.depth+(if (s.fd.isSeq) 1 else 0)
+              analyzeType(da.expected,parent.eltCtx.converters,n) match {
+                case (_,None)    =>  //OK, can be converted : don't change anything
+                case (i,Some(x)) =>  //Can't be converted
+                   println(s"+ ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
+                   val s1 = new CtxCore.Status(key,s.idx,
+                     rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,i-(if (s.fd.isSeq) 1 else 0)),
+                     s.broken,
+                     CtxCore.list)
+                   println(s"+ ${s1.fd.loader.id} ${s1.fd.depth}")
+                   return s1
+              }
+            case CtxCore.term =>
+              analyzeType(da.expected,parent.eltCtx.converters,s.fd.depth+1) match {
+                case (_,None)    =>  //OK, can be converted : don't change anything
+                case (i,Some(x)) =>  //Can't be converted
+                   println(s"* ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
+                   val s1 = new CtxCore.Status(key,s.idx,
+                     rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,i-1),
+                     s.broken,
+                     CtxCore.struct)
+                   println(s"* ${s1.fd.loader.id} ${s1.fd.depth}")
+                   return s1
+              }
+          }
         }
         s
       }

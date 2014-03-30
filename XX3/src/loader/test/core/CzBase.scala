@@ -70,6 +70,7 @@ abstract class CzBase {
 
 object CzBase {
 
+  //annotation fully filled
   class FullAnnot extends CzBase {
     type Cz = FullAnnot
     @TagField          val id:Int = 0                           //standard scalar field with auto conversion
@@ -78,12 +79,13 @@ object CzBase {
     @TagSeq            val idL:List[Integer] = null             //collection of scalars
     @TagList(depth=2)  val id2:Array[Array[Double]] = null      //deep collection of scalars
     
-    @TagField(loader=classOf[Cz]) val cz:Cz = null                        //object
-    @TagSeq(loader=classOf[Cz])   val czA:Array[Cz] = null                //array of objects
-    @TagList(loader=classOf[Cz])  val czL:List[Cz] = null                 //collection of objects
-    @TagList(loader=classOf[Cz], depth=2) val cz2:Array[List[Cz]] = null  //deep collection of objects
+    @TagField(loader=classOf[Cz])         val cz:Cz = null                       //object
+    @TagSeq(loader=classOf[Cz])           val czA:Array[Cz] = null               //array of objects
+    @TagList(loader=classOf[Cz])          val czL:List[Cz] = null                //collection of objects
+    @TagList(loader=classOf[Cz], depth=2) val cz2:Array[List[Cz]] = null         //deep collection of objects
     @TagSeq(loader=classOf[Cz], depth=2)  val cz3:Array[List[Array[Cz]]] = null  //deep sequence of objects
   }
+  //class to load inferred
   class InferAnnot extends CzBase {
     type Cz = InferAnnot
     @TagField          val id:Int = 0                           //standard scalar field with auto conversion
@@ -92,10 +94,25 @@ object CzBase {
     @TagSeq            val idL:List[Integer] = null             //collection of scalars
     @TagList(depth=2)  val id2:Array[Array[Double]] = null      //deep collection of scalars
     
-    @TagField val cz:Cz = null                        //object
-    @TagSeq   val czA:Array[Cz] = null                //array of objects
-    @TagList  val czL:List[Cz] = null                 //collection of objects
-    @TagList(loader=classOf[Cz], depth=2) val cz2:Array[List[Cz]] = null  //deep collection of objects
-    @TagSeq(loader=classOf[Cz], depth=2)  val cz3:Array[List[Array[Cz]]] = null  //deep sequence of objects    
+    @TagField         val cz:Cz = null                        //object
+    @TagSeq           val czA:Array[Cz] = null                //array of objects
+    @TagList          val czL:List[Cz] = null                 //collection of objects
+    @TagList(depth=2) val cz2:Array[List[Cz]] = null          //deep collection of objects
+    @TagSeq(depth=2)  val cz3:Array[List[Array[Cz]]] = null   //deep sequence of objects    
+  }
+  //class to load and list/seq depth inferred
+  class FullInferAnnot extends CzBase {
+    type Cz = FullInferAnnot
+    @TagField val id:Int = 0                           //standard scalar field with auto conversion
+    @TagField val ok:Boolean = false                   //same, different conversion
+    @TagList  val idA:Array[Double] = null             //array of scalars
+    @TagSeq   val idL:List[Integer] = null             //collection of scalars
+    @TagList  val id2:Array[Array[Double]] = null      //deep collection of scalars
+    
+    @TagField val cz:Cz = null                         //object
+    @TagSeq   val czA:Array[Cz] = null                 //array of objects
+    @TagList  val czL:List[Cz] = null                  //collection of objects
+    @TagList  val cz2:Array[List[Cz]] = null           //deep collection of objects
+    @TagSeq   val cz3:Array[List[Array[Cz]]] = null    //deep sequence of objects    
   }
 }

@@ -36,13 +36,15 @@ abstract class CollectionAdapter[C:ClassTag] {
     final def depth(n:Int):(Int,BaseAdapter[_]) = { //go to the nth level (starting level is 1) and find the corresponding embedded adapter; all the way down if n=0
       var last:BaseAdapter[_] = this
       var depth:Int           = 1
+      println(s"    limit = $n")
       do {
         val d=apply(last.czElt)
+        println(s"    $depth $last")
         if (d==null || depth==n) return (depth,last)
         last   = d
         depth += 1
       } while (true)
-      return null
+      null
     }
   }
   abstract class SeqAdapter[X](val czElt:Type) extends BaseAdapter[X] {
