@@ -1,4 +1,3 @@
-2
     limit = 2
     1 SeqAdapter[class [D]
     2 SeqAdapter[double]
@@ -12,70 +11,83 @@
     limit = 1
     1 SeqAdapter[class java.lang.Integer]
 (1,SeqAdapter[class java.lang.Integer])
-1
     limit = 1
     1 SeqAdapter[double]
 (1,SeqAdapter[double])
-1
+* <> 0
+* loader.test.core.CzBase$InferAnnot -1
     limit = 1
-    1 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(1,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 1
-+ loader.test.core.CzBase$FullAnnot 1
-2
+    1 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(1,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 1
++ loader.test.core.CzBase$InferAnnot 1
+    limit = 1
+    1 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(1,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
+* <> 0
+* loader.test.core.CzBase$InferAnnot 0
+    limit = 1
+    1 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(1,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
+* <> 0
+* loader.test.core.CzBase$InferAnnot 0
     limit = 2
-    1 SeqAdapter[scala.collection.immutable.List<loader.test.core.CzBase$FullAnnot>]
-    2 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(2,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 2
-+ loader.test.core.CzBase$FullAnnot 2
-1
+    1 SeqAdapter[scala.collection.immutable.List<loader.test.core.CzBase$InferAnnot>]
+    2 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(2,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 2
++ loader.test.core.CzBase$InferAnnot 2
     limit = 1
     1 SeqAdapter[double]
 (1,SeqAdapter[double])
-1
+* <> 0
+* loader.test.core.CzBase$InferAnnot -1
     limit = 1
-    1 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(1,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 1
-+ loader.test.core.CzBase$FullAnnot 1
-1
+    1 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(1,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
+* <> 0
+* loader.test.core.CzBase$InferAnnot 0
+    limit = 1
+    1 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(1,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
+* <> 0
+* loader.test.core.CzBase$InferAnnot 0
+    limit = 1
+    1 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(1,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 1
++ loader.test.core.CzBase$InferAnnot 1
     limit = 1
     1 SeqAdapter[double]
 (1,SeqAdapter[double])
-2
     limit = 3
-    1 SeqAdapter[scala.collection.immutable.List<[Lloader.test.core.CzBase$FullAnnot;>]
-    2 SeqAdapter[class [Lloader.test.core.CzBase$FullAnnot;]
-    3 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(3,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 2
-+ loader.test.core.CzBase$FullAnnot 2
-2
+    1 SeqAdapter[scala.collection.immutable.List<[Lloader.test.core.CzBase$InferAnnot;>]
+    2 SeqAdapter[class [Lloader.test.core.CzBase$InferAnnot;]
+    3 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(3,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 2
++ loader.test.core.CzBase$InferAnnot 2
     limit = 3
-    1 SeqAdapter[scala.collection.immutable.List<[Lloader.test.core.CzBase$FullAnnot;>]
-    2 SeqAdapter[class [Lloader.test.core.CzBase$FullAnnot;]
-    3 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(3,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 2
-+ loader.test.core.CzBase$FullAnnot 2
-2
+    1 SeqAdapter[scala.collection.immutable.List<[Lloader.test.core.CzBase$InferAnnot;>]
+    2 SeqAdapter[class [Lloader.test.core.CzBase$InferAnnot;]
+    3 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(3,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 2
++ loader.test.core.CzBase$InferAnnot 2
     limit = 2
-    1 SeqAdapter[scala.collection.immutable.List<loader.test.core.CzBase$FullAnnot>]
-    2 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(2,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 2
-+ loader.test.core.CzBase$FullAnnot 2
-1
+    1 SeqAdapter[scala.collection.immutable.List<loader.test.core.CzBase$InferAnnot>]
+    2 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(2,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 2
++ loader.test.core.CzBase$InferAnnot 2
     limit = 1
-    1 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(1,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 1
-+ loader.test.core.CzBase$FullAnnot 1
-2
+    1 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(1,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 1
++ loader.test.core.CzBase$InferAnnot 1
     limit = 2
-    1 SeqAdapter[scala.collection.immutable.List<loader.test.core.CzBase$FullAnnot>]
-    2 SeqAdapter[class loader.test.core.CzBase$FullAnnot]
-(2,SeqAdapter[class loader.test.core.CzBase$FullAnnot])
-+ loader.test.core.CzBase$FullAnnot 2
-+ loader.test.core.CzBase$FullAnnot 2
+    1 SeqAdapter[scala.collection.immutable.List<loader.test.core.CzBase$InferAnnot>]
+    2 SeqAdapter[class loader.test.core.CzBase$InferAnnot]
+(2,SeqAdapter[class loader.test.core.CzBase$InferAnnot])
++ <> 2
++ loader.test.core.CzBase$InferAnnot 2

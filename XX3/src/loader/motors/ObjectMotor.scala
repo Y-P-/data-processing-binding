@@ -181,6 +181,7 @@ object ObjectMotor extends ProcessorImpl {
       def loader:String      = loader0
       def isSeq:Boolean      = isSeq0
       def depth:Int          = depth0
+      def isList:Boolean     = depth0>1
       def contiguous:Boolean = fd.annot.contiguous
       def min:Int            = fd.annot.min
       def max:Int            = fd.annot.max
@@ -211,36 +212,38 @@ object ObjectMotor extends ProcessorImpl {
       def depth:Int           = e.fd.depth
     }
     class Dlg(on:AnyRef) extends DlgBase(on) with super[Abstract].DlgBase {
-      override def onName(parent:Elt,key:Key):Status = {
-        val s=super.onName(parent,key)
+      override def onName(parent:Elt,k:Key):Status = {
+        val s=super.onName(parent,k)
         //we don't believe the upper layer for terminals ; the default impl relies on fd, but it may be uncomplete
         //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
         //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
         //In that case, we assume a struct with X used to load.
         if (s.kind!=CtxCore.struct && parent.eClass==CtxCore.struct) {
           val da = DataActor(parent.data.asInstanceOf[StcData].on.getClass,s.key,"bsfm").get
+          import s._
+          import s.fd._
           s.kind match {
             case CtxCore.list =>
-              val n = s.fd.depth+(if (s.fd.isSeq) 1 else 0)
+              val n = depth+(if (isSeq) 1 else 0)
               analyzeType(da.expected,parent.eltCtx.converters,n) match {
                 case (_,None)    =>  //OK, can be converted : don't change anything
                 case (i,Some(x)) =>  //Can't be converted
-                   println(s"+ ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
+                   println(s"+$k ${if (loader!=null) loader.id else "<>"} ${depth}")
                    val s1 = new CtxCore.Status(key,s.idx,
-                     rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,i-(if (s.fd.isSeq) 1 else 0)),
-                     s.broken,
+                     rebuild(fd,Reflect.findClass(x).getName,fd.isSeq,i-(if (isSeq) 1 else 0)),
+                     broken,
                      CtxCore.list)
                    println(s"+ ${s1.fd.loader.id} ${s1.fd.depth}")
                    return s1
               }
             case CtxCore.term =>
-              analyzeType(da.expected,parent.eltCtx.converters,s.fd.depth+1) match {
+              analyzeType(da.expected,parent.eltCtx.converters,fd.depth+1) match {
                 case (_,None)    =>  //OK, can be converted : don't change anything
                 case (i,Some(x)) =>  //Can't be converted
-                   println(s"* ${if (s.fd.loader!=null) s.fd.loader.id else "<>"} ${s.fd.depth}")
+                   println(s"*$k ${if (loader!=null) loader.id else "<>"} ${depth}")
                    val s1 = new CtxCore.Status(key,s.idx,
-                     rebuild(s.fd,Reflect.findClass(x).getName,s.fd.isSeq,i-1),
-                     s.broken,
+                     rebuild(fd,Reflect.findClass(x).getName,isSeq,i-1),
+                     broken,
                      CtxCore.struct)
                    println(s"* ${s1.fd.loader.id} ${s1.fd.depth}")
                    return s1

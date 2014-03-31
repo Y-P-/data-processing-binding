@@ -204,7 +204,7 @@ object CtxCore {
   class Status[K>:Null](key:K, val idx: Int, val fd: Context#FieldMapping, val broken: Boolean, val kind:Int) extends ExtCore.Status(key) {
     def this(key:K, idx: Int, fd: Context#FieldMapping, broken: Boolean) =
       this(key,idx,fd,broken,
-             if      (fd.depth>0)  CtxCore.list
+             if      (fd.isList)  CtxCore.list
              else if (fd.isStruct) CtxCore.struct
              else                  CtxCore.term)
   }

@@ -85,6 +85,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       def audit:String       = f.audit()
       def contiguous:Boolean = false
       def isSeq:Boolean      = false
+      def isList:Boolean     = false
       def depth:Int          = 0
     }
     /** Translate TagSeq into something usable
@@ -103,6 +104,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       def contiguous:Boolean = f.contiguous()
       def depth:Int          = f.depth()
       def isSeq:Boolean      = true
+      def isList:Boolean     = f.depth()>1
    }
     /** Translate TagList into something usable
      */
@@ -119,6 +121,7 @@ class ClassContext(tagMapBuilder: =>TagMap) extends Context(tagMapBuilder) {
       def depth:Int          = f.depth()
       def contiguous:Boolean = false
       def isSeq:Boolean      = false
+      def isList:Boolean     = true
     }
     /** Translate TagStruct into something usable
      */

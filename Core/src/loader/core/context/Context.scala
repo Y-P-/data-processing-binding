@@ -95,6 +95,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     final val ctx:Context.this.type = Context.this
     final lazy val loader = build(annot.loader)
     final def isStruct = loader!=null
+    final def isList   = annot.isList
     final def isSeq    = annot.isSeq
     final def depth    = annot.depth
     final def inName   = annot.inName
@@ -115,6 +116,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
         def audit:String   = annot.audit
         def contiguous:Boolean = true
         def isSeq:Boolean  = true
+        def isList:Boolean = annot.depth>1
         def depth:Int      = annot.depth-1
         def loader:String  = annot.loader
         def convert:String = annot.convert     

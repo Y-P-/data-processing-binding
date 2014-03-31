@@ -23,7 +23,8 @@ abstract class FieldAnnot extends utils.reflect.AutoConvertData {
   def inName:String        //the name for the field in the parser (it is meaningful for the TagMap to recognized which entry names match this Field)
   def loader:String        //the id to a StructAnnot ; null if not mapped to a structure ; "" if the structure is unknown (dynamic)
   def isSeq:Boolean        //indicates that the field can be repeated
-  def depth:Int            //for list/seq, indicates the depth of embedding
+  def isList:Boolean       //indicates that the field is a list
+  def depth:Int            //for list/seq, indicates the depth of embedding (seqs have one level less)
   
   /* information pertaining to the expected syntax.
    */
