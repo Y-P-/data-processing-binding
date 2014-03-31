@@ -22,5 +22,5 @@ public @interface TagList {
   String param()    default "";
   String convert()  default "";
   String audit()    default "";
-  int depth()       default 1;
+  int depth()       default -1;
 }
