@@ -181,7 +181,28 @@ object ObjectMotor extends ProcessorImpl {
       def loader:String      = loader0
       def isSeq:Boolean      = isSeq0
       def depth:Int          = depth0
-      def isList:Boolean     = depth0>1
+      def isList:Boolean     = depth0 > (if (isSeq0) 1 else 0)
+      def contiguous:Boolean = fd.annot.contiguous
+      def min:Int            = fd.annot.min
+      def max:Int            = fd.annot.max
+      def audit:String       = fd.annot.audit
+      def check:String       = fd.annot.check
+      def valid:String       = fd.annot.valid
+      def param:String       = fd.annot.param
+      def convert:String     = fd.annot.convert
+    }
+    new fd.ctx.FieldMapping(annot)
+  }
+  /** Rebuilds a fd using a different depth.
+   *  This is usually called when the initial fd depth was -1 (i.e. left for inferrence.)
+   */
+  def rebuild(fd:Context#FieldMapping, depth0:Int):Context#FieldMapping = {
+    val annot = new loader.core.context.FieldAnnot {
+      def inName:String      = fd.annot.inName
+      def loader:String      = fd.annot.loader
+      def isSeq:Boolean      = fd.annot.isSeq
+      def depth:Int          = depth0
+      def isList:Boolean     = depth0 > (if (isSeq) 1 else 0)
       def contiguous:Boolean = fd.annot.contiguous
       def min:Int            = fd.annot.min
       def max:Int            = fd.annot.max
@@ -226,7 +247,11 @@ object ObjectMotor extends ProcessorImpl {
             case CtxCore.list =>
               val n = depth+(if (isSeq) 1 else 0)
               analyzeType(da.expected,parent.eltCtx.converters,n) match {
-                case (_,None)    =>  //OK, can be converted : don't change anything
+                case (`n`,None)  =>  //OK, can be converted : don't change anything
+                case (i,None)    =>  //depth not correct
+                   val s1 = new CtxCore.Status(key,s.idx, rebuild(fd,i-(if (isSeq) 1 else 0)), broken, CtxCore.list)
+                   println(s"+ ${if (loader!=null) loader.id else "<>"} ${s1.fd.depth}")
+                   return s1
                 case (i,Some(x)) =>  //Can't be converted
                    println(s"+$k ${if (loader!=null) loader.id else "<>"} ${depth}")
                    val s1 = new CtxCore.Status(key,s.idx,
@@ -237,12 +262,18 @@ object ObjectMotor extends ProcessorImpl {
                    return s1
               }
             case CtxCore.term =>
-              analyzeType(da.expected,parent.eltCtx.converters,fd.depth+1) match {
-                case (_,None)    =>  //OK, can be converted : don't change anything
+              val n = depth+(if (isSeq) 1 else 0)
+              analyzeType(da.expected,parent.eltCtx.converters,n) match {
+                case (`n`,None)  =>  //OK, can be converted : don't change anything
+                case (i,None)    =>  //depth not correct
+                  val k = i-(if (isSeq) 1 else 0)
+                   val s1 = new CtxCore.Status(key,s.idx, rebuild(fd,k), broken, if (k>0) CtxCore.list else CtxCore.term)
+                   println(s"* ${if (loader!=null) loader.id else "<>"} ${s1.fd.depth}")
+                   return s1
                 case (i,Some(x)) =>  //Can't be converted
                    println(s"*$k ${if (loader!=null) loader.id else "<>"} ${depth}")
                    val s1 = new CtxCore.Status(key,s.idx,
-                     rebuild(fd,Reflect.findClass(x).getName,isSeq,i-1),
+                     rebuild(fd,Reflect.findClass(x).getName,isSeq,i-(if (isSeq) 1 else 0)),
                      broken,
                      CtxCore.struct)
                    println(s"* ${s1.fd.loader.id} ${s1.fd.depth}")
