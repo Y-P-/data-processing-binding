@@ -283,7 +283,25 @@ object Reflect {
     if (p1 eq java.lang.Long.TYPE)      return p2 eq classOf[java.lang.Long]
     false
   }
-      
+  
+  /** Analyzes a type to determine if it is a collection, and in that case the relevant information.
+   * @param t, the type to analyze
+   * @param cv, the conversion solver in use
+   * @param n, the depth for the analysis (0 is all the way to the bottom of encapsulated seqs/lists)
+   * @returns  the actual depth if less than n, then None if the type can be converted or Some(class found)
+   */
+  def analyzeType(t:java.lang.reflect.Type, cv:ConversionSolver, n:Int):(Int, Option[java.lang.reflect.Type]) = {
+    val l = cv.collectionSolver(t)
+    if (l!=null) {
+      val x = l.depth(n)
+      val isConvertible = cv.stringSolver(x._2.czElt)
+      (x._1, if (isConvertible==None) Some(x._2.czElt) else None)
+    } else {
+      val isConvertible = cv.stringSolver(t)
+      (0,if (isConvertible==None) Some(t) else None)
+    }
+  }
+  
       //XXX for fun... test on the Scala reflective API sho it is very slow for our requirements
       def copy[T<:AnyRef:scala.reflect.ClassTag](b:T,p1: String):T = {
         import scala.reflect.runtime.{ currentMirror => cm }

@@ -122,10 +122,10 @@ object definition {
             
       /** The push/pull interface on the processor side
        */
-      def push(n:Key):Elt = { val c=build(parser,userCtx,onName(n)); c.onInit(); c }
-      def pull()          = { doBeg(); parent.onChild(this,onEnd()) }
-      def pull(v:Value)   = {
-        parent.doBeg
+      def push(k:Key):Elt    = { val c=build(parser,userCtx,eltCtx.onName(this,onName(k))); c.onInit(); c }
+      def pull():Unit        = { doBeg(); parent.onChild(this,onEnd()) }
+      def pull(v:Value):Unit = {
+        parent.doBeg()
         parent.onChild(this,
           eltCtx.solver(v) match {
             case null => onVal(v)

@@ -34,7 +34,7 @@ object ObjTest {
   def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore]
                                     with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
     override def apply(e:Proc#Elt) = eltCtx
-    class EltCtx extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase {
+    class EltCtx extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase with ObjectMotor.CtxFdInferrence[Pars,Proc] {
       val elt:Proc#Elt = null
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
       override def solver(s:Proc#Value):()=>Proc#Ret = null
@@ -86,8 +86,6 @@ object ObjTest {
 
 //TODO
 //Named
-//Dynamic
-//Default loader
 //tagEnd
 //maps
 //Cache for binders
@@ -95,3 +93,6 @@ object ObjTest {
 
 //remove/simplify onChild ? (but do not make Ret=Unit ?)
 //finish the ObjectMotor.ext implementation
+//type checking for multi-interfaces in UCtx
+
+//Dynamic => Test (userCtx.eltCtx.onName)

@@ -88,7 +88,7 @@ object ObjectMotor extends ProcessorImpl {
     def depth:Int            //if element being built is a list, depth
   }
   
-  /** These are the methods used when buildind a Data.
+  /** These are the methods used when building a Data.
    */
   trait EltCtx {
     /** if true, a current field (object) will be updated rather than created from scratch */
@@ -104,21 +104,19 @@ object ObjectMotor extends ProcessorImpl {
      *  By default, we concatenate the old and the new values.
      *  @returns 'cur' if you keep the old (not null) value, 'read' if you keep the new, or a new Traversable for the merge
      */
-    def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = cur ++ read    
+    def merge(cur:Traversable[Any],read:Traversable[Any]):Traversable[Any] = cur ++ read
   }  
   /*-----------------------------------------------------------------------*/
   /*       SECTION II: Define DefImpl                                      */
   /*-----------------------------------------------------------------------*/
   
-  /** We make a common implementation for ctx and ext, even though it is likely marginally less efficient
-   *  It is a bit more complex too, but this makes only one algorithm to maintain.
+  /** We make a minimal common implementation for ctx and ext.
    */
   trait DefImpl extends super.DefImpl with CtxCore {self=>
     type Value      = String
     type Key        = String
     type Ret        = Unit
     type BaseParser = ParserBuilder //any parser
-    type Data       = ObjectMotor.Data
     type UCtx[-p<:BaseParser]>:Null<:CtxCore.UsrCtx[p,this.type] with ObjectMotor.UCtx[p,this.type]
     final def baseParserClass = classOf[BaseParser]
     
@@ -130,94 +128,19 @@ object ObjectMotor extends ProcessorImpl {
      * @param on, the object to fill up
      */    
     abstract class DlgBase(on:AnyRef) extends super.DlgBase {this:Dlg=>
-      type Result = AnyRef
-      type EX = Elt
-      
-      //building the data: we must first examine the kind of parent we have
-      def getData(e:Elt):Data = if (e.parent==null) new RootData(on) else e.parent.data(e.eClass,e.name,info(e))
-  
+      type Result = AnyRef  
       //pretty simple processor here: actual complexity is in Data
+      //for efficiency, the common implementation is minimal
       def onInit(e:Elt):Unit           = {}
       def onBeg(e:Elt): Unit           = {}
-      def onVal(e:Elt,v:String): Unit  = e.data.set(v)           //set terminal field
-      def onEnd(e:Elt): Unit           = e.data.close(e.eltCtx)  //'close' container (list/struct) and assign result to upper layer
       def onChild(e:Elt,child: Elt, r: Unit): Unit = {}
-
       def onInit():Unit = {}
       def onExit():AnyRef = on
     }
   }
-  
+      
   /*-----------------------------------------------------------------------*/
-  /*       SECTION III: Dynamic Field analysis, Dynami fd building         */
-  /*-----------------------------------------------------------------------*/
-  
-  /** Analyzes a type to determine if it is a collection, and in that case the relevant information.
-   * @param t, the type to analyze
-   * @param cv, the conversion solver in use
-   * @param n, the depth for the analysis (0 is all the way to the bottom of encapsulated seqs/lists)
-   * @returns  the actual depth if less than n, then None if the type can be converted or Some(class found)
-   */
-  def analyzeType(t:java.lang.reflect.Type, cv:ConversionSolver, n:Int):(Int, Option[java.lang.reflect.Type]) = {
-    import Reflect._
-    val l = cv.collectionSolver(t)
-    if (l!=null) {
-      val x = l.depth(n)
-      val isConvertible = cv.stringSolver(x._2.czElt)
-      println(x)
-      (x._1, if (isConvertible==None) Some(x._2.czElt) else None)
-    } else {
-      val isConvertible = cv.stringSolver(t)
-      (0,if (isConvertible==None) Some(t) else None)
-    }
-  }
-  
-  /** Rebuilds a fd using a specified loader.
-   *  This is usually called when the initial fd loader was blank (i.e. left for inferrence.)
-   */
-  def rebuild(fd:Context#FieldMapping, loader0:String, isSeq0:Boolean, depth0:Int):Context#FieldMapping = {
-    val annot = new loader.core.context.FieldAnnot {
-      def inName:String      = fd.annot.inName
-      def loader:String      = loader0
-      def isSeq:Boolean      = isSeq0
-      def depth:Int          = depth0
-      def isList:Boolean     = depth0 > (if (isSeq0) 1 else 0)
-      def contiguous:Boolean = fd.annot.contiguous
-      def min:Int            = fd.annot.min
-      def max:Int            = fd.annot.max
-      def audit:String       = fd.annot.audit
-      def check:String       = fd.annot.check
-      def valid:String       = fd.annot.valid
-      def param:String       = fd.annot.param
-      def convert:String     = fd.annot.convert
-    }
-    new fd.ctx.FieldMapping(annot)
-  }
-  /** Rebuilds a fd using a different depth.
-   *  This is usually called when the initial fd depth was -1 (i.e. left for inferrence.)
-   */
-  def rebuild(fd:Context#FieldMapping, depth0:Int):Context#FieldMapping = {
-    val annot = new loader.core.context.FieldAnnot {
-      def inName:String      = fd.annot.inName
-      def loader:String      = fd.annot.loader
-      def isSeq:Boolean      = fd.annot.isSeq
-      def depth:Int          = depth0
-      def isList:Boolean     = depth0 > (if (isSeq) 1 else 0)
-      def contiguous:Boolean = fd.annot.contiguous
-      def min:Int            = fd.annot.min
-      def max:Int            = fd.annot.max
-      def audit:String       = fd.annot.audit
-      def check:String       = fd.annot.check
-      def valid:String       = fd.annot.valid
-      def param:String       = fd.annot.param
-      def convert:String     = fd.annot.convert
-    }
-    new fd.ctx.FieldMapping(annot)
-  }
-  
-  
-  /*-----------------------------------------------------------------------*/
-  /*       SECTION IV: Define ctx implementation                           */
+  /*       SECTION III: Define ctx implementation                          */
   /*-----------------------------------------------------------------------*/
   
   /** Actual implementation for CtxCore.
@@ -227,63 +150,16 @@ object ObjectMotor extends ProcessorImpl {
     override type UCtx[-p<:BaseParser] = CtxCore.UsrCtx[p,this.type] with ObjectMotor.UCtx[p,ctx.type] 
     final def baseUCtxClass   = null //XXX classOf[UCtx[_]] => use TypeTags for dynamic class checking
     def info(e:Elt) = new Info {
-      def eltCtx              = e.eltCtx
-      def fd:AutoConvertData  = e.fd
-      def isSeq:Boolean       = e.fd.isSeq
-      def depth:Int           = e.fd.depth
+      def eltCtx             = e.eltCtx
+      def fd:AutoConvertData = e.fd
+      def isSeq:Boolean      = e.fd.isSeq
+      def depth:Int          = e.fd.depth
     }
+    
     class Dlg(on:AnyRef) extends DlgBase(on) with super[Abstract].DlgBase {
-      override def onName(parent:Elt,k:Key):Status = {
-        val s=super.onName(parent,k)
-        //we don't believe the upper layer for terminals ; the default impl relies on fd, but it may be uncomplete
-        //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
-        //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
-        //In that case, we assume a struct with X used to load.
-        if (s.kind!=CtxCore.struct && parent.eClass==CtxCore.struct) {
-          val da = DataActor(parent.data.asInstanceOf[StcData].on.getClass,s.key,"bsfm").get
-          import s._
-          import s.fd._
-          s.kind match {
-            case CtxCore.list =>
-              val n = depth+(if (isSeq) 1 else 0)
-              analyzeType(da.expected,parent.eltCtx.converters,n) match {
-                case (`n`,None)  =>  //OK, can be converted : don't change anything
-                case (i,None)    =>  //depth not correct
-                   val s1 = new CtxCore.Status(key,s.idx, rebuild(fd,i-(if (isSeq) 1 else 0)), broken, CtxCore.list)
-                   println(s"+ ${if (loader!=null) loader.id else "<>"} ${s1.fd.depth}")
-                   return s1
-                case (i,Some(x)) =>  //Can't be converted
-                   println(s"+$k ${if (loader!=null) loader.id else "<>"} ${depth}")
-                   val s1 = new CtxCore.Status(key,s.idx,
-                     rebuild(fd,Reflect.findClass(x).getName,fd.isSeq,i-(if (isSeq) 1 else 0)),
-                     broken,
-                     CtxCore.list)
-                   println(s"+ ${s1.fd.loader.id} ${s1.fd.depth}")
-                   return s1
-              }
-            case CtxCore.term =>
-              val n = depth+(if (isSeq) 1 else 0)
-              analyzeType(da.expected,parent.eltCtx.converters,n) match {
-                case (`n`,None)  =>  //OK, can be converted : don't change anything
-                case (i,None)    =>  //depth not correct
-                   val k = i-(if (isSeq) 1 else 0)
-                   val s1 = new CtxCore.Status(key,s.idx, rebuild(fd,k), broken, if (k>0) CtxCore.list else CtxCore.term)
-                   println(s"* ${if (loader!=null) loader.id else "<>"} ${s1.fd.depth}")
-                   return s1
-                case (i,Some(x)) =>  //Can't be converted
-                   val k = i-(if (isSeq) 1 else 0)
-                   println(s"*$k ${if (loader!=null) loader.id else "<>"} ${depth}")
-                   val s1 = new CtxCore.Status(key,s.idx,
-                     rebuild(fd,Reflect.findClass(x).getName,isSeq,i-(if (isSeq) 1 else 0)),
-                     broken,
-                     if (k>0) CtxCore.list else CtxCore.struct)
-                   println(s"* ${s1.fd.loader.id} ${s1.fd.depth}")
-                   return s1
-              }
-          }
-        }
-        s
-      }
+      def getData(e:Elt):Data = if (e.parent==null) new RootData(on) else e.parent.data(e.eClass,e.name,info(e))
+      def onVal(e:Elt,v:String): Unit  = e.data.set(v)           //set terminal field
+      def onEnd(e:Elt): Unit           = e.data.close(e.eltCtx)  //'close' container (list/struct) and assign result to upper layer
     }
     def apply(pr: utils.ParamReader):Dlg   = ???
     def apply(on:AnyRef):Dlg = new Dlg(on:AnyRef)
@@ -328,6 +204,37 @@ object ObjectMotor extends ProcessorImpl {
   trait UCtx[-P<:ParserBuilder,-M<:DefImpl] extends UsrCtx[P,M] {
     type EltCtx>:Null<:EltCtxBase
     protected[this] trait EltCtxBase extends super.EltCtxBase with ObjectMotor.EltCtx { this:EltCtx=>
+    }
+  }
+  
+  /** This trait can be placed on the UsrCtx#EltCtx class to enable tag "annotations" inference when
+   *  either or both depth/loader are not filled up. Not using it forces the user to have fully filled tags.
+   *  The drawback here is that inference has a performance cost, and in rare cases it might not ensure the
+   *  expected result (in all tests it does!)
+   */
+  trait CtxFdInferrence[P<:ParserBuilder,M<:DefImpl] { this:UCtx[P,M]#EltCtx =>
+    override def onName(parent:M#Elt,s0: =>M#Status):M#Status = {
+      val s = s0
+      //we don't believe the upper layer for terminals or lists ; the default impl relies on fd, but it may be uncomplete
+      //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
+      //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
+      //In that case, we assume a struct with X used to load.
+      //BEWARE: the next lines are extremely delicate.
+      if (s.kind!=CtxCore.struct && parent.eClass==CtxCore.struct) {
+        val da = DataActor(parent.data.asInstanceOf[StcData].on.getClass,s.key,"bsfm").get       //find field
+        val delta = if (s.fd.isSeq) 1 else 0                                                     //depth offset accounting for sequences (which look like one level less)
+        val n = s.fd.depth+delta                                                                 //calculate depth for analysis: result is <=0 for undeclared depth, >0 for declared depth
+        val r = Reflect.analyzeType(da.expected,parent.eltCtx.converters,n) match {              //analyze its type
+          case (`n`,None) => return s                                                            //the declared depth matches and we can convert the end type: believe what we have
+          case (i,x) =>
+            x match {
+              case None    => (i>delta,s.fd.rebuild(i),false)                                        //infer depth.
+              case Some(c) => (i>delta,s.fd.rebuild(Reflect.findClass(c).getName,s.fd.isSeq,i),true) //infer depth/loader
+            }
+        }
+        return new CtxCore.Status(s.key,s.idx,r._2,s.broken,if (s.kind==CtxCore.list || r._1) CtxCore.list else if (r._3) CtxCore.struct else CtxCore.term)
+      }
+      s
     }
   }
   

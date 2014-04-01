@@ -27,6 +27,13 @@ trait UsrCtx[-P<:ParserBuilder,-M<:Processor] {
   protected[this] trait EltCtxBase extends ECtx[P,M] {this:EltCtx=>
     protected[this] val elt:Proc#Elt
     def usrCtx:UsrCtx.this.type = UsrCtx.this
+    
+    /** This is used to refactor a precomputed (by the framework) status to suit specific requirements.
+     *  While this can also be achieved in Callbacks, it is much more convenient to place this in eltCtx.
+     *  Is for example extremely important when one wants to do custom dynamic choices instead of relying on
+     *  the default implementation.
+     */
+    def onName(parent:M#Elt,s: =>M#Status):M#Status = s
   }
 }
 

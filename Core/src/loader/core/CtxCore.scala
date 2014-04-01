@@ -84,12 +84,12 @@ trait CtxCore extends definition.Impl {
         case None     =>
           if (seen.size == tags.size && doFast) throw ParserBuilder.skipEnd
           else                                  throw ParserBuilder.skip
-        case Some(fd) =>  //XXX problem with eq compare on spawned fd1
+        case Some(fd) =>
           val fd1 = if (fd.annot.loader==null || fd.annot.loader.length>0) fd else eltCtx.solveDynamic(fd)
           val idx = seen.getOrElse(name, 0) + 1
           seen.update(name, idx)
           var broken: Boolean = idx != 1 //for non seq, idx!=1 indicates a multiple occurence ; for a seq, the possibility that the seq is broken
-          if (fd1.isSeq) broken &&= fd1.isSeq && previous != null && previous != fd1 //check last fd to see if the current seq has been broken
+          if (fd1.isSeq) broken &&= fd1.isSeq && previous != null && previous.inName != fd1.inName //check last fd to see if the current seq has been broken
           previous = fd1
           new Status(key, idx, fd1, broken)
       }
