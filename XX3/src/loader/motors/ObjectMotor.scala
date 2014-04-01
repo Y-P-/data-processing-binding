@@ -266,16 +266,17 @@ object ObjectMotor extends ProcessorImpl {
               analyzeType(da.expected,parent.eltCtx.converters,n) match {
                 case (`n`,None)  =>  //OK, can be converted : don't change anything
                 case (i,None)    =>  //depth not correct
-                  val k = i-(if (isSeq) 1 else 0)
+                   val k = i-(if (isSeq) 1 else 0)
                    val s1 = new CtxCore.Status(key,s.idx, rebuild(fd,k), broken, if (k>0) CtxCore.list else CtxCore.term)
                    println(s"* ${if (loader!=null) loader.id else "<>"} ${s1.fd.depth}")
                    return s1
                 case (i,Some(x)) =>  //Can't be converted
+                   val k = i-(if (isSeq) 1 else 0)
                    println(s"*$k ${if (loader!=null) loader.id else "<>"} ${depth}")
                    val s1 = new CtxCore.Status(key,s.idx,
                      rebuild(fd,Reflect.findClass(x).getName,isSeq,i-(if (isSeq) 1 else 0)),
                      broken,
-                     CtxCore.struct)
+                     if (k>0) CtxCore.list else CtxCore.struct)
                    println(s"* ${s1.fd.loader.id} ${s1.fd.depth}")
                    return s1
               }
