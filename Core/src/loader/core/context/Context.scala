@@ -83,10 +83,7 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     }
     override def toString = asXml(0)
   }
-  object FldStatus extends Enumeration {
-    class FldStatus extends Val
-    val unknown,struct,list,terminal=new FldStatus
-  }
+  
   /** A class that groups all information about a given field mapping.
    *  Note that this has no relationship to objects fields/methods, even though we may get this information by reading from such items.
    *  When we have to connect to such an item, we have to use the binding method.

@@ -46,13 +46,12 @@ import loader.core.ParserBuilder
  */
 abstract class Callback[-E0,-S0,-R0,K,V>:Null] { self=>
   protected class Inner(protected[this] val elt:E0) {
-    def onName[S<:S0](key:K, f: (K)=>S):S                      = f(key)
-    def onInit(f: =>Unit):Unit                                 = f
-    def onBeg(f: =>Unit):Unit                                  = f
-    def onVal[R<:R0](s:V,f: (V) =>R):R                         = f(s)
-    def onSolver[R<:R0](s:V, r: ()=>R, f: (V,()=>R) =>R):R     = f(s,r)
-    def onEnd[R<:R0](f: =>R):R                                 = f
-    def onChild[E<:E0,R<:R0](child:E,r:R,f: (E,R) =>Unit):Unit = f(child,r)  
+    def onName[S<:S0](key:K, f: (K)=>S):S                  = f(key)
+    def onInit(f: =>Unit):Unit                             = f
+    def onBeg(f: =>Unit):Unit                              = f
+    def onVal[R<:R0](s:V,f: (V) =>R):R                     = f(s)
+    def onSolver[R<:R0](s:V, r: ()=>R, f: (V,()=>R) =>R):R = f(s,r)
+    def onEnd[R<:R0](f: =>R):R                             = f
   }
   def apply(elt:E0):Callback[E0,S0,R0,K,V]#Inner = new Inner(elt)
   
@@ -68,7 +67,6 @@ abstract class Callback[-E0,-S0,-R0,K,V>:Null] { self=>
         override def onVal[R<:R1](s:V,f: (V)=>R):R                          = cbOut.onVal(s,cbIn.onVal(_,f))
         override def onSolver[R<:R1](s:V, r: ()=>R, f: (V,()=>R)=>R):R      = cbOut.onSolver(s,r,cbIn.onSolver(_:V,_:()=>R,f))
         override def onEnd[R<:R1](f: =>R):R                                 = cbOut.onEnd(cbIn.onEnd(f))
-        override def onChild[E<:E1,R<:R1](child:E,r:R,f: (E,R)=>Unit):Unit  = cbOut.onChild(child,r,cbIn.onChild(_:E,_:R,f))
       }
     }
   }

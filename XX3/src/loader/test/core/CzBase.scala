@@ -115,4 +115,19 @@ object CzBase {
     @TagList  val cz2:Array[List[Cz]] = null           //deep collection of objects
     @TagSeq   val cz3:Array[List[Array[Cz]]] = null    //deep sequence of objects    
   }
+  //class to load and missing annotations inferred
+  class TotalInferAnnot extends CzBase {
+    type Cz = TotalInferAnnot
+    val id:Int = 0                                     //standard scalar field with auto conversion
+    val ok:Boolean = false                             //same, different conversion
+    val idA:Array[Double] = null                       //array of scalars
+    @TagSeq   val idL:List[Integer] = null             //collection of scalars
+    val id2:Array[Array[Double]] = null                //deep collection of scalars
+    
+    val cz:Cz = null                                   //object
+    @TagSeq   val czA:Array[Cz] = null                 //array of objects
+    val czL:List[Cz] = null                            //collection of objects
+    val cz2:Array[List[Cz]] = null                     //deep collection of objects
+    @TagSeq   val cz3:Array[List[Array[Cz]]] = null    //deep sequence of objects    
+  }
 }

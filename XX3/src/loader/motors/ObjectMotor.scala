@@ -200,6 +200,7 @@ object ObjectMotor extends ProcessorImpl {
   
   /** We define a specific UserType here.
    *  This processor indeed requires specific information to work, and these can be tuned by the end user.
+   *  see ObjectMotor.EltCtx.
    */
   trait UCtx[-P<:ParserBuilder,-M<:DefImpl] extends UsrCtx[P,M] {
     type EltCtx>:Null<:EltCtxBase
@@ -212,20 +213,41 @@ object ObjectMotor extends ProcessorImpl {
    *  The drawback here is that inference has a performance cost, and in rare cases it might not ensure the
    *  expected result (in all tests it does!)
    */
-  trait CtxFdInferrence[P<:ParserBuilder,M<:DefImpl] { this:UCtx[P,M]#EltCtx =>
-    override def onName(parent:M#Elt,s0: =>M#Status):M#Status = {
-      val s = s0
-      //we don't believe the upper layer for terminals or lists ; the default impl relies on fd, but it may be uncomplete
-      //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
-      //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
-      //In that case, we assume a struct with X used to load.
+  trait CtxStatusInferrence[P<:ParserBuilder,M<:DefImpl with CtxCore] extends ECtx[P,M] {
+    abstract override def onName(key:elt.Key0):M#Status = Inference(elt,super.onName(key))
+  }
+  trait CtxFdInferrence[P<:ParserBuilder,M<:DefImpl with CtxCore] extends ECtx[P,M] {
+    abstract override def onName(key:elt.Key0):M#Status = {
+      import ParserBuilder.{ skip, skipEnd }
+      try { super.onName(key) } catch {
+        case e@ (`skip` | `skipEnd`) => try {
+          val fd = Inference(elt,key,elt.fd.ctx(""))         //read field and infer state
+          elt.asInstanceOf[CtxCore#Struct].tags.put(key,fd)  //dynamically assign the new field to the tagMap ; if the cast fails, we indeed have an error.
+          super.onName(key) //new CtxCore.Status(key,1,fd,false)                 //return appropriate status
+        } catch {
+          case _:Throwable => throw e
+        }
+      }
+   }
+  }
+  
+  protected def readParams(pr: utils.ParamReader) = ???
+
+  /** Logic for inferring missing data in FieldContext.
+   */
+  object Inference {
+    //we don't believe the upper layer for terminals or lists ; the default impl relies on fd, but it may be uncomplete
+    //if the user uses defaults. Possibly we have to guess by watching the actual bound field.
+    //X being the field type, either we have a converter String -> X and X can be terminal, or we don't.
+    //In that case, we assume a struct with X used to load.
+    def apply[M<:ObjectMotor.DefImpl](elt:M#Elt,s:M#Status):M#Status = {
       //BEWARE: the next lines are extremely delicate.
-      if (s.kind!=CtxCore.struct && parent.eClass==CtxCore.struct) {
-        val da = DataActor(parent.data.asInstanceOf[StcData].on.getClass,s.key,"bsfm").get       //find field
-        val delta = if (s.fd.isSeq) 1 else 0                                                     //depth offset accounting for sequences (which look like one level less)
-        val n = s.fd.depth+delta                                                                 //calculate depth for analysis: result is <=0 for undeclared depth, >0 for declared depth
-        val r = Reflect.analyzeType(da.expected,parent.eltCtx.converters,n) match {              //analyze its type
-          case (`n`,None) => return s                                                            //the declared depth matches and we can convert the end type: believe what we have
+      if (s.kind!=CtxCore.struct && elt.eClass==CtxCore.struct) {
+        val da = DataActor(elt.data.asInstanceOf[StcData].on.getClass,s.key,"bsfm").get  //find field; the cast will work because there is a bijection StcData <-> Struct
+        val delta = if (s.fd.isSeq) 1 else 0                                             //depth offset accounting for sequences (which look like one level less)
+        val n = s.fd.depth+delta                                                         //calculate depth for analysis: result is <=0 for undeclared depth, >0 for declared depth
+        val r = Reflect.analyzeType(da.expected,elt.eltCtx.converters,n) match {         //analyze its type
+          case (`n`,None) => return s                                                    //the declared depth matches and we can convert the end type: believe what we have
           case (i,x) =>
             x match {
               case None    => (i>delta,s.fd.rebuild(i),false)                                        //infer depth.
@@ -236,7 +258,19 @@ object ObjectMotor extends ProcessorImpl {
       }
       s
     }
+    //this will be used to infer a Context#FieldMapping from a underlying field/method.
+    //this is used when we don't even want to place some/all annotations.
+    //Note that ALL types that get an answer from the collection solver will be assumed to be lists.
+    //As a consequence, no sequences are ever inferred. Not wanting to write anything has a cost...
+    def apply[M<:ObjectMotor.DefImpl](elt:M#Elt,key:M#Key,empty:Context#FieldMapping):Context#FieldMapping = {
+      val da = DataActor(elt.data.asInstanceOf[StcData].on.getClass,key,"bsfm").get
+      val r = Reflect.analyzeType(da.expected,elt.eltCtx.converters,0)
+      r._2 match {
+        case None    => empty.rebuild(r._1)
+        case Some(c) => empty.rebuild(Reflect.findClass(c).getName,false,r._1)
+      }
+    }  
   }
-  
-  protected def readParams(pr: utils.ParamReader) = ???
+
 }
+

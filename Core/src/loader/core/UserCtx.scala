@@ -24,20 +24,13 @@ trait UsrCtx[-P<:ParserBuilder,-M<:Processor] {
    *  Each element can define its own special actions: these do not have to be defined globally.
    *  However, if you need global actions, the previous method just has to return a constant. 
    */
-  protected[this] trait EltCtxBase extends ECtx[P,M] {this:EltCtx=>
-    protected[this] val elt:Proc#Elt
-    def usrCtx:UsrCtx.this.type = UsrCtx.this
-    
-    /** This is used to refactor a precomputed (by the framework) status to suit specific requirements.
-     *  While this can also be achieved in Callbacks, it is much more convenient to place this in eltCtx.
-     *  Is for example extremely important when one wants to do custom dynamic choices instead of relying on
-     *  the default implementation.
-     */
-    def onName(parent:M#Elt,s: =>M#Status):M#Status = s
+  protected[this] trait EltCtxBase extends ECtx[Pars,Proc] {this:EltCtx=>
+    def usrCtx:UsrCtx.this.type = UsrCtx.this    
   }
 }
 
 abstract class ECtx[P<:ParserBuilder,M<:Processor] {
+  val elt:M#Elt
   /** Solving an include for e with data K */
   def keyMap(s:P#Key):M#Key
   /** Solving an include for e with data K */
@@ -60,5 +53,17 @@ abstract class ECtx[P<:ParserBuilder,M<:Processor] {
       case u:Throwable               => try { current(UnexpectedException(u)) } catch { case _:Throwable => throw new InternalLoaderException(u,current) }
     }
   }
+  
+  /** These are alternatives to using Callbacks.
+   *  - These are more specific (callbacks affect all calls) and likely more effective (speed, run time memory.)
+   *  - But they are attached statically while callbacks are dynamic and can be attached at run-time.
+   *  - Specific addons (e.g. CtxFdInferrence) are compiled at every occurrence, and may cause code bloating.
+   */
+  def onName(k:elt.Key0):M#Status                    = elt.onName(k)
+  def onInit(): Unit                                 = elt.onInit()
+  def onBeg(): Unit                                  = elt.onBeg()
+  def onVal(v:elt.Value0): M#Ret                     = elt.onVal(v)
+  def onEnd()                                        = elt.onEnd()
+  def onSolver(v:elt.Value0, f: ()=>elt.Ret0): M#Ret = elt.onSolver(v,f)
 }
 

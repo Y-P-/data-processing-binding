@@ -50,7 +50,6 @@ trait ExtCore extends definition.Impl {
     override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,null,cbks:_*) with WithCallbacks
   }
   protected class ElementCbk [X<:BaseParser with Singleton](parser:X#Parser, userCtx:UCtx[X], dlg:Dlg, s:Status, parent:Elt, val cb:Cbk, cbks:Cbks*) extends ElementCbks(parser,userCtx,dlg,s,parent,cbks:_*) with WithCallback {
-    override def onChild(child:Elt,r:Ret):Unit = super[WithCallback].onChild(child,r)    
     override def copy[P<:BaseParser with Singleton](p:P#Parser,u:UCtx[P]):Elt { type Builder=P } = new Copy(p,u,cb,cbks:_*) with WithCallbacks
   }
 }

@@ -89,7 +89,7 @@ trait CtxCore extends definition.Impl {
           val idx = seen.getOrElse(name, 0) + 1
           seen.update(name, idx)
           var broken: Boolean = idx != 1 //for non seq, idx!=1 indicates a multiple occurence ; for a seq, the possibility that the seq is broken
-          if (fd1.isSeq) broken &&= fd1.isSeq && previous != null && previous.inName != fd1.inName //check last fd to see if the current seq has been broken
+          if (fd1.isSeq) broken &&= previous != null && previous.inName != fd1.inName //check last fd to see if the current seq has been broken
           previous = fd1
           new Status(key, idx, fd1, broken)
       }
@@ -115,7 +115,7 @@ trait CtxCore extends definition.Impl {
   trait Terminal extends EltBase {
     final def eClass = CtxCore.term
     protected[CtxCore] def onNameBase(key: Key): Status = throw new IllegalStateException(s"illegal field $key in the terminal field $name")
-    override protected def onEnd():Ret                  = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
+    override def onEnd():Ret                            = throw new IllegalStateException(s"cannot pull a simple field : '$name'")
   }
   
   trait DlgBase extends super.DlgBase { dlg:Dlg=>

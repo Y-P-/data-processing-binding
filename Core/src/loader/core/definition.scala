@@ -65,6 +65,10 @@ object definition {
      *  it accordingly to the processor's requirements.
      */
     trait EltBase extends Traversable[Elt] { self:Elt=>
+      //forwarding some types helps the compiler later (in UsrCtx)
+      type Value0  = Value
+      type Key0    = Key
+      type Ret0    = Ret
       final def myself:Elt { type Builder=self.Builder } = self //self cast
       type Builder <: BaseParser with Singleton
       val parser:Builder#Parser
@@ -89,20 +93,15 @@ object definition {
        *  - parent executes onName ; child doesn't yet exist
        *  - child is created by the appropriate builder : onBeg is invoked
        *  - child may either be a terminal ; onSolver is checked. If not null, it is invoked, otherwise onVal is invoked.
-       *  - or it maybe a container, in which case it will receive parents events (onName,onChild),
+       *  - or it maybe a container, in which case it will receive parents events (onName),
        *    until it is finished and onEnd is invoked.
-       *  - parent executes onChild.
-       *  They are protected because users have little reason to invoke these directly! See below onName0/onEnd0.
-       *  However, these methods are important because they provide the entries for callbacks and understanding
-       *  them is necessary to coding complex callbacks.
        */
-      protected def onName(key: Key): Status
-      protected def onInit(): Unit                            //called on all elements on creation
-      protected def onBeg(): Unit                             //called once only, before any other call within struct, as late as possible (i.e. only when receiving the first child, or when closing the struct)
-      protected def onVal(v: Value): Ret                      //called when receiving a value
-      protected def onEnd(): Ret                              //called at the end of a struct
-      protected def onChild(child: Elt, r: Ret): Unit         //called when a struct is receiving a child value
-      protected def onSolver(v: Value, e: ()=>Ret): Ret = e() //called when resolving a value (as defined by the EltCtx solver) ; you had better know what you do if you override this
+      def onName(key: Key0): Status
+      def onInit(): Unit                              //called on all elements on creation
+      def onBeg(): Unit                               //called once only, before any other call within struct, as late as possible (i.e. only when receiving the first child, or when closing the struct)
+      def onVal(v: Value0): Ret                       //called when receiving a value
+      def onEnd(): Ret                                //called at the end of a struct
+      def onSolver(v: Value0, e: ()=>Ret0): Ret = e() //called when resolving a value (as defined by the EltCtx solver) ; you had better know what you do if you override this
       
       /** current depth in the hierarchy; 0 is top */
       def depth:Int = if (parent==null) 0 else parent.depth+1
@@ -118,19 +117,18 @@ object definition {
       
       /** Ensure the call to doBeg is done as late as possible, but in time. */
       private[this] var begDone=false
-      private def doBeg():Unit = if (!begDone) { begDone=true; if (parent!=null) parent.doBeg; onBeg; }
+      private def doBeg():Unit = if (!begDone) { begDone=true; if (parent!=null) parent.doBeg; eltCtx.onBeg; }
             
-      /** The push/pull interface on the processor side
+      /** The push/pull interface on the processor side.
        */
-      def push(k:Key):Elt    = { val c=build(parser,userCtx,eltCtx.onName(this,onName(k))); c.onInit(); c }
-      def pull():Unit        = { doBeg(); parent.onChild(this,onEnd()) }
+      def push(k:Key):Elt    = { val c=build(parser,userCtx,eltCtx.onName(k)); c.eltCtx.onInit(); c }
+      def pull():Unit        = { doBeg(); eltCtx.onEnd() }
       def pull(v:Value):Unit = {
         parent.doBeg()
-        parent.onChild(this,
-          eltCtx.solver(v) match {
-            case null => onVal(v)
-            case i    => onSolver(v,i)
-          })
+        eltCtx.solver(v) match {
+          case null => eltCtx.onVal(v)
+          case i    => eltCtx.onSolver(v,i)
+        }
       }
       
       /** standard invoker, used on the top level elements */
@@ -188,12 +186,11 @@ object definition {
       /** When handling Callbacks, we will want to reach the parent behaviour. */
       val cb: callbacks.Callback[Elt,Status,Ret,Key,Value] //the callback for the current element
       val cbx = cb(this)
-      abstract override protected def onName(key: Key): Status            = if (cbx==null) super.onName(key)      else cbx.onName(key, super.onName)
-      abstract override protected def onBeg(): Unit                       = if (cbx==null) super.onBeg()          else cbx.onBeg(super.onBeg)
-      abstract override protected def onVal(v: Value): Ret                = if (cbx==null) super.onVal(v)         else cbx.onVal(v,super.onVal)
-      abstract override protected def onSolver(v: Value, x: ()=>Ret): Ret = if (cbx==null) super.onSolver(v,x)    else cbx.onSolver(v, x, super.onSolver)
-      abstract override protected def onEnd(): Ret                        = if (cbx==null) super.onEnd()          else cbx.onEnd(super.onEnd)
-      abstract override protected def onChild(child: Elt, r: Ret): Unit   = if (cbx==null) super.onChild(child,r) else cbx.onChild(child, r, super.onChild)
+      abstract override def onName(key: Key): Status            = if (cbx==null) super.onName(key)      else cbx.onName(key, super.onName)
+      abstract override def onBeg(): Unit                       = if (cbx==null) super.onBeg()          else cbx.onBeg(super.onBeg)
+      abstract override def onVal(v: Value): Ret                = if (cbx==null) super.onVal(v)         else cbx.onVal(v,super.onVal)
+      abstract override def onSolver(v: Value, x: ()=>Ret): Ret = if (cbx==null) super.onSolver(v,x)    else cbx.onSolver(v, x, super.onSolver)
+      abstract override def onEnd(): Ret                        = if (cbx==null) super.onEnd()          else cbx.onEnd(super.onEnd)
     }
     /** Modifies the current element to manage a callback tree
      *  Children are built according to the following rules:
@@ -282,12 +279,12 @@ object definition {
     protected abstract class ElementBase[X<:BaseParser with Singleton] (val parser:X#Parser, val userCtx:UCtx[X], val dlg:Dlg, val key:Key, val parent:Elt) extends EltBase {this:Element[X]=>
       type Builder = X
       def builder = dlg.builder
-      protected def onName(key: Key)      = dlg.onName(this,key)
-      protected def onInit(): Unit        = dlg.onInit(this)
-      protected def onBeg(): Unit         = dlg.onBeg(this)
-      protected def onVal(v: Value): Ret  = dlg.onVal(this,v)
-      protected def onEnd(): Ret          = dlg.onEnd(this)
-      protected def onChild(child: Elt, r: Ret): Unit = dlg.onChild(this,child,r)      
+      def onName(key: Key)      = dlg.onName(this,key)
+      def onInit(): Unit        = dlg.onInit(this)
+      def onBeg(): Unit         = dlg.onBeg(this)
+      def onVal(v: Value): Ret  = dlg.onVal(this,v)
+      def onEnd(): Ret          = dlg.onEnd(this)
+      def onChild(child: Elt, r: Ret): Unit = dlg.onChild(this,child,r)      
     }    
   }
   

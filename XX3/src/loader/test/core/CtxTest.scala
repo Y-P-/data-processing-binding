@@ -33,8 +33,8 @@ object CtxTest {
     val eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(new PrintWriter(buf))))
     override def apply(e:Proc#Elt) = e.names match {
       case _ if e.parent==null           => new EltCtx(e)
-      case _ if e.parent.eltCtx==EltCtxI => EltCtxI
-      case Seq(r"he.*", "include", _*)   => EltCtxI
+      case _ if e.parent.eltCtx.isInstanceOf[EltCtxI] => new EltCtxI(e)
+      case Seq(r"he.*", "include", _*)   => new EltCtxI(e)
       case _                             => new EltCtx(e)
     }
     
@@ -47,7 +47,7 @@ object CtxTest {
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s
     }
-    object EltCtxI extends EltCtx(null) {
+    class EltCtxI(elt:Proc#Elt) extends EltCtx(elt) {
       override def valMap(s:Pars#Value):Proc#Value = s"*$s*"
     }
   }

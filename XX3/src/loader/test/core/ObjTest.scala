@@ -32,67 +32,59 @@ object ObjTest {
   
   //a generic context that works with any parser for a string processor
   def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore]
-                                    with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
-    override def apply(e:Proc#Elt) = eltCtx
-    class EltCtx extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase with ObjectMotor.CtxFdInferrence[Pars,Proc] {
-      val elt:Proc#Elt = null
+                                   with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
+    override def apply(e:Proc#Elt) = new EltCtx(e)
+    class EltCtx(val elt:Proc#Elt) extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase with ObjectMotor.CtxFdInferrence[Pars,Proc] with ObjectMotor.CtxStatusInferrence[Pars,Proc] {
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
       override def solver(s:Proc#Value):()=>Proc#Ret = null
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s
     }
-    val eltCtx = new EltCtx
   }
   val p = new parsers.Struct(256,40,false)
+  
+  def baseTest(out:PrintWriter,on:AnyRef) = {
+    import ObjectMotor.ctx
+    val buf = new java.io.StringWriter
+    val m = ctx(on)
+    val r=run(p,m)(userCtx(new PrintWriter(buf)),_(ClassContext(on.getClass),DefaultCtxEventsCbk(m)),_.read(load("objTest.txt"), "UTF-8"))._2
+    out.println(on)
+    out.print(buf)
+  }
     
   /** Test to verify that an object is correctly filled up ; it tests most cases and ends up with some deep nesting */
   @Test class ObjBaseTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter):Unit = {
-      import ObjectMotor.ctx
-      val buf = new java.io.StringWriter
-      val on = new CzBase.FullAnnot
-      val m = ctx(on)
-      val r=run(p,m)(userCtx(new PrintWriter(buf)),_(ClassContext(classOf[CzBase.FullAnnot]),DefaultCtxEventsCbk(m)),_.read(load("objTest.txt"), "UTF-8"))._2
-      out.println(on)
-      out.print(buf)
-    }
+    def apply(file:Solver,out:PrintWriter):Unit = baseTest(out,new CzBase.FullAnnot)
   }
   /** Test to verify that an object is correctly filled up ; it tests most cases and ends up with some deep nesting */
   @Test class ObjBaseInferTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter):Unit = {
-      import ObjectMotor.ctx
-      val buf = new java.io.StringWriter
-      val on = new CzBase.InferAnnot
-      val m = ctx(on)
-      val r=run(p,m)(userCtx(new PrintWriter(buf)),_(ClassContext(classOf[CzBase.InferAnnot]),DefaultCtxEventsCbk(m)),_.read(load("objTest.txt"), "UTF-8"))._2
-      out.println(on)
-      out.print(buf)
-    }
+    def apply(file:Solver,out:PrintWriter):Unit = baseTest(out,new CzBase.InferAnnot)
   }
   /** Test to verify that an object is correctly filled up ; it tests most cases and ends up with some deep nesting */
   @Test class ObjBaseFullInferTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter):Unit = {
-      import ObjectMotor.ctx
-      val buf = new java.io.StringWriter
-      val on = new CzBase.FullInferAnnot
-      val m = ctx(on)
-      val r=run(p,m)(userCtx(new PrintWriter(buf)),_(ClassContext(classOf[CzBase.FullInferAnnot]),DefaultCtxEventsCbk(m)),_.read(load("objTest.txt"), "UTF-8"))._2
-      out.println(on)
-      out.print(buf)
-    }
+    def apply(file:Solver,out:PrintWriter):Unit = baseTest(out,new CzBase.FullInferAnnot)
+  }
+  /** Test to verify that an object is correctly filled up ; it tests most cases and ends up with some deep nesting */
+  @Test class ObjBaseTotalInferTest extends StandardTester {
+    def apply(file:Solver,out:PrintWriter):Unit = baseTest(out,new CzBase.TotalInferAnnot)
   }
 }
 
 
 //TODO
 //Named
-//tagEnd
+//tagEnd (=convert ; influence with inference ?)
 //maps
 //Cache for binders
 //External conf for field kind choice "bsfm"
+//Correct errors in CtxTest
+//Full serialization
+//cardinality for inferred lists
 
-//remove/simplify onChild ? (but do not make Ret=Unit ?)
+//remove def userCtx:UCtx[Builder] from EltBase (contained in eltCtx ; requires different init phase)
+//remove Ret in profit of Unit ?
 //finish the ObjectMotor.ext implementation
 //type checking for multi-interfaces in UCtx
 
-//Dynamic => Test (userCtx.eltCtx.onName)
+//Testing:
+//Dynamic (use userCtx.eltCtx.onName) => do it with full serialization
