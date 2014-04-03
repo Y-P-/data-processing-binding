@@ -62,7 +62,7 @@ trait CtxCore extends definition.Impl {
     /** the known tags for that struct */
     val tags = fd.loader.fields
     /** tags seen count */
-    val seen = HashMap.empty[String, Int]
+    val seen = HashMap.empty[String, CtxCore.Counter]
     /** the last fd seen in that struct */
     protected[this] var previous:Context#FieldMapping
     /** Tells whether that Struct can ask for fast forward to the parser */
@@ -86,8 +86,7 @@ trait CtxCore extends definition.Impl {
           else                                  throw ParserBuilder.skip
         case Some(fd) =>
           val fd1 = if (fd.annot.loader==null || fd.annot.loader.length>0) fd else eltCtx.solveDynamic(fd)
-          val idx = seen.getOrElse(name, 0) + 1
-          seen.update(name, idx)
+          val idx = { val c=seen.getOrElseUpdate(name, new CtxCore.Counter(0)); c.n+=1; c.n }
           var broken: Boolean = idx != 1 //for non seq, idx!=1 indicates a multiple occurence ; for a seq, the possibility that the seq is broken
           if (fd1.isSeq) broken &&= previous != null && previous.inName != fd1.inName //check last fd to see if the current seq has been broken
           previous = fd1
@@ -208,6 +207,7 @@ object CtxCore {
              else if (fd.isStruct) CtxCore.struct
              else                  CtxCore.term)
   }
+  final protected class Counter(var n:Int)
 
   /** possible category for elements */
   final val list    = 0

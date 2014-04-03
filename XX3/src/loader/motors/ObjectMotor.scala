@@ -221,9 +221,9 @@ object ObjectMotor extends ProcessorImpl {
       import ParserBuilder.{ skip, skipEnd }
       try { super.onName(key) } catch {
         case e@ (`skip` | `skipEnd`) => try {
-          val fd = Inference(elt,key,elt.fd.ctx(""))         //read field and infer state
+          val fd = Inference(elt,key,elt.fd.ctx(key))        //read field and infer state
           elt.asInstanceOf[CtxCore#Struct].tags.put(key,fd)  //dynamically assign the new field to the tagMap ; if the cast fails, we indeed have an error.
-          super.onName(key) //new CtxCore.Status(key,1,fd,false)                 //return appropriate status
+          super.onName(key)                                  //return appropriate status
         } catch {
           case _:Throwable => throw e
         }
@@ -266,7 +266,7 @@ object ObjectMotor extends ProcessorImpl {
       val da = DataActor(elt.data.asInstanceOf[StcData].on.getClass,key,"bsfm").get
       val r = Reflect.analyzeType(da.expected,elt.eltCtx.converters,0)
       r._2 match {
-        case None    => empty.rebuild(r._1)
+        case None    => empty.rebuild(null,false,r._1)
         case Some(c) => empty.rebuild(Reflect.findClass(c).getName,false,r._1)
       }
     }  

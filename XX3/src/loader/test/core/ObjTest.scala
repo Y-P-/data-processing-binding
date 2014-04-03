@@ -79,7 +79,8 @@ object ObjTest {
 //External conf for field kind choice "bsfm"
 //Correct errors in CtxTest
 //Full serialization
-//cardinality for inferred lists
+//cardinality for inferred lists: see below
+//separate @Tag annot with @Check (checking info)
 
 //remove def userCtx:UCtx[Builder] from EltBase (contained in eltCtx ; requires different init phase)
 //remove Ret in profit of Unit ?
@@ -87,4 +88,4 @@ object ObjTest {
 //type checking for multi-interfaces in UCtx
 
 //Testing:
-//Dynamic (use userCtx.eltCtx.onName) => do it with full serialization
+//Dynamic (use userCtx.eltCtx.onName) => test = full serialization

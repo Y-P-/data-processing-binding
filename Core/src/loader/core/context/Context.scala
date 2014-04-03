@@ -142,23 +142,8 @@ abstract class Context(tagMapBuilder: =>TagMap) {
     /** Rebuilds a fd using a different depth.
      *  This is usually called when the initial annot depth was -1 (i.e. left for inference.)
      */
-    final def rebuild(depth0:Int):FieldMapping = {
-      new FieldMapping(new FieldAnnot {
-        def inName:String      = annot.inName
-        def loader:String      = annot.loader
-        def isSeq:Boolean      = annot.isSeq
-        def depth:Int          = depth0 - (if (isSeq) 1 else 0)
-        def isList:Boolean     = depth > 0
-        def contiguous:Boolean = annot.contiguous
-        def min:Int            = annot.min
-        def max:Int            = annot.max
-        def audit:String       = annot.audit
-        def check:String       = annot.check
-        def valid:String       = annot.valid
-        def param:String       = annot.param
-        def convert:String     = annot.convert
-      })
-    }
+    final def rebuild(depth0:Int):FieldMapping = rebuild(annot.loader,annot.isSeq,depth0)
+
     override def toString = annot.toString
   }
 }

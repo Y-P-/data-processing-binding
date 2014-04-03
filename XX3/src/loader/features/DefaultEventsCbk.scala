@@ -65,7 +65,7 @@ class DefaultCtxEventsCbk[P<:CtxCore] extends Callback[P#Elt,P#Status,P#Ret,P#Ke
               if (f.annot.min==0) stc(DefaultValueEvt(f.inName))
               else                stc(TagNotFoundEvt(f.inName,f.annot.min))
             else if (f.isSeq) {
-              val x = stc.seen(f.inName)
+              val x = stc.seen(f.inName).n
               if (f.annot.min>0 && x<f.annot.min || f.annot.max>0 && x>f.annot.max)
                 stc(InvalidCardinalityEvt(f.inName, f.annot.min, f.annot.max, x))
             }
