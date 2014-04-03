@@ -31,10 +31,10 @@ object ObjTest {
   }
   
   //a generic context that works with any parser for a string processor
-  def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore]
-                                   with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.DefImpl with CtxCore] {self=>
+  def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ctx.type]
+                                   with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ctx.type] {self=>
     override def apply(e:Proc#Elt) = new EltCtx(e)
-    class EltCtx(val elt:Proc#Elt) extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase with ObjectMotor.CtxFdInferrence[Pars,Proc] with ObjectMotor.CtxStatusInferrence[Pars,Proc] {
+    class EltCtx(val elt:Proc#Elt) extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase with ObjectMotor.CtxFullInfer[Pars] {
       override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
       override def solver(s:Proc#Value):()=>Proc#Ret = null
       def keyMap(s:Pars#Key):Proc#Key = s
@@ -77,10 +77,10 @@ object ObjTest {
 //maps
 //Cache for binders
 //External conf for field kind choice "bsfm"
-//Correct errors in CtxTest
 //Full serialization
 //cardinality for inferred lists: see below
 //separate @Tag annot with @Check (checking info)
+//how to manage different contexts for one class ?
 
 //remove def userCtx:UCtx[Builder] from EltBase (contained in eltCtx ; requires different init phase)
 //remove Ret in profit of Unit ?

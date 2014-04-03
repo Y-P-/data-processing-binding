@@ -44,14 +44,13 @@ object Data {
   class GlobalData {
     val cz0 = classOf[Treaty]
     final def cz = cz0
-    //@TagSeq(dynamic="cz") var treaty:Array[AnyRef] = _
-    @TagSeq(loader=classOf[Treaty]) var treaty:Array[Treaty] = _
+    @TagSeq(loader=classOf[Treaty],depth=0) var treaty:Array[Treaty] = _
     @Convert def tagEnd(l:Element) = this
   }
   
   @TagStruct
   class Treaty extends Named {
-    @TagSeq var country:Array[String] = _
+    @TagSeq(depth=0) var country:Array[String] = _
     @TagField(inName="{types?}") var types:String=_
     @Convert def tagEnd(l:Element) = this
     def name_=(nm:String) = println(nm)
@@ -76,7 +75,7 @@ object Data {
     @TagField var set_ai_aggresive:Int=_
     @TagField(inName="saved")
     def saved(v:Boolean) = if (v) println("WAS SAVED") else println("WAS NOT SAVED") 
-    @TagSeq(loader=classOf[Id],contiguous=false) var id:Array[Int]=_
+    @TagSeq(loader=classOf[Id],contiguous=false,depth=0) var id:Array[Int]=_
     @Convert def tagEnd(l:Element)  = this
     def name_=(nm:String) = println(nm)
   }
@@ -90,7 +89,7 @@ object Data {
     val date = new java.util.GregorianCalendar(2012,12,12).getTime
     //@TagField
     //var load:loader.Parser.Value = _
-    @TagSeq(loader=classOf[Top],min=3)
+    @TagSeq(loader=classOf[Top],min=3,depth=0)
     var include:Array[Top]=null
     @TagField(loader=classOf[Header])
     protected var header:Header=null
@@ -98,17 +97,17 @@ object Data {
     var test:Int=_
     @TagField(loader=classOf[Encap], valid="3")
     var oye:Integer=_
-    @TagList(loader=classOf[Encap], valid="3")
+    @TagList(loader=classOf[Encap], valid="3",depth=1)
     var encap:ListBuffer[Integer]=_
-    @TagList(loader=classOf[Encap2],max=1)
+    @TagList(loader=classOf[Encap2],max=1,depth=1)
     var encap2:HashMap[Integer,Integer]=_
-    @TagSeq(inName="{even.}", check=".*", contiguous=true) //was ....
+    @TagSeq(inName="{even.}", check=".*", contiguous=true,depth=0) //was ....
     var event:Array[String]=_
-    @TagList(check="...(.*)",valid="[000,800000]",min=10,max=100)  //was ....(.)?, [7000,8000]
+    @TagList(check="...(.*)",valid="[000,800000]",min=10,max=100,depth=1)  //was ....(.)?, [7000,8000]
     var history:Array[Int]=_
     @TagField(loader=classOf[GlobalData])
     var globaldata:GlobalData=_
-    @TagSeq(inName="{provinc.}",loader=classOf[Province],min=50)
+    @TagSeq(inName="{provinc.}",loader=classOf[Province],min=50,depth=0)
     var province:scala.collection.immutable.HashMap[Integer,String]=_
     @Convert def tagEnd(l:Element):this.type = this
     def write(out:Writer):Unit = {

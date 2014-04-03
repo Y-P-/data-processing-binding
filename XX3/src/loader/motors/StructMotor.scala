@@ -27,7 +27,7 @@ object StructMotor extends ProcessorImpl {
       type Result = Unit
       def getData(e:Elt):Null = null
     
-      private def newLine(e:Elt):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent) else " ")
+      private def newLine(e:Elt):Unit   = out.write(if (indent>0) Indent((e.depth-1)*indent,false) else " ")
       private def quote(s:String):Unit  = out.write(if(parser.px.Data.isChar(s)) s else s""""$s"""")
       private def tag(e:Elt):Unit       = { newLine(e); if (!e.name.isEmpty) { quote(e.name); out.write(s" = ") } }
   
