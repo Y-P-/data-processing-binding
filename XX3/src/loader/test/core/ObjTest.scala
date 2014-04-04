@@ -22,6 +22,7 @@ import loader.core.events.EventHandler
 import loader.core.definition.Processor
 import loader.annotations._
 import loader.motors.ObjectMotor
+import loader.core.ExtCore
 
 object ObjTest {
   
@@ -30,7 +31,7 @@ object ObjTest {
     case url  => url
   }
   
-  //a generic context that works with any parser for a string processor
+  //a generic context that works with any parser for a string processor and ObjectMotor.ctx
   def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ctx.type]
                                    with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ctx.type] {self=>
     override def apply(e:Proc#Elt) = new EltCtx(e)
@@ -39,6 +40,25 @@ object ObjTest {
       override def solver(s:Proc#Value):()=>Proc#Ret = null
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s
+      override def errHandler(p:Pars#BaseImpl):PartialFunction[Throwable,Unit] = {
+        case e => println(e.getMessage)
+                  e.printStackTrace
+                  super.errHandler(p)
+      }
+    }
+  }
+  //a generic context that works with any parser for a string processor and ObjectMotor.ext
+  def userCtxE(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ext.type] {self=>
+    override def apply(e:Proc#Elt) = new EltCtx(e)
+    class EltCtx(val elt:Proc#Elt) extends super[UCtx].EltCtxBase {
+      override def solver(s:Proc#Value):()=>Proc#Ret = null
+      def keyMap(s:Pars#Key):Proc#Key = s
+      def valMap(s:Pars#Value):Proc#Value = s
+      override def errHandler(p:Pars#BaseImpl):PartialFunction[Throwable,Unit] = {
+        case e => println(e.getMessage)
+                  e.printStackTrace
+                  super.errHandler(p)
+      }
     }
   }
   val p = new parsers.Struct(256,40,false)
@@ -68,6 +88,18 @@ object ObjTest {
   @Test class ObjBaseTotalInferTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter):Unit = baseTest(out,new CzBase.TotalInferAnnot)
   }
+  /** Test to verify that an object is correctly filled up with ext (other tests with ctx); it tests most cases and ends up with some deep nesting */
+  @Test class ObjBaseTotalInferExtTest extends StandardTester {
+    def apply(file:Solver,out:PrintWriter):Unit = {
+      import ObjectMotor.ext
+      val buf = new java.io.StringWriter
+      val on = new CzBase.TotalInferExt
+      val m = ext(on)
+      val r=run(p,m)(userCtxE(new PrintWriter(buf)),_(),_.read(load("objTestInfer.txt"), "UTF-8"))._2
+      out.println(on)
+      out.print(buf)
+    }
+  }
 }
 
 
@@ -82,10 +114,6 @@ object ObjTest {
 //separate @Tag annot with @Check (checking info)
 //how to manage different contexts for one class ?
 
-//remove def userCtx:UCtx[Builder] from EltBase (contained in eltCtx ; requires different init phase)
+//remove def userCtx:UCtx[Builder] from EltBase (we can reach it from eltCtx ; requires different init phase)
 //remove Ret in profit of Unit ?
-//finish the ObjectMotor.ext implementation
 //type checking for multi-interfaces in UCtx
-
-//Testing:
-//Dynamic (use userCtx.eltCtx.onName) => test = full serialization

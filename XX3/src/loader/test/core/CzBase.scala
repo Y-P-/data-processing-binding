@@ -4,6 +4,8 @@ import loader.annotations.{TagField,TagList,TagSeq}
 
 /** A minimal class to test most object spawning cases, including collections, deep collections,
  *  object nesting, empty lists...
+ *  Note that we will not check list/sequence nesting combinations (List[Array[Seq]] or Array[List[List]] etc.
+ *  as we rely on the utils.reflect utilities which are tested independently.
  */
 abstract class CzBase {
   type Cz<:CzBase
@@ -28,7 +30,7 @@ abstract class CzBase {
     val b = new StringBuffer
     b.append(s"${x}czA=[")
     for (v<-czA) b.append(v.p(x(2)))
-    b.append(s"${x},").toString
+    b.append(s"${x}],").toString
   }
   def p6(x:Indent):String = if (czL==null) "" else if (czL.isEmpty) "-, " else {
     val b = new StringBuffer
@@ -62,7 +64,7 @@ abstract class CzBase {
       }
       b.append(s"${x(2)}]")
     }
-    b.append(s"${x},").toString
+    b.append(s"${x}],").toString
   }
   def p(x:Indent):String = s"$x{$id, ${if(ok)"true, "else""}$p1$p2$p3${p4(x(2))}${p5(x(2))}${p6(x(2))}${p7(x(2))}${p8(x(2))}}"
   override def toString = p(new Indent(0))
@@ -130,4 +132,18 @@ object CzBase {
     val cz2:Array[List[Cz]] = null                     //deep collection of objects
     @TagSeq   val cz3:Array[List[Array[Cz]]] = null    //deep sequence of objects    
   }
-}
+  //everything inferred! (no sequences)
+  class TotalInferExt extends CzBase {
+    type Cz = TotalInferExt
+    val id:Int = 0                                     //standard scalar field with auto conversion
+    val ok:Boolean = false                             //same, different conversion
+    val idA:Array[Double] = null                       //array of scalars
+    val idL:List[Integer] = null                       //collection of scalars
+    val id2:Array[Array[Double]] = null                //deep collection of scalars
+    
+    val cz:Cz = null                                   //object
+    val czA:Array[Cz] = null                           //array of objects
+    val czL:List[Cz] = null                            //collection of objects
+    val cz2:Array[List[Cz]] = null                     //deep collection of objects
+    val cz3:Array[List[Array[Cz]]] = null              //deep sequence of objects    
+  }}
