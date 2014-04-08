@@ -47,7 +47,7 @@ object ObjectMotor extends ProcessorImpl {
     override def close(eltCtx:EltCtx) = { localClose(); set(on) }   //and assign structure to its owner
     override def apply(name:String, info:Info):Data = {
       val b = Binder(info.pCtx.dataActor(on.getClass,name), info.eltCtx.converters, info.fd, info.isSeq || info.depth>0)(on)
-      Data(info.eClass, info.pCtx,  //seqs are kept in an immutable map (we expect it to stay small) stored in a local var which we update when needed 
+      Data(info.eClass, info.eltCtx,  //seqs are kept in an immutable map (we expect it to stay small) stored in a local var which we update when needed 
         if (info.isSeq) seqs.getOrElse(name,{val x=b.subInstance; seqs=seqs+((name,x)); x})
         else            b //otherwise, simply bind the field
       )      

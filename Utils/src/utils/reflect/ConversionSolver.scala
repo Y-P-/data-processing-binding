@@ -21,7 +21,7 @@ class ConversionSolver(
     val stringSolver:(Class[_]=>Option[FromString[_]])                   = Converters.defaultMap,
     val namedSolver:Map[String,Converter[_,_]]                           = null,
     val registeredSolver:Seq[Converter[_,_]]                             = null,
-    val collectionSolver:java.lang.reflect.Type=>CollectionAdapter.Adapt = CollectionAdapter.defaultMap) {
+    val collectionSolver:java.lang.reflect.Type=>Option[CollectionAdapter.Adapt] = CollectionAdapter.defaultMap) {
   
   /** Finds an appropriate converter from one of the sources by following these exclusive rules (in order):
    *  - if the name is significant (not null or "")

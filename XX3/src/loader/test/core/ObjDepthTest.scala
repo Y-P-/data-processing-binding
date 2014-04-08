@@ -62,9 +62,9 @@ object ObjDepthTest {
   }
   
   val cvInt   = utils.ClassMap[FromString[_]](CvvInt)
-  val cvL2id  = new ConversionSolver(cvInt,null,null,Map.empty.withDefaultValue(null))
-  val cvL2ids = new ConversionSolver(cvInt,null,null,null/*CollectionAdapter()*/)
-  val noCv    = new ConversionSolver(Map.empty.get,null,null,Map.empty.withDefaultValue(null))
+  val cvL2id  = new ConversionSolver(cvInt,null,null,Map.empty.get)
+  val cvL2ids = new ConversionSolver(cvInt,null,null,CollectionAdapter())
+  val noCv    = new ConversionSolver(Map.empty.get,null,null,Map.empty.get)
   
   // Prepare extremely specific contexts
   val L0Ctx = new ObjectMotor.EltCtx {
@@ -101,7 +101,7 @@ object ObjDepthTest {
   val L2idsCtx = new ObjectMotor.EltCtx {
     override def toString                                          = "L2idsCtx"
     override def converters                                        = cvL2ids
-    override def spawn(i:Binder#I)                                 = ???
+    override def spawn(i:Binder#I)                                 = super.spawn(i)
     override def converters(key:String)                            = ???
     override def dataActor(cz:Class[_],name:String)                = ???
   }

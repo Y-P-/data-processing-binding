@@ -23,11 +23,12 @@ import utils.reflect.Reflect._
  *  IMPORTANT: this class relies heavily on casts ; this means that you're on your own when using it: the compiler
  *             will hardly help you locate type discrepancies!
  */
-abstract class CollectionAdapter[C:ClassTag] {
-  val czzCol = implicitly[ClassTag[C]].runtimeClass
+abstract class CollectionAdapter[CC:ClassTag] {
+  val czzCol = implicitly[ClassTag[CC]].runtimeClass
   def apply(p:Type):BaseAdapter[_]
   
   sealed trait BaseAdapter[X] {
+    type C = CC
     def isMap:Boolean
     def czCol:Type                                  //the actual collection full type
     def czElt:Type                                  //the element in the collection
@@ -61,7 +62,7 @@ abstract class CollectionAdapter[C:ClassTag] {
 }
 
 object CollectionAdapter {
-  
+  type Adapt = CollectionAdapter[_]#BaseAdapter[_]  
   final class Info(depth:Int,eltClass:Class[_])
   
   /** Type of the underlying contained element.
@@ -334,9 +335,8 @@ object CollectionAdapter {
     }
   }
   
-  //the Type => Adapt function is what the user really wants ; the map is only an intermediate container
-  implicit def wrap(m:Map[Class[_],CollectionAdapter[_]]):Type=>Adapt = (t:Type) => m(t)(t)
-  type Adapt = CollectionAdapter[_]#BaseAdapter[_]
+  //the Type => Option[Adapt] function is what the user really wants ; the map is only an intermediate container
+  implicit def wrap(m:Map[Class[_],CollectionAdapter[_]]):Type=>Option[Adapt] = (t:Type) => Option(m(t)(t))
   
-  val defaultMap = CollectionAdapter(BitSetAdapter,JBitSetAdapter,JEnumSetAdapter,IntMapAdapter,LongMapAdapter,MBitSetAdapter,MUnrolledBuffer,HistoryAdapter,JEnumMapAdapter,JPropertiesAdapter,RevertibleHistoryAdapter)
+  val defaultMap = wrap(CollectionAdapter(BitSetAdapter,JBitSetAdapter,JEnumSetAdapter,IntMapAdapter,LongMapAdapter,MBitSetAdapter,MUnrolledBuffer,HistoryAdapter,JEnumMapAdapter,JPropertiesAdapter,RevertibleHistoryAdapter))
 }

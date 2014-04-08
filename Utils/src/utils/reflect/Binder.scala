@@ -122,9 +122,9 @@ object Binder {
     
     class Analyze(val depth:Int,val parent:super.Analyze) extends super.Analyze {
       override def subAnalyze:Analyze = solver.collectionSolver(eType) match {
-        case null         => throw new IllegalArgumentException(s"type $eType cannot be identified as a workable collection")
-        case a if a.isMap => new Map(a,depth+1,this)
-        case a            => new Col(a,depth+1,this)
+        case None         => throw new IllegalArgumentException(s"type $eType cannot be identified as a workable collection")
+        case Some(a) if a.isMap => new Map(a,depth+1,this)
+        case Some(a)            => new Col(a,depth+1,this)
       }
       override protected[reflect] def newInstance(on:AnyRef,parent:I) = new Instance(on,parent)
       class Instance(on:AnyRef,parent:I) extends super.Instance(on) {
@@ -134,7 +134,7 @@ object Binder {
         }
       }
     }
-    private class Col[C](adapt:CollectionAdapter[C]#BaseAdapter[_],depth:Int,parent:Analyze) extends Analyze(depth,parent) {
+    private class Col(adapt:CollectionAdapter.Adapt,depth:Int,parent:Analyze) extends Analyze(depth,parent) {
       override final def eType = adapt.czElt
       final override def isCol = true
       final override def isMap = adapt.isMap
@@ -144,10 +144,10 @@ object Binder {
         final override def close():Unit        = parent.rcv(stack.result)
         final override def close(key:Any):Unit = parent.rcv(key,stack.result)
         override def rcv(x:Any):Unit           = stack+=x
-        override def asT                       = { val r=read().asInstanceOf[C]; if (r==null) null else adapt.asTraversable(r) }
+        override def asT                       = { val r=read(); if (r==null) null else adapt.asTraversable(r.asInstanceOf[adapt.C]) }
       }
     }
-    private class Map[C](adapt:CollectionAdapter[C]#BaseAdapter[_],depth:Int,parent:Analyze) extends Col(adapt,depth,parent) {  //used for mapped collection
+    private class Map(adapt:CollectionAdapter.Adapt,depth:Int,parent:Analyze) extends Col(adapt,depth,parent) {  //used for mapped collection
       final val kType = adapt.asInstanceOf[CollectionAdapter[_]#MapAdapter[_,_]].czKey
       protected[this] var kConvert:(Any)=>Any = null
       override def newInstance(on:AnyRef,parent:I):Instance = new Instance(on,parent)
