@@ -1,6 +1,6 @@
 package utils.reflect
 
-import utils.reflect.Converters.StringConverter
+import utils.reflect.Converters.FromString
 import utils.reflect.Reflect._
 import utils.reflect._
 
@@ -18,7 +18,7 @@ import utils.reflect._
  *  - by default, if nothing is specified, the created object is returned.
  */
 class ConversionSolver(
-    val stringSolver:(Class[_]=>Option[StringConverter[_]])              = Converters.defaultMap,
+    val stringSolver:(Class[_]=>Option[FromString[_]])                   = Converters.defaultMap,
     val namedSolver:Map[String,Converter[_,_]]                           = null,
     val registeredSolver:Seq[Converter[_,_]]                             = null,
     val collectionSolver:java.lang.reflect.Type=>CollectionAdapter.Adapt = CollectionAdapter.defaultMap) {

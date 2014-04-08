@@ -145,5 +145,5 @@ object CzBase {
     val czA:Array[Cz] = null                           //array of objects
     val czL:List[Cz] = null                            //collection of objects
     val cz2:Array[List[Cz]] = null                     //deep collection of objects
-    val cz3:Array[List[Array[Cz]]] = null              //deep sequence of objects    
+    val cz3:Array[List[Array[Cz]]] = null              //deep collection of objects    
   }}

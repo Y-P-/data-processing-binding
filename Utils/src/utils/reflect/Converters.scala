@@ -37,123 +37,123 @@ object ConvertData {
  */
 object Converters {
   
-  abstract class StringConverter[+V](val dst:Class[_<:V]) extends Converter[String,V] {
+  abstract class FromString[+V](val dst:Class[_<:V]) extends Converter[String,V] {
     def this(s:utils.StringConverter[V]) = this(s.dst)
     val src = classOf[String]
   }
-  object StringConverter {
-    implicit def toX[R](cz:StringConverter[R]):utils.ClassMap.Factory[_,StringConverter[_]] = new utils.ClassMap.Factory[R,StringConverter[R]] {
-      def build[Y <: R](c: Class[Y]): StringConverter[R] = cz
+  object FromString {
+    implicit def toX[R](cz:FromString[R]):utils.ClassMap.Factory[_,FromString[_]] = new utils.ClassMap.Factory[R,FromString[R]] {
+      def build[Y <: R](c: Class[Y]): FromString[R] = cz
       def max: RichClass[R] = cz.dst
     }
   }
-  trait StringConverterBuilder[V] {
-    def apply(c:Class[V]):StringConverter[V]
+  trait FromStringBuilder[V] {
+    def apply(c:Class[V]):FromString[V]
   }
   
   protected[this] implicit def toConverter[S](f:String=>S) = (s:String) => f(s)
-  protected[this] implicit def toMapElt[U:ClassTag](sc:StringConverter[U]) = (implicitly[ClassTag[U]].runtimeClass,sc)
+  protected[this] implicit def toMapElt[U:ClassTag](sc:FromString[U]) = (implicitly[ClassTag[U]].runtimeClass,sc)
   
   //bridge from ConvertData to standard converters. 
-  object CvvString extends StringConverter(CvString) {
+  object CvvString extends FromString(CvString) {
     def apply(fd:ConvertData) = CvString(fd.check)
   }
-  object CvvCharArray extends StringConverter(CvCharArray) {
+  object CvvCharArray extends FromString(CvCharArray) {
     def apply(fd:ConvertData) = CvCharArray(fd.check)
   }
-  object CvvInt extends StringConverter(CvInt) {
+  object CvvInt extends FromString(CvInt) {
     def apply(fd:ConvertData) = CvInt(fd.valid,fd.check,fd.param)
   }
-  object CvvJInt extends StringConverter(CvJInt) {
+  object CvvJInt extends FromString(CvJInt) {
     def apply(fd:ConvertData) = CvJInt(fd.valid,fd.check,fd.param)
   }
-  object CvvLong extends StringConverter(CvLong) {
+  object CvvLong extends FromString(CvLong) {
     def apply(fd:ConvertData) = CvLong(fd.valid,fd.check,fd.param)
   }
-  object CvvJLong extends StringConverter(CvJLong) {
+  object CvvJLong extends FromString(CvJLong) {
     def apply(fd:ConvertData) = CvJLong(fd.valid,fd.check,fd.param)
   }
-  object CvvShort extends StringConverter(CvShort) {
+  object CvvShort extends FromString(CvShort) {
     def apply(fd:ConvertData) = CvShort(fd.valid,fd.check,fd.param)
   }
-  object CvvJShort extends StringConverter(CvJShort) {
+  object CvvJShort extends FromString(CvJShort) {
     def apply(fd:ConvertData) = CvJShort(fd.valid,fd.check,fd.param)
   }
-  object CvvByte extends StringConverter(CvByte) {
+  object CvvByte extends FromString(CvByte) {
     def apply(fd:ConvertData) = CvByte(fd.valid,fd.check,fd.param)
   }
-  object CvvJByte extends StringConverter(CvJByte) {
+  object CvvJByte extends FromString(CvJByte) {
     def apply(fd:ConvertData) = CvJByte(fd.valid,fd.check,fd.param)
   }
-  object CvvChar extends StringConverter(CvChar) {
+  object CvvChar extends FromString(CvChar) {
     def apply(fd:ConvertData) = CvChar(fd.valid,fd.check)
   }
-  object CvvJChar extends StringConverter(CvJChar) {
+  object CvvJChar extends FromString(CvJChar) {
     def apply(fd:ConvertData) = CvJChar(fd.valid,fd.check)
   }
-  object CvvFloat extends StringConverter(CvFloat) {
+  object CvvFloat extends FromString(CvFloat) {
     def apply(fd:ConvertData) = CvFloat(fd.valid,fd.check)
   }
-  object CvvJFloat extends StringConverter(CvJFloat) {
+  object CvvJFloat extends FromString(CvJFloat) {
     def apply(fd:ConvertData) = CvJFloat(fd.valid,fd.check)
   }
-  object CvvDouble extends StringConverter(CvDouble) {
+  object CvvDouble extends FromString(CvDouble) {
     def apply(fd:ConvertData) = CvDouble(fd.valid,fd.check)
   }
-  object CvvJDouble extends StringConverter(CvJDouble) {
+  object CvvJDouble extends FromString(CvJDouble) {
     def apply(fd:ConvertData) = CvJDouble(fd.valid,fd.check)
   }
-  object CvvBoolean extends StringConverter(CvBoolean) {
+  object CvvBoolean extends FromString(CvBoolean) {
     def apply(fd:ConvertData) = {
       val x = if (fd.param==null || fd.param.length==0) "yes|oui|vrai|true|1|y|o|v|t@no|non|faux|false|0|n|f" else fd.param
       val s=x.split("@")
       CvBoolean(s(0),s(1))
     }
   }
-  object CvvJBoolean extends StringConverter(CvJBoolean) {
+  object CvvJBoolean extends FromString(CvJBoolean) {
     def apply(fd:ConvertData) = {
       val x = if (fd.param==null || fd.param.length==0) "yes|oui|vrai|true|1|y|o|v|t@no|non|faux|false|0|n|f" else fd.param
       val s=x.split("@")
       CvJBoolean(s(0),s(1))
     }
   }
-  object CvvPattern extends StringConverter[java.util.regex.Pattern](classOf[java.util.regex.Pattern]) {
+  object CvvPattern extends FromString[java.util.regex.Pattern](classOf[java.util.regex.Pattern]) {
     def apply(fd:ConvertData) = java.util.regex.Pattern.compile(_)
   }  
-  object CvvURL extends StringConverter(CvURL) {
+  object CvvURL extends FromString(CvURL) {
     def apply(fd:ConvertData) = CvURL(fd.check,fd.valid=="C")
   }
-  object CvvURI extends StringConverter(CvURI) {
+  object CvvURI extends FromString(CvURI) {
     def apply(fd:ConvertData) = CvURI(fd.check)
   }
-  object CvvDate extends StringConverter(CvDate) {
+  object CvvDate extends FromString(CvDate) {
     def apply(fd:ConvertData) = CvDate(fd.valid,fd.check,fd.param)
   }
-  object CvvFile extends StringConverter(CvFile) {
+  object CvvFile extends FromString(CvFile) {
     def apply(fd:ConvertData) = CvFile(fd.valid,fd.check)
   }
-  object CvvClass extends StringConverter(CvClass) {
+  object CvvClass extends FromString(CvClass) {
     def apply(fd:ConvertData) = CvClass(fd.valid,fd.check)
   }
   
-  object CvvEnum extends utils.ClassMap.Factory[Enumeration#Value,StringConverter[_]] {
+  object CvvEnum extends utils.ClassMap.Factory[Enumeration#Value,FromString[_]] {
     val max = ^(classOf[Enumeration#Value])
-    def build[X<:Enumeration#Value](cz:Class[X]) = new StringConverter[X](cz) {
+    def build[X<:Enumeration#Value](cz:Class[X]) = new FromString[X](cz) {
       def apply(fd:ConvertData) = new CvEnumeration[X]()(ClassTag(cz))(fd.check)
     }
   }
-  object CvvJEnum extends utils.ClassMap.Factory[Enum[_],StringConverter[_]] {
+  object CvvJEnum extends utils.ClassMap.Factory[Enum[_],FromString[_]] {
     //Note that Enum[_] is generic, but abstract. Concrete classes (i.e. java enums) are not generic, and these will be effectively
     //tested. So in a way the "no generics" contract is not broken here.
     val max = ^(classOf[Enum[_]])
-    def build[X<:Enum[_]](cz:Class[X]) = new StringConverter[X](cz) {
+    def build[X<:Enum[_]](cz:Class[X]) = new FromString[X](cz) {
       def apply(fd:ConvertData) = new CvEnum[X]()(ClassTag(cz))(fd.check)
     }
   }
   
  
   //the default ClassMap for string converters.
-  val defaultMap = utils.ClassMap[StringConverter[_]](
+  val defaultMap = utils.ClassMap[FromString[_]](
                         CvvString,CvvCharArray,CvvInt,CvvJInt,CvvShort,CvvJShort,CvvLong,CvvJLong,
                         CvvByte,CvvJByte,CvvChar,CvvJChar,CvvFloat,CvvJFloat,CvvDouble,CvvJDouble,
                         CvvURL,CvvURI,CvvDate,CvvFile,CvvBoolean,CvvJBoolean,CvvClass,CvvPattern,

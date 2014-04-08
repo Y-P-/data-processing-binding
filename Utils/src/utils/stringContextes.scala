@@ -7,9 +7,17 @@ object stringContextes {
   implicit class RegexPattern(val pattern:java.util.regex.Pattern) extends AnyVal {
     def unapply(s:String):Boolean = pattern.matcher(s).matches
   }
-  implicit class RegexContext(val sc: StringContext) extends AnyVal {
+  
+  //use r"" to build the corresponding regex
+  implicit class RegexPatternContext(val sc: StringContext) extends AnyVal {
     def r(args:Any*):RegexPattern = new RegexPattern(java.util.regex.Pattern.compile(sc.s(args:_*)))
     def r:RegexPattern = new RegexPattern(java.util.regex.Pattern.compile(sc.parts(0)))
+  }
+  
+  //use /"" to split the string into the sequence of / separated elements
+  implicit class RegexSeqContext(val sc: StringContext) extends AnyVal {
+    def split(args:Any*):Seq[String] = { val x=sc.s(args:_*); if (x=="/") Seq("") else x.split("/") }
+    def split:Seq[String] = { val x=sc.parts(0); if (x=="/") Seq("") else x.split("/") }
   }
 
 }

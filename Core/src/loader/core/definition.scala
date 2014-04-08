@@ -121,7 +121,7 @@ object definition {
             
       /** The push/pull interface on the processor side.
        */
-      def push(k:Key):Elt    = { val c=build(parser,userCtx,eltCtx.onName(k)); c.eltCtx.onInit(); c }
+      def push(k:Key):Elt    = { println(s"pushing $k"); val c=build(parser,userCtx,eltCtx.onName(k)); c.eltCtx.onInit(); c }
       def pull():Unit        = { doBeg(); eltCtx.onEnd() }
       def pull(v:Value):Unit = {
         parent.doBeg()

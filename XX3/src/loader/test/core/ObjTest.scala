@@ -31,12 +31,8 @@ object ObjTest {
     case url  => url
   }
   
-  //a generic context that works with any parser for a string processor and ObjectMotor.ctx
-  def userCtx(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ctx.type]
-                                   with CtxCore.UsrCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ctx.type] {self=>
-    override def apply(e:Proc#Elt) = new EltCtx(e)
-    class EltCtx(val elt:Proc#Elt) extends super[UCtx].EltCtxBase with super[UsrCtx].EltCtxBase with ObjectMotor.CtxFullInfer[Pars] {
-      override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
+  abstract class Defaults[P<:ParserBuilder {type Value=String; type Key=String}, M<:ObjectMotor.DefImpl] extends loader.core.UsrCtx[P,M] with ObjectMotor.UCtx[P,M] {
+    class EltCtxBase(val elt:Proc#Elt) extends super.EltCtxBase { this:EltCtx=>
       override def solver(s:Proc#Value):()=>Proc#Ret = null
       def keyMap(s:Pars#Key):Proc#Key = s
       def valMap(s:Pars#Value):Proc#Value = s
@@ -47,18 +43,25 @@ object ObjTest {
       }
     }
   }
-  //a generic context that works with any parser for a string processor and ObjectMotor.ext
-  def userCtxE(out:PrintWriter) = new ObjectMotor.UCtx[ParserBuilder {type Value=String; type Key=String},ObjectMotor.ext.type] {self=>
-    override def apply(e:Proc#Elt) = new EltCtx(e)
-    class EltCtx(val elt:Proc#Elt) extends super[UCtx].EltCtxBase {
-      override def solver(s:Proc#Value):()=>Proc#Ret = null
-      def keyMap(s:Pars#Key):Proc#Key = s
-      def valMap(s:Pars#Value):Proc#Value = s
-      override def errHandler(p:Pars#BaseImpl):PartialFunction[Throwable,Unit] = {
-        case e => println(e.getMessage)
-                  e.printStackTrace
-                  super.errHandler(p)
+  
+  //a generic context that works with any parser for a string processor and ObjectMotor.ctx
+  def userCtx(out:PrintWriter) = {
+    type P0 = ParserBuilder {type Value=String; type Key=String}
+    type M0 = ObjectMotor.ctx.type
+    new Defaults[P0,M0] with CtxCore.UsrCtx[P0,M0] {
+      override def apply(e:Proc#Elt) = new EltCtx(e)
+      class EltCtx(elt:Proc#Elt) extends super[Defaults].EltCtxBase(elt) with super[UsrCtx].EltCtxBase with ObjectMotor.CtxFullInfer[Pars] {
+        override def eventHandler = new DefaultAuditHandler(new StandardAuditLogger(IdScheme.ctx,5),new AuditRecorder(5,action=AuditRecorder.print(out))) 
       }
+    }
+  }
+  //a generic context that works with any parser for a string processor and ObjectMotor.ext
+  def userCtxE(out:PrintWriter) = {
+    type P0 = ParserBuilder {type Value=String; type Key=String}
+    type M0 = ObjectMotor.ext.type
+    new Defaults[P0,M0] {
+      type EltCtx = EltCtxBase
+      override def apply(e:Proc#Elt) = new EltCtx(e)
     }
   }
   val p = new parsers.Struct(256,40,false)
@@ -110,9 +113,10 @@ object ObjTest {
 //Cache for binders
 //External conf for field kind choice "bsfm"
 //Full serialization
-//cardinality for inferred lists: see below
+//cardinality for inferred lists
 //separate @Tag annot with @Check (checking info)
 //how to manage different contexts for one class ?
+//print exceptions when no log activated
 
 //remove def userCtx:UCtx[Builder] from EltBase (we can reach it from eltCtx ; requires different init phase)
 //remove Ret in profit of Unit ?

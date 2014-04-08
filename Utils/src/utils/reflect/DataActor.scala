@@ -4,12 +4,13 @@ package utils.reflect
 import java.lang.reflect.{Field,Method,Type}
 import scala.annotation.tailrec
 import Reflect._
+import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 abstract class DataActor {
-  def name:String                     //'name' for the data (usually the field name, could be a method name)
-  def set(on:AnyRef,v:Any):Unit       //the method that sets 'name' in on
-  def get(from:AnyRef):Any            //the method that gets 'name' from on  
-  def expected:Type                   //expected class
+  def name:String                             //'name' for the data (usually the field name, could be a method name)
+  def set(on:AnyRef,v:Any):Unit               //the method that sets 'name' in on
+  def get(from:AnyRef):Any                    //the method that gets 'name' from on  
+  def expected:Type                           //expected class
   def underlying = findClass[Any](expected)   //the expected java class
 }
 
@@ -46,7 +47,7 @@ object DataActor {
    */
   def apply(cz:RichClass[_],name:String,order:String):Option[DataActor] = apply(cz,name,order,0)
   
-  final private class FldElt(f:Field) extends DataActor {
+  final class FldElt(f:Field) extends DataActor {
     val name = f.getName
     f.setAccessible(true)
     def set(on:AnyRef,a:Any):Unit = f.set(on,a)
@@ -54,7 +55,7 @@ object DataActor {
     def expected                  = f.getGenericType
     override def toString         = s"field ${f}"
   }
-  final private class BeanElt(set:Method) extends DataActor {
+  final class BeanElt(set:Method) extends DataActor {
     set.setAccessible(true)
     val name = set.getName.charAt(3).toLower+set.getName.substring(4)
     private val get = {
@@ -70,7 +71,7 @@ object DataActor {
     def expected = set.getGenericParameterTypes()(0)
     override def toString = s"bean ${name}"
   }
-  final private class ScalaElt(set:Method) extends DataActor {
+  final class ScalaElt(set:Method) extends DataActor {
     set.setAccessible(true)
     val name = set.getName.substring(0, set.getName.length-4)
     private val get = {
@@ -81,23 +82,16 @@ object DataActor {
       g
     }
     def set(on:AnyRef,a:Any):Unit = set.invoke(on,a.asInstanceOf[AnyRef])
-    def get(on:AnyRef):Any        = if (get!=null) get.invoke(on) else null
+    def get(on:AnyRef):Any        = if (get!=null) get.invoke(on) else throw new NotImplementedException
     def expected                  = set.getGenericParameterTypes()(0)
     override def toString         = s"scala field ${name}"
   }
-  final private class MethodElt(set:Method) extends DataActor {
+  final class MethodElt(set:Method) extends DataActor {
     set.setAccessible(true)
     val name = set.getName
     def set(on:AnyRef,a:Any):Unit = set.invoke(on,a.asInstanceOf[AnyRef])
     def get(on:AnyRef):Any        = null
     def expected                  = set.getGenericParameterTypes()(0)
     override def toString         = s"method ${name}"
-  }
-  final object DummyElt extends DataActor {
-    val name = null
-    def set(on:AnyRef,a:Any):Unit = ()
-    def get(on:AnyRef):Any        = null
-    def expected                  = classOf[AnyRef]
-    override def toString         = s"dummy field"
   }
 }
