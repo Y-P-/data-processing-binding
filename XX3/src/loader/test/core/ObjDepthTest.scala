@@ -76,7 +76,7 @@ object ObjDepthTest {
   val L0l1Ctx = new ObjectMotor.EltCtx {
     override def toString                           = "L0l1Ctx"
     override def converters                         = noCv
-    override def spawn(i:Binder#I)                  = new L1
+    override def spawn(i:Binder#I)                  = super.spawn(i) // we could write new L1, but this uses inference
     override def converters(key:String)             = key match {
       case "l2" => L1l2Ctx.converters
       case "l0" => L0Ctx.converters
@@ -86,14 +86,14 @@ object ObjDepthTest {
   val L0l1l0Ctx = new ObjectMotor.EltCtx {
     override def toString                           = "L0l1l0Ctx"
     override def converters                         = noCv
-    override def spawn(i:Binder#I)                  = new L0
+    override def spawn(i:Binder#I)                  = super.spawn(i) //new L0
     override def converters(key:String)             = noCv
     override def dataActor(cz:Class[_],name:String) = super.dataActor(cz,name)
   }
   val L1l2Ctx = new ObjectMotor.EltCtx {
     override def toString                           = "L1l2Ctx"
     override def converters                         = noCv
-    override def spawn(i:Binder#I)                  = new L2
+    override def spawn(i:Binder#I)                  = super.spawn(i) //new L2
     override def converters(key:String)             = key match {
       case "id"  => L2idCtx.converters
       case "ids" => L2idsCtx.converters
