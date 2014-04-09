@@ -16,8 +16,8 @@ object stringContextes {
   
   //use /"" to split the string into the sequence of / separated elements
   implicit class RegexSeqContext(val sc: StringContext) extends AnyVal {
-    def split(args:Any*):Seq[String] = { val x=sc.s(args:_*); if (x=="/") Seq("") else x.split("/") }
-    def split:Seq[String] = { val x=sc.parts(0); if (x=="/") Seq("") else x.split("/") }
+    def split(args:Any*):Seq[String] = { val x=sc.s(args:_*); if (x=="/") Seq("") else x.split("/",-1) }
+    def split:Seq[String] = split(sc.parts(0))
   }
 
 }

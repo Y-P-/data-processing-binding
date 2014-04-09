@@ -111,12 +111,19 @@ object ObjTest {
 //tagEnd (=convert ; influence with inference ?)
 //maps
 //Cache for binders
+//how to manage different contexts for one class ?
 //External conf for field kind choice "bsfm"
+
 //Full serialization
 //cardinality for inferred lists
+
 //separate @Tag annot with @Check (checking info)
-//how to manage different contexts for one class ?
 //print exceptions when no log activated
+//enable loops for trees; make new tree with no parent but loops possible: loop(split"/")
+//define default values for trees
+
+//make Proc/Parser generic in UsrCtx (to avoid cast in ObjDepthTest)
+//imagine a generic docking structure for EltCtx into which Tree can fit
 
 //remove def userCtx:UCtx[Builder] from EltBase (we can reach it from eltCtx ; requires different init phase)
 //remove Ret in profit of Unit ?

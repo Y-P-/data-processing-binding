@@ -32,27 +32,25 @@ import utils.reflect.CollectionAdapter
 
 /** The purpose of this test is to check that each layer of EltCtx is correctly
  *  found, and that there are no erroneous access to the parent layer.
- *  This test is particularly important for the ObjectMotor processor, which
- *  relies heavily on such data.
- *  This is not tested elsewhere as we usually rely on constant values across
- *  layers.
+ *  This test is particularly important for the ObjectMotor processor, which relies heavily on such data.
+ *  This is not tested elsewhere as we usually rely on constant values across layers.
+ *  Note here how each layer is severely constrained both on the availability of converters and on
+ *  what it can spawn, get (as in converters(key)) or convert. 
  */
 object ObjDepthTest {
   
   class L0 {
-    println(s"created L0")
     var l1:L1 = _
     override def toString = s"l1= { $l1 } "
   }
   class L1 {
-    println(s"created L1")
     var l2:L2 = _
-    override def toString = s"l2= { $l2 } "
+    var l0:Array[L0] = _
+    override def toString = s"l2= { $l2 } ${if (l0!=null) l0.mkString("["," ","]") else ""}"
   }
   class L2 {
-    println(s"created L2")
     var id:Int = _
-    var ids:Array[Int] = null
+    var ids:Array[Int] = _
     override def toString = s"id=$id ids={ ${ids.mkString(" ")} } "
   }
   
@@ -62,57 +60,78 @@ object ObjDepthTest {
   }
   
   val cvInt   = utils.ClassMap[FromString[_]](CvvInt)
+  val cvCol   = new ConversionSolver(Map.empty.get,null,null,CollectionAdapter())
   val cvL2id  = new ConversionSolver(cvInt,null,null,Map.empty.get)
   val cvL2ids = new ConversionSolver(cvInt,null,null,CollectionAdapter())
   val noCv    = new ConversionSolver(Map.empty.get,null,null,Map.empty.get)
   
   // Prepare extremely specific contexts
   val L0Ctx = new ObjectMotor.EltCtx {
-    override def toString                                          = "L0Ctx"
-    override def converters                                        = noCv
-    override def spawn(i:Binder#I)                                 = new L0
-    override def converters(key:String)                            = noCv
-    override def dataActor(cz:Class[_],name:String)                = new FldElt(classOf[L0].getDeclaredField("l1"))
+    override def toString                           = "L0Ctx"
+    override def converters                         = cvCol   //for collection in L1.l0
+    override def spawn(i:Binder#I)                  = ???     //should not be called: case (1) is root, L0 is provided. case two is collection: we don't use spawn.
+    override def converters(key:String)             = noCv
+    override def dataActor(cz:Class[_],name:String) = new FldElt(classOf[L0].getDeclaredField("l1"))
   }
   val L0l1Ctx = new ObjectMotor.EltCtx {
-    override def toString                                          = "L0l1Ctx"
-    override def converters                                        = noCv
-    override def spawn(i:Binder#I)                                 = new L1
-    override def converters(key:String)                            = noCv
-    override def dataActor(cz:Class[_],name:String)                = new FldElt(classOf[L1].getDeclaredField("l2"))
+    override def toString                           = "L0l1Ctx"
+    override def converters                         = noCv
+    override def spawn(i:Binder#I)                  = new L1
+    override def converters(key:String)             = key match {
+      case "l2" => L1l2Ctx.converters
+      case "l0" => L0Ctx.converters
+    }
+    override def dataActor(cz:Class[_],name:String) = new FldElt(classOf[L1].getDeclaredField(name))
+  }
+  val L0l1l0Ctx = new ObjectMotor.EltCtx {
+    override def toString                           = "L0l1l0Ctx"
+    override def converters                         = noCv
+    override def spawn(i:Binder#I)                  = new L0
+    override def converters(key:String)             = noCv
+    override def dataActor(cz:Class[_],name:String) = super.dataActor(cz,name)
   }
   val L1l2Ctx = new ObjectMotor.EltCtx {
-    override def toString                                          = "L1l2Ctx"
-    override def converters                                        = noCv
-    override def spawn(i:Binder#I)                                 = new L2
-    override def converters(key:String)                            = key match {
+    override def toString                           = "L1l2Ctx"
+    override def converters                         = noCv
+    override def spawn(i:Binder#I)                  = new L2
+    override def converters(key:String)             = key match {
       case "id"  => L2idCtx.converters
       case "ids" => L2idsCtx.converters
     }
-    override def dataActor(cz:Class[_],name:String)                = new FldElt(classOf[L2].getDeclaredField(name))
+    override def dataActor(cz:Class[_],name:String) = new FldElt(classOf[L2].getDeclaredField(name))
   }
   val L2idCtx = new ObjectMotor.EltCtx {
-    override def toString                                          = "L2idCtx"
-    override def converters                                        = cvL2id
-    override def spawn(i:Binder#I)                                 = ???
-    override def converters(key:String)                            = ???
-    override def dataActor(cz:Class[_],name:String)                = ???
+    override def toString                           = "L2idCtx"
+    override def converters                         = cvL2id
+    override def spawn(i:Binder#I)                  = ???
+    override def converters(key:String)             = ???
+    override def dataActor(cz:Class[_],name:String) = ???
   }
   val L2idsCtx = new ObjectMotor.EltCtx {
-    override def toString                                          = "L2idsCtx"
-    override def converters                                        = cvL2ids
-    override def spawn(i:Binder#I)                                 = super.spawn(i)
-    override def converters(key:String)                            = ???
-    override def dataActor(cz:Class[_],name:String)                = ???
+    override def toString                           = "L2idsCtx"
+    override def converters                         = cvL2ids
+    override def spawn(i:Binder#I)                  = ???
+    override def converters(key:String)             = ???
+    override def dataActor(cz:Class[_],name:String) = ???
   }
   
-  // Load contextes into a tree
+  //Load contexts into a tree
+  //as we do not yet have trees with loop, we must repeat for recursivity: stop at one level deep.
+  //XXX check for missing elements ???
   import utils.stringContextes._
-  val r = utils.Tree(List((split"/",            L0Ctx),
-                          (split"/l1",          L0l1Ctx),
-                          (split"/l1/l2",       L1l2Ctx),
-                          (split"/l1/l2/id",    L2idCtx),
-                          (split"/l1/l2/ids",   L2idsCtx)))
+  val r = utils.Tree(List((split"/",                      L0Ctx),
+                          (split"/l1",                    L0l1Ctx),
+                          (split"/l1/l2",                 L1l2Ctx),
+                          (split"/l1/l0",                 L0Ctx),
+                          (split"/l1/l0/",                L0l1l0Ctx),
+                          (split"/l1/l0//l1",             L0l1Ctx),
+                          (split"/l1/l0//l1/l2",          L1l2Ctx),
+                          (split"/l1/l0//l1/l2/id",       L2idCtx),
+                          (split"/l1/l0//l1/l2/ids",      L2idsCtx),
+                          (split"/l1/l0//l1/l2/ids/",     L2idCtx),
+                          (split"/l1/l2/id",              L2idCtx),
+                          (split"/l1/l2/ids",             L2idsCtx),
+                          (split"/l1/l2/ids/",            L2idCtx)))
   
   //prepare default user-context: it will use the tree for specific elements
   abstract class Defaults[P<:ParserBuilder {type Value=String; type Key=String}, M<:ObjectMotor.DefImpl]
