@@ -1,0 +1,32 @@
+=> check creation by using sequences and the Sequence View
+0 => Map(a -> 1 => Map(b -> 2, c -> 3 => Map(f -> 4, e -> 5, d -> 6), d -> 7 => Map(a -> 8)), b -> None => Map(b -> 9), c -> None => Map(c -> 10 => Map(d -> None => Map(x -> None => Map(y -> 11)))))
+=> check the global iterator by sequence
+Queue() => Some(0)
+Queue(a) => Some(1)
+Queue(a, b) => Some(2)
+Queue(a, c) => Some(3)
+Queue(a, c, f) => Some(4)
+Queue(a, c, e) => Some(5)
+Queue(a, c, d) => Some(6)
+Queue(a, d) => Some(7)
+Queue(a, d, a) => Some(8)
+Queue(b) => None
+Queue(b, b) => Some(9)
+Queue(c) => None
+Queue(c, c) => Some(10)
+Queue(c, c, d) => None
+Queue(c, c, d, x) => None
+Queue(c, c, d, x, y) => Some(11)
+=> check standard remove operation
+0 => Map(a -> 1 => Map(b -> 2, d -> 7 => Map(a -> 8)), b -> None => Map(b -> 9), c -> None => Map(c -> 10 => Map(d -> None => Map(x -> None => Map(y -> 11)))))
+=> check that intermediate empty entries are removed in a remove operation
+0 => Map(a -> 1 => Map(b -> 2, d -> 7 => Map(a -> 8)), c -> None => Map(c -> 10))
+=> check that self-referencing trees work ; note: looping is infinite, so we cannot print the tree!
+Some(4)
+Some(4)
+true
+=> print the tree with loop detection, with top levels last : stressful test on iterators
+Queue(a, c, d) => Some(4)
+Queue(a, c) => Some(3)
+Queue(a) => Some(1)
+Queue() => Some(0)

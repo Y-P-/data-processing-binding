@@ -191,7 +191,7 @@ object Tree {
   }
 }
 
-/** A standard implementation for strong immutbale tree bindings, likely sufficient for most needs.
+/** A standard implementation for strong immutable tree bindings, likely sufficient for most needs.
  */
 class StrongTree[X,T](val name:X,val cur:Option[T],val self:Map[X,StrongTree[X,T]],prv: =>StrongTree[X,T]) extends MapProxy[X,StrongTree[X,T]] with StrongTreeLike[X,T,StrongTree[X,T]] with Mutable[X,T,StrongTree[X,T]] {
   val builder = StrongTree.builder[X,T]()
