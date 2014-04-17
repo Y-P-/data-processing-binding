@@ -61,6 +61,9 @@ object TreeTests {
       println("=> test clone with loops")
       for (x <- t.clone.seqIterator(false))
         println(s"${x._1} => ${x._2.value}")
-    }
+      println("=> test StringTree")
+      val tc = StringTree("a=(b=(u=3;v=4);c=6);b=1;c=(a=3)")
+      println(tc)
+    }      
   }
 }

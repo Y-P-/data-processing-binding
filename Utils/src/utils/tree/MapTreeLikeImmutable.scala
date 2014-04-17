@@ -19,7 +19,7 @@ import scala.annotation.tailrec
  *  @param V, the type of Value, which are homogeneous at all levels
  *  @param This, the upper limit of all contained sub-trees
  */
-trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:This=>
+trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] extends Iterable[(K,This)] {self:This=>
   final def myself:This = this
   /** value for this key */
   def value:Option[V]
@@ -132,4 +132,50 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:Thi
         null                                                   //return null when finished
     }
   }
+  
+  /** runs through all entries which hold data.
+   *  @param key, the Key for the current (this) entry
+   */
+  def forDefined[U](key:K)(f:(K,This)=>U):Unit = {
+    if (value!=None) f(key,this)
+    for (x <- iterator) x._2.forDefined(x._1)(f)
+  }
+  /** Tries to turn a one level deep hierarchy to a map*/
+  def toMap:Map[K,V] = try {
+    val m = scala.collection.mutable.HashMap.empty[K,V]
+    for (v <- iterator) {
+      if (!v._2.isEmpty) throw new IllegalStateException("cannot transform hierarchy to map if not exactly 1 level deep")
+      m += ((v._1,v._2.value.get))
+    }
+    m.toMap
+  } catch {
+    case _:Throwable => throw new IllegalStateException("cannot transform hierarchy to a map"+this)
+  }
+  /** flattens the tree to it's canonical state */
+  def flatten:Seq[(Seq[K],This)] = seqIterator(true).toSeq
+  /** removes elements */
+  def filter(f:((K,This))=>Boolean):This = {
+    val l = for (x <- iterator if f(x)) yield x._1
+    for (x <- l) this -= x
+    for (x <- iterator) x._2.filter(f)
+    this
+  }
+  
+  /* TODO
+  /** 'Replaces' T with f(this):S in all nodes */
+  def map[S](f:(This)=>Option[S]):builder.Repr[S] = {
+    def doIt(t:This,prev: =>builder.Repr[S]):builder.Repr[S] = {
+      var res = null.asInstanceOf[builder.Repr[S]]
+      val n = builder.emptyMap[builder.Repr[S]]
+      t.self.foreach { u => n.put(u._1,doIt(u._2,res)) }
+      res = builder.mapBuild(t.name,f(t),n,prev)
+      res
+    }
+    doIt(this,null.asInstanceOf[builder.Repr[S]])
+  }
+  /** 'Develops' f(this) in all nodes, enlarging the tree */
+  def flatMap[S](f:(This)=>builder.Repr[S]):builder.Repr[S] =
+    builder.mapFromCanonical(for (x <- flatten; z <- f(x).canonical) yield (x.parents.map(_.name) ::: z._1, z._2))  
+  */
+
 }
