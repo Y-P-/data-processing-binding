@@ -41,7 +41,7 @@ object MapTreeLike {
     def get(keys:Seq[K]):Option[This]      = self.get(keys:_*)
     def +=(kv: (Seq[K], This)): this.type  = { self.add(kv._1,kv._2); this }
     def -=(keys: Seq[K]): this.type        = { self.rem(keys:_*); this }
-    def iterator: Iterator[(Seq[K], This)] = self.seqIterator(true,false)
+    def iterator: Iterator[(Seq[K], This)] = self.seqIterator(true)
     override def apply(keys: Seq[K]):This  = self.apply(keys:_*)
   }
   
@@ -57,17 +57,19 @@ object MapTreeLike {
    *  Internal reference resolution doesn't use default values initially.
    *  Beware: a Tree that contains internal references is significantly more complex.
    */
-  def withLoop[K,This<:MapTreeLike[K,_,This]](empty:MapTreeLike[K,_,This] with This)(seq:(Seq[K],Either[This,Seq[K]])*):This = {
+  def withLoop[K,This<:MapTreeLike[K,_,This]](empty:MapTreeLike[K,_,This] with This,useDefault:Boolean)(seq:(Seq[K],Either[This,Seq[K]])*):This = {
     val m = new SeqTree[K,This](empty)
     //processes one self-reference not using default
-    @inline def check(keys:Seq[K],ref:Seq[K]):Boolean = m.get(keys) match {
+    @inline def check(keys:Seq[K],ref:Seq[K]):Boolean = m.get(ref) match {
                                                     case None    => false
-                                                    case Some(v) => m += ((keys, v)); true
+                                                    case Some(v) => m += ((keys, v.selfRef.myself)); true
                                                 }
     //solve all normal entries
     for ((x,Left(v)) <- seq) m += ((x, v))
     //build the list of references to process
     var l = for ((x,Right(s)) <- seq) yield (x,s)
+    if (l.isEmpty) return m.self
+    //now resolve the yet unsolved references if any
     var ko = false
     do {
       //processes a list of self-reference not using default ; returns the list of unprocessed references
@@ -76,12 +78,15 @@ object MapTreeLike {
       l = l1
       //loop as long as we solve entries
     } while (l.length>0 && !ko)
+    if (l.length==0) return m.self
     //all was not yet solved: we have to pass through default values now
-    if (ko) {
-      //use brute force ; a smart policy might attempt to minimize the use of default.
-      for (r <- l) m += ((r._1, m(r._2)))
+    if (useDefault) {
+      //use brute force ; a smart (?) policy might attempt to minimize the use of default.
+      for (r <- l) m += ((r._1, m(r._2).selfRef.myself))
+    } else {
+      throw new NoSuchElementException(s"some Inner references could not be resolved : $l")
     }
-    empty
+    m.self
   }
   
   //implicits that helps using withLoop with an lighter syntax 

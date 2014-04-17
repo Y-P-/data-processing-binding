@@ -20,9 +20,11 @@ import scala.annotation.tailrec
  *  @param This, the upper limit of all contained sub-trees
  */
 trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:This=>
-  final def myself:this.type = this
+  final def myself:This = this
   /** value for this key */
   def value:Option[V]
+  /** indicates that this Tree node references another node */
+  def isRef:Boolean = false
   
   //All of the following methods have equivalence in Map and are shown to remind the user about what needs be implemented.
   /** subtree for this key */
@@ -37,6 +39,13 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:Thi
   def isEmpty:Boolean
   /** empty implementation */
   def empty: This
+  /** build a self reference -used to resolve inner links- */
+  def selfRef:SelfRef
+  
+  trait SelfRef extends MapTreeLikeImmutable[K,V,This] {this:This=>
+    final def owner:This = self
+    final override def isRef:Boolean  = true
+  }
 
   /** default value ; there is a default implementation that throws an exception. You may want to override this if the Tree is not exactly a Map... */
   def default(key:K):This
@@ -61,6 +70,7 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:Thi
    *      if not it removes it, and in that case it proceeds to "a"...
    */
   def rem (keys:K*): This = {
+    if (keys.length==1) return this
     val x = keys(0)
     val m = get(x)
     if (keys.length==1 || m.isEmpty)    this -= x
@@ -72,6 +82,7 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:Thi
   }
   /** subtree for this sequence of keys, without using any default */
   def get(keys:K*):Option[This] = {
+    if (keys.length==0) return Some(this)
     val k = keys(0)
     val r = get(k)
     if (keys.length==1) r else (r match {
@@ -87,12 +98,11 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:Thi
       case None    => default(k)
       case Some(x) => x
     })
-    if (keys.length==1) r else r(keys.tail:_*)
+    r(keys.tail:_*)
   }
-  def seqIterator(topFirst:Boolean,detectLoop:Boolean):Iterator[(Seq[K], This)] = new TreeIterator(scala.collection.immutable.Queue.empty,topFirst,if(detectLoop) new java.util.IdentityHashMap[This,This] else null)
+  def seqIterator(topFirst:Boolean):Iterator[(Seq[K], This)] = new TreeIterator(scala.collection.immutable.Queue.empty,topFirst)
   
-  private class TreeIterator(val cur:scala.collection.immutable.Queue[K],topFirst:Boolean,set:java.util.IdentityHashMap[This,This]) extends Iterator[(Seq[K], This)] {
-    if (set!=null) set.put(MapTreeLikeImmutable.this,MapTreeLikeImmutable.this)
+  private class TreeIterator(val cur:scala.collection.immutable.Queue[K],topFirst:Boolean) extends Iterator[(Seq[K], This)] {
     protected[this] val iter = iterator                        //iterator for this level
     protected[this] var i:Iterator[(Seq[K], This)] = getSub    //current sub-iterator
     protected[this] var done:Boolean = false                   //true when this item has been provided
@@ -110,13 +120,14 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] {self:Thi
       } else                                                   //if the next is not the current item, then it is the current sub-ioterator next element
         i.next
     }
-    @tailrec private def getSub:Iterator[(Seq[K], This)] = {
+    private def getSub:Iterator[(Seq[K], This)] = {
       if (iter.hasNext) {                                      //move to next element
         val (k,t)=iter.next
-        if (set==null || !set.containsKey(t))                  //if not already processed
-          new t.TreeIterator(cur.enqueue(k),topFirst,set)      //fetch sub-iterator
-        else
-          getSub                                               //if already processed : loop
+        if (!t.isRef)                                          //if not already processed
+          new t.TreeIterator(cur.enqueue(k),topFirst)          //fetch sub-iterator
+        else {
+          Iterator((cur.enqueue(k),t))                         //iterate superficially on self-references (otherwise you might get an infinite loop)
+        }
       } else
         null                                                   //return null when finished
     }

@@ -39,20 +39,27 @@ object TreeTests {
     
       println("=> check that self-referencing trees work ; note: looping is infinite, so we cannot print the tree!")
       import MapTreeLike._
-      val m1 = MapTreeLike.withLoop(b(0))(
+      val t = b(0)
+      val m1 = MapTreeLike.withLoop(t,false)(
               (Seq("a"),b(1)),
               (Seq("a","b"),Seq("a","c")),
               (Seq("a","c"),b(3)),
               (Seq("a","c","d"),b(4)),
-              (Seq("a","c","e"),Seq())
+              (Seq("a","c","f"),b(6)),
+              (Seq("a","c","e"),Seq()),
+              (Seq("a","c","f","x"),b(5)),
+              (Seq("a","c","u"),b(2))
              )
       val v1 = m1("a","b","d")
       val v2 = m1("a","c","e","a","b","d")
       println(v1.value)
       println(v2.value)
       println(v1 eq v2)  //checks strict equality between objects (i.e. the same trees are referenced)
-      println("=> print the tree with loop detection, with top levels last : stressful test on iterators")
-      for (x <- m1.seqIterator(false, true))
+      println("=> print the tree with loop detection, with top levels last : stressfull test on iterators")
+      for (x <- t.seqIterator(false))
+        println(s"${x._1} => ${x._2.value}")
+      println("=> test clone with loops")
+      for (x <- t.clone.seqIterator(false))
         println(s"${x._1} => ${x._2.value}")
     }
   }

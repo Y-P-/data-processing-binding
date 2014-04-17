@@ -8,15 +8,18 @@ package utils.tree
  */
 abstract class AbstractDelegatedMapTree[K,V,This<:AbstractDelegatedMapTree[K,V,This]](val value:Option[V]) extends MapTreeLike[K,V,This] with Cloneable {this:This=>
   protected var self:scala.collection.Map[K,This]
-  def get(key:K):Option[This]         = self.get(key)
-  def iterator: Iterator[(K, This)]   = self.iterator
-  def +=(kv: (K, This)): this.type    = { self+=kv; this }
-  def -=(key: K): this.type           = { self-=key; this }
-  override def isEmpty:Boolean        = self.isEmpty
+  def copy(v:Option[V],t:scala.collection.Map[K,This]):This
+  def get(key:K):Option[This]       = self.get(key)
+  def iterator: Iterator[(K, This)] = self.iterator
+  def +=(kv: (K, This)): this.type  = { self+=kv; this }
+  def -=(key: K): this.type         = { self-=key; this }
+  override def isEmpty:Boolean      = self.isEmpty
   override def clone:This = {
-    val r = super.clone.asInstanceOf[This]
-    if (self.isInstanceOf[scala.collection.mutable.Map[K,This]])
-      r.self = self.asInstanceOf[scala.collection.mutable.Map[K,This]].clone
-    r
+    val t = if (self.isInstanceOf[scala.collection.mutable.Map[K,This]]) {
+      self.map(x=>(x._1,x._2.clone))
+    } else {
+      self
+    }
+    copy(value,t)
   }
 }
