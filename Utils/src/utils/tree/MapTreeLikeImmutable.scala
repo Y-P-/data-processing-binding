@@ -161,7 +161,10 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] extends I
     this
   }
   
+  
   /* TODO
+  /** Creates a new Tree T with the same structure, possibly transforming all Keys, Values and even underlying Map representation */
+  def map[K1,V1,T<:MapTreeLikeImmutable[K1,V1,T]](f:((K,This))=>(K1,T)):T
   /** 'Replaces' T with f(this):S in all nodes */
   def map[S](f:(This)=>Option[S]):builder.Repr[S] = {
     def doIt(t:This,prev: =>builder.Repr[S]):builder.Repr[S] = {
