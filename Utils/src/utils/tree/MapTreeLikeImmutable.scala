@@ -32,8 +32,10 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] extends I
   /** iterator */
   def iterator: Iterator[(K, This)]
   /** add element */
+  //def +[T>:This<:MapTreeLikeImmutable[K,V,T]](kv:(K,T)):T
   protected[this] def += (kv: (K, This)): this.type
   /** remove element */
+  //def -(key:K):This
   protected[this] def -=(key: K): this.type
   /** tells if the subtree is empty */
   def isEmpty:Boolean
@@ -154,7 +156,7 @@ trait MapTreeLikeImmutable[K,+V,+This<:MapTreeLikeImmutable[K,V,This]] extends I
   /** flattens the tree to it's canonical state */
   def flatten:Seq[(Seq[K],This)] = seqIterator(true).toSeq
   /** removes elements */
-  def filter(f:((K,This))=>Boolean):This = {
+  override def filter(f:((K,This))=>Boolean):This = {
     val l = for (x <- iterator if f(x)) yield x._1
     for (x <- l) this -= x
     for (x <- iterator) x._2.filter(f)
