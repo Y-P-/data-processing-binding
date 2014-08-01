@@ -1,8 +1,6 @@
 package utils
 
-import java.nio.CharBuffer
 import java.nio.charset.Charset
-import java.nio.ByteBuffer
 
 
 final class EOD extends Exception {
@@ -44,18 +42,18 @@ object CharReader {
     def nextChar = (if (c<0) { c= -c; c } else { c=in.read; if (c<0) throw eod else c }).asInstanceOf[Char]
     def reject() = c = -c
   }
-  implicit def apply(s:CharBuffer):CharReader = new CharReader {
+  implicit def apply(s:java.nio.CharBuffer):CharReader = new CharReader {
     private[this] var hasOld=false
     private[this] var old:Char=0
     final def nextChar = if (hasOld) { hasOld=false; old } else try { old=s.get; old } catch { case _:Exception=>throw eod }
     final def reject() = hasOld=true
   }
-  def apply(s:ByteBuffer,charset:String):CharReader = new CharReader {
+  def apply(s:java.nio.ByteBuffer,charset:String):CharReader = new CharReader {
     private[this] var hasOld=false
     private[this] var old:Char=0
     private[this] val buf = Charset.forName(charset).decode(s)
     final def nextChar = if (hasOld) { hasOld=false; old } else try { old=buf.get; old } catch { case _:Exception=>throw eod }
     final def reject() = hasOld=true
   }
-  def apply(s:Array[Byte],charset:String):CharReader = apply(ByteBuffer.wrap(s),charset)
+  def apply(s:Array[Byte],charset:String):CharReader = apply(java.nio.ByteBuffer.wrap(s),charset)
 }

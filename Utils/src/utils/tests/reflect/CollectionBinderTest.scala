@@ -9,6 +9,7 @@ import scala.collection.JavaConversions.asScalaSet
 import scala.collection.JavaConversions.collectionAsScalaIterable
 import scala.collection.JavaConversions.mapAsScalaMap
 import scala.collection.JavaConversions.propertiesAsScalaMap
+import java.time.LocalDateTime
 
 /*
 
@@ -162,7 +163,7 @@ object CollectionBinderTest extends Helper {
     class V2(val a1:scala.collection.immutable.HashMap[Ex.Val,Ex.Val],
            val a2:scala.collection.immutable.IntMap[java.util.regex.Pattern],
            val a3:scala.collection.immutable.ListMap[Ex.Val,Ex.Val],
-           val a4:scala.collection.immutable.LongMap[java.util.Date],
+           val a4:scala.collection.immutable.LongMap[java.time.LocalDateTime],
            val a5:scala.collection.immutable.Map[Ex.Val,Ex.Val],
            val a6:scala.collection.mutable.HashMap[Ex.Val,Ex.Val],
            val a9:scala.collection.mutable.LinkedHashMap[Ex.Val,Ex.Val],
@@ -231,9 +232,9 @@ object CollectionBinderTest extends Helper {
       assert(w.a2(2).pattern==java.util.regex.Pattern.compile("([a-z]+)*").pattern)
       assert(w.a2(3).pattern==java.util.regex.Pattern.compile("abc|abe").pattern)
       get("a4",w).u(o("2010" --> "01/01/2010 00:00","2011" --> "01/01/2011 00:00","2012" --> "01/01/2012 00:00"))
-      assert(w.a4(2010L)==new java.util.Date("01/01/2010 00:00"))
-      assert(w.a4(2011L)==new java.util.Date("01/01/2011 00:00"))
-      assert(w.a4(2012L)==new java.util.Date("01/01/2012 00:00"))
+      assert(w.a4(2010L)==LocalDateTime.parse("01/01/2010 00:00"))
+      assert(w.a4(2011L)==LocalDateTime.parse("01/01/2011 00:00"))
+      assert(w.a4(2012L)==LocalDateTime.parse("01/01/2012 00:00"))
       get("a14",w).u(o("a1" --> "ex1","b1" --> "ex2","c1" --> "ex3"))
       assert(w.a14.get(MyEnum.a1)==Ex.ex1)
       assert(w.a14.get(MyEnum.b1)==Ex.ex2)
@@ -253,7 +254,7 @@ object CollectionBinderTest extends Helper {
     class V(val a1:scala.collection.immutable.BitSet,
            val a2:scala.collection.immutable.HashSet[Ex.Val],
            val a3:scala.collection.immutable.List[Ex.Val],
-           val a4:scala.collection.immutable.ListSet[java.util.Date],
+           val a4:scala.collection.immutable.ListSet[java.time.LocalDateTime],
            val a5:scala.collection.immutable.Queue[Ex.Val],
            val a6:scala.collection.immutable.IndexedSeq[Ex.Val],
            val a7:scala.collection.immutable.Iterable[Ex.Val],
@@ -359,9 +360,9 @@ object CollectionBinderTest extends Helper {
       assert(w.a3.contains(Ex.ex2))
       assert(!w.a3.contains(Ex.ex3))
       get("a4",w).u(o("01/01/2010 00:00","01/01/2011 00:00","01/01/2012 00:00","01/01/2012 00:00"))
-      assert(w.a4.contains(new java.util.Date("01/01/2010 00:00")))
-      assert(w.a4.contains(new java.util.Date("01/01/2011 00:00")))
-      assert(w.a4.contains(new java.util.Date("01/01/2012 00:00")))
+      assert(w.a4.contains(LocalDateTime.parse("01/01/2010 00:00")))
+      assert(w.a4.contains(LocalDateTime.parse("01/01/2011 00:00")))
+      assert(w.a4.contains(LocalDateTime.parse("01/01/2012 00:00")))
       assert(w.a4.size==3)
       get("a5",w).u(o("ex1","ex2"))
       assert(w.a5.front==Ex.ex1)

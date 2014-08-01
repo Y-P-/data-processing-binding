@@ -834,7 +834,7 @@ class Properties extends LinkedHashMap<String,String>{
         bw.newLine();
         synchronized (this) {
             for (String key : keySet()) {
-                String val = (String)get(key);
+                String val = get(key);
                 key = saveConvert(key, true, escUnicode);
                 /* No need to escape embedded and trailing spaces for value, hence
                  * pass false to flag.
