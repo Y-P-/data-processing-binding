@@ -1,5 +1,5 @@
 package utils.tree2
-
+/*
 import scala.annotation.tailrec
 import scala.collection.{Set,Map,GenTraversableOnce,IterableLike}
 import scala.collection.generic.Subtractable
@@ -7,6 +7,9 @@ import scala.collection.mutable.MapBuilder
 import scala.collection.mutable.Builder
 import java.util.NoSuchElementException
 import scala.collection.immutable.HashMap
+import scala.collection.Map
+import scala.collection.MapLike
+import scala.collection.immutable.AbstractMap
 
 /** A Prefix Tree is a tree where each sub-node has a name (K) and possibly a value (V)
  *  A child node is reached through its name (K)
@@ -37,36 +40,40 @@ import scala.collection.immutable.HashMap
  *  @param K    the key type
  *  @param V    the value type, covariant
  */
-trait PrefixTree[K,+V] { self=>
-  /** A type which is warranted to represent all sub-nodes of the tree */
-  type Sup>:this.type<:PrefixTree.PF[K,V,Sup]
-  /** no-cast conversion to Sup - solves compiler issues - required for upper traits */
-  final def repr:Sup = this
-  /** the canonical representation, if the (non default) children can be enumerated */
-  def canonical:Option[Iterable[(K,(Option[V],Sup))]]
+trait PrefixTreeLike[K,+V,+This<:PrefixTreeLike[K,V,This]] extends Map[K,This] with MapLike[K,This,This] { self:This=>
+  /** no-cast conversion to This - solves compiler issues - required for upper traits */
+  override def repr:This = this
+  //override protected[this] def newBuiler:Builder[(K, This),This] = null
+  override def empty:This = null.asInstanceOf[This]
   /** the way to reach a given child for its value and sub-tree ; default values, if any, must be accounted for here */
-  @throws(classOf[NoSuchElementException])
-  def value:PartialFunction[K, (Option[V],Sup)]
+  //@throws(classOf[NoSuchElementException])
+  //def get:PartialFunction[K, This]
   /** nice way to reach an item. e.g tree->"a"->"x" looks better than t("a")("x") */
-  def ->(key:K):(Option[V],Sup) = value(key)
-  
+  //def ->(key:K):This = apply(key)
+  /** indicates if this is a reference to a tree -as opposed to a real tree- */
+  def isRef:Boolean = false
+  /** value for that node, if any */
+  val value:Option[V]
+
   /** subtree for this sequence of keys, using all possible defaults */
-  def apply(keys:K*):(Option[V],Sup) = {
+  @tailrec def deepGet(keys:K*):Option[This] = {
     if (keys.length==0) throw new IllegalArgumentException
-    val r = value(keys(0))
-    if (keys.length==1) r  else r._2.apply(keys.tail:_*)
+    val r = get(keys(0))
+    if (keys.length==1) r  else r.get.deepGet(keys.tail:_*)
   }
-  
-  /** an iterator on the defined (non default) elements */
-  final def iterator: Iterator[(K, (Option[V],Sup))] = canonical match {
-    case None    => null
-    case Some(i) => i.toIterator
+  @tailrec def isDefinedAt(keys:K*):Boolean = {
+    if (keys.length==0) throw new IllegalArgumentException
+    val r = get(keys(0))
+    if (keys.length==1) r.isDefined  else r.get.isDefinedAt(keys.tail:_*)
   }
+    
+  /** provides a global iterator ; that iterator is used to visit the whole sub-trees */
+  def seqIterator(topFirst:Boolean):Iterator[(Seq[K], This)] = new TreeIterator(Nil,topFirst)
   
-  private class TreeIterator(val cur:scala.collection.immutable.List[K],topFirst:Boolean) extends Iterator[(Seq[K], (Option[V],Sup))] {
-    protected[this] val iter = iterator                                   //iterator for this level
-    protected[this] var i:Iterator[(Seq[K], (Option[V],Sup))] = getSub    //current sub-iterator
-    protected[this] var done:Boolean = false                              //true when this item has been provided
+  private class TreeIterator(val cur:scala.collection.immutable.List[K],topFirst:Boolean) extends Iterator[(Seq[K], This)] {
+    protected[this] val iter = iterator                        //iterator for this level
+    protected[this] var i:Iterator[(Seq[K], This)] = getSub     //current sub-iterator
+    protected[this] var done:Boolean = false                   //true when this item has been provided
     @tailrec final def hasNext:Boolean = {
       if (!done)     return true                               //if this item has not been processed, there is a next
       if (i==null)   return false                              //if there is no sub-iterator available (this item neing processed), we are finished
@@ -74,18 +81,18 @@ trait PrefixTree[K,+V] { self=>
       i = getSub                                               //for self recursing trees, we must find here if we can go on, i.e. fetch the next sub-iterator
       hasNext                                                  //and then check if it has a next element
     }
-    def next(): (Seq[K], (Option[V],Sup)) = {
+    def next(): (Seq[K], This) = {
       if (!done && (topFirst || i==null || !i.hasNext)) {      //give current item immediately if topFirst or wait for no more items
         done = true                                            //once processed, mark this
         (cur,repr)
       } else                                                   //if the next is not the current item, then it is the current sub-iterator next element
         i.next
     }
-    def getSub:Iterator[(Seq[K], (Option[V],Sup))] = {
+    def getSub:Iterator[(Seq[K], This)] = {
       if (iter.hasNext) {                                      //move to next element
         val (k,t)=iter.next
         if (!t.isRef)                                          //if not already processed
-          new t._2.TreeIterator(cur.+:(k),topFirst)            //fetch sub-iterator
+          new t.TreeIterator(cur.+:(k),topFirst)               //fetch sub-iterator
         else {
           Iterator((cur.+:(k),t))                              //iterate superficially on self-references (otherwise you might get an infinite loop)
         }
@@ -98,34 +105,37 @@ trait PrefixTree[K,+V] { self=>
    *  This is very convenient to build the Tree and iterate through it.
    *  This view provides such a map-like interface.
    */
-  class SeqTreeView extends Iterable[(Seq[K],Sup)] with PartialFunction[Seq[K], Sup] {
-    def get(keys:Seq[K]):(Option[V],Sup)             = self(keys:_*)
-    def +[T>:This<:R[K,_>:V,T]](kv: (Seq[K], T)): T     = (self:T).add(kv._1,kv._2)
-    def -(keys: Seq[K]): This                           = self.rem(keys:_*)
-    def iterator: Iterator[(Seq[K], This)]              = self.seqIterator(true)
-    def apply(keys: Seq[K]):This                        = self.apply(keys:_*)
-    def isDefinedAt(keys: Seq[K]):Boolean               = get(keys).isDefined
+  class SeqTreeView extends Map[Seq[K],This] with MapLike[Seq[K],This,SeqTreeView] {
+    def get(keys:Seq[K]):Option[This]                = self.deepGet(keys:_*)
+    def +[B1 >: This](kv: (Seq[K], B1)): SeqTreeView = null //(self:B1).add(kv._1,kv._2)
+    def -(keys: Seq[K]): SeqTreeView               = null //self.rem(keys:_*)
+    def iterator: Iterator[(Seq[K], This)]         = self.seqIterator(true)
+    override def empty: SeqTreeView                = null
+    override def isDefinedAt(keys: Seq[K]):Boolean = self.isDefinedAt(keys:_*) 
   }
   
 }
+
+class PrefixTree[K,+V](val value: Option[V],val tree: Map[K,PrefixTree[K,V]]) extends AbstractMap[K,PrefixTree[K,V]] with PrefixTreeLike[K,V,PrefixTree[K,V]] {
+  def +[B1 >: PrefixTree[K,V]](kv: (K, B1)): PrefixTree[K,V] = ???
+  def -(key: K): PrefixTree[K,V]                             = new PrefixTree(value,tree-key)
+  def get(key: K): Option[PrefixTree[K,V]]                   = tree.get(key)
+  def iterator:Iterator[(K, PrefixTree[K,V])]                = tree.iterator
+  override def empty: PrefixTree[K,V]                        = new PrefixTree[K,V](None,tree.empty)
+}
+
 object PrefixTree {
-  type PF[K,+V,+S]=PrefixTree[K,V] { type Sup<:S }
+  def apply[K,V](v:Option[V],tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V] = new PrefixTree[K,V](v,tree)
+  def apply[K,V](v:V,tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V]         = apply(Some(v),tree)
+  def apply[K,V](tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V]             = apply(None,tree)
 }
 
+class StringTree[+V](value: Option[V],tree: Map[String,StringTree[V]]) extends PrefixTree[String,V](value,tree) {
+  override def + [B1 >: StringTree[V]](kv: (String, B1))     = null //new StringTree(value,tree + kv)
+  override def -(key: String): StringTree[V]                 = new StringTree(value,tree - key)
+  override def get(key: String): Option[StringTree[V]]       = tree.get(key)
+  override def iterator: Iterator[(String, StringTree[V])]   = tree.iterator
+  override def empty: StringTree[V]                          = new StringTree[V](None,tree.empty)
+}
 
-/**
- * An implementation of PrefixTree where the key/values are stored in a Map.
- * Note that maps conveniently default to a method : this container can thus be used with
- * some generality.
- */
-trait MapPrefixTree[K,+V] extends PrefixTree[K,V] {
-  /** Implementation */
-  final def canonical:Option[Iterable[(K,(Option[V],Sup))]] = Some(value)
-  def value:Map[K,(Option[V],Sup)] 
-}
-object MapPrefixTree {
-  def apply[K,V,S>:MapPrefixTree[K,V]<:PrefixTree.PF[K,V,S]](map:Map[K,(Option[V],S)]) = new MapPrefixTree[K,V] {
-    type Sup = S
-    val value = map
-  }
-}
+*/
