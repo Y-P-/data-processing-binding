@@ -61,6 +61,8 @@ self:This =>
   
   /** A common implementation of `newBuilder` for all maps in terms of `empty`.
    *  Overridden for mutable maps in `mutable.MapLike`.
+   *  Note that this newBuilder cannot build a mapped Tree (i.e. K, V, Repr different from original.)
+   *  This limitation leads us to introduce a new kind of builder, which is more generic.
    */
   protected[this] def newBuilder: Builder[(K, Repr), Repr] = new StdPrefixTreeBuilder[K, V, Repr](empty)
   
@@ -267,12 +269,6 @@ self:This =>
   //XXX
   def isRef = false
   
-  /** subtree for this sequence of keys, using all possible defaults */
-  @tailrec final def get(key1:K,keys:K*):Option[Repr] = {
-    val r = get(key1)
-    if (keys.length==0) r  else r.get.get(keys(0),keys.tail:_*)
-  }
-  def isDefinedAt(key1:K,keys:K*):Boolean = get(key1,keys:_*)!=None
   def seqView = new SeqView
   
   
@@ -312,13 +308,17 @@ self:This =>
    *  This view provides such a map-like interface.
    */
   class SeqView {
-    def iterator(topFirst:Boolean):Iterator[(Seq[K], This)] = new TreeIterator(Nil,topFirst)
-    def get(keys:Seq[K]):Option[This]                       = self.get(keys(0),keys.tail:_*)
-    def +[B1 >: This](kv: (Seq[K], B1)): Repr#SeqView       = null //(self:B1).add(kv._1,kv._2)
-    def -(keys: Seq[K]): Repr#SeqView                       = if (keys.length==1) (self - keys(0)).seqView else (self(keys(0)).seqView - keys.tail)
+    def iterator(topFirst:Boolean):Iterator[(Seq[K], Repr)] = new TreeIterator(Nil,topFirst)
+    def apply(keys:K*):Repr                                 = keys.foldLeft(self)(_(_))
+    def get(keys:K*):Option[Repr]                           = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) return None else t.get.get(k))
+    def +[T>:Repr<:PrefixTreeLike[K,_,T]](kv:(Seq[K],T)):T  = if (kv._1.length==1) (self + ((kv._1(0),kv._2))) else (self(kv._1(0)).seqView + (kv._1.tail,kv._2))
+    def -(keys: Seq[K]): Repr                               = if (keys.length==1) (self - keys(0)) else (self(keys(0)).seqView - keys.tail)
     def iterator: Iterator[(Seq[K], This)]                  = iterator(true)
-    def empty: Repr#SeqView                                 = self.empty.seqView
-    def isDefinedAt(keys: Seq[K]):Boolean                   = get(keys)!=None
+    def isDefinedAt(keys: K*):Boolean                       = get(keys:_*)!=None
+    final def repr = self
+  }
+  object SeqView {
+    implicit def toRepr(s:SeqView) = s.repr
   }
 
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
@@ -347,6 +347,10 @@ self:This =>
   override def toString = super[IterableLike].toString
 }
 
+object PrefixTreeLike {
+  implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):T#SeqView = t.seqView
+}
+
 /*************************************************************************/
 /*************************************************************************/
 /*************************************************************************/
@@ -364,6 +368,17 @@ class StdPrefixTreeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](initial: Tree) ex
   def +=(x: (K, Tree)): this.type = { elems = elems + x; this }
   def clear() { elems = initial.empty }
   def result: Tree = elems
+}
+
+/** A more generic Builder for PrefixTreeLike.
+ *  In effect it can build any tree.
+ *  X is a helper type used to build that kind of tree.
+ */
+abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree],X] {
+  def emptyx:X
+  def apply(v:Option[V],tree:X):Tree
+  final def apply(v:V,tree:X):Tree = apply(Some(v),tree)
+  final def apply(v:V):Tree        = apply(Some(v),emptyx)
 }
 
 /*************************************************************************/
@@ -391,13 +406,13 @@ class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) ex
   
   /** A full map operation that can tranform key, value and Tree type.
    */
-  def map[W,L,T<:PrefixTree[L,W]](f:V=>W, g:K=>L)(implicit builder:PrefixTreeBuilder[L,W,T]):T = {
+  def map[W,L,T<:PrefixTree[L,W] with PrefixTreeLike[L,W,T]](f:V=>W, g:K=>L)(implicit builder:PrefixTreeBuilder[L,W,T]):T = {
     def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(g(x._1),h(x._2))))
     h(this)
   }
   /** A more usual map operation that only tranforms value and Tree type.
    */
-  def map[W,T<:PrefixTree[K,W]](f:V=>W)(implicit builder:PrefixTreeBuilder[K,W,T]):T = {
+  def map[W,T<:PrefixTree[K,W] with PrefixTreeLike[K,W,T]](f:V=>W)(implicit builder:PrefixTreeBuilder[K,W,T]):T = {
     def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(x._1,h(x._2))))
     h(this)
   }
@@ -409,6 +424,7 @@ class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) ex
 
 object PrefixTree {
   implicit def builder[K,V] = new PrefixTreeBuilder[K,V,PrefixTree[K,V]] {
+    def emptyx = Map.empty
     def apply(v:Option[V],tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V] = new PrefixTree[K,V](v,tree)
   }
   def apply[K,V](v:Option[V],tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V] = builder(v,tree)
@@ -419,12 +435,7 @@ object PrefixTree {
 
 /** A specific Builder for PrefixTree, which uses maps.
  */
-abstract class PrefixTreeBuilder[K,V,Tree<:PrefixTree[K,V]] {
-  def apply(v:Option[V],tree:Map[K,Tree]):Tree
-  final def apply(v:V,tree:Map[K,Tree]):Tree = apply(Some(v),tree)
-  final def apply(tree:Map[K,Tree]):Tree     = apply(None,tree)
-  final def apply(v:V):Tree                  = apply(Some(v),Map.empty[K,Tree])
-}
+abstract class PrefixTreeBuilder[K,V,Tree<:PrefixTree[K,V] with PrefixTreeLike[K,V,Tree]] extends PrefixTreeLikeBuilder[K,V,Tree,Map[K,Tree]]
 
 /*************************************************************************/
 /*************************************************************************/
@@ -438,6 +449,7 @@ class StringTree[+V](value: Option[V],override val tree: Map[String,StringTree[V
 
 object StringTree {
   implicit def builder[V] = new PrefixTreeBuilder[String,V,StringTree[V]] {
+    def emptyx = Map.empty
     def apply(v:Option[V],tree:Map[String,StringTree[V]]):StringTree[V] = new StringTree[V](v,tree)
   }
   def apply[V](v:Option[V],tree:Map[String,StringTree[V]]):StringTree[V] = builder(v,tree)
@@ -474,6 +486,12 @@ object X {
     println(q)
     val u = c111.map[String,StringTree[String]]((_:Int).toString+"x")
     println(u)
-    for (z<-u.seqView.iterator(true)) println(z)
+    for (z<-u.iterator(true)) println(z)
+    println(c111.get("d"))
+    println(c111.seqView.get("d","a"))
+    println(c111.seqView.get("d","a","c"))
+    println(c111("d"))
+    println(c111.seqView("d","a"))
+    println(c111.seqView("d","a","c"))
   }
 }
