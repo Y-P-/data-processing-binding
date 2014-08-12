@@ -77,8 +77,7 @@ self:This =>
    *  Note that this newBuilder cannot build a mapped Tree (i.e. K, V, Repr different from original.)
    *  This limitation leads us to introduce a new kind of builder, which is more generic.
    */
-  protected[this] def newBuilder: Builder[(K, Repr), Repr] = new StdPrefixTreeBuilder[K, V, Repr](empty)
-  protected[this] def builder:PrefixTreeLikeBuilder[K,V,Repr]
+  protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
   
   /** Optionally returns the value associated with a key.
    *
@@ -377,25 +376,19 @@ abstract class AbstractPrefixTree[K, +V, +This <: AbstractPrefixTree[K, V, This]
   this:This=>
 }
 
-/** The standard Builder for scala collections.
- */
-class StdPrefixTreeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](initial: Tree) extends Builder[(K,Tree),Tree] {
-  protected var elems: Tree = initial
-  def +=(x: (K, Tree)): this.type = { elems = elems + x; this }
-  def clear() { elems = initial.empty }
-  def result: Tree = elems
-}
 
-/** A more generic Builder for PrefixTreeLike.
- *  In effect it can build any tree.
- *  X is a helper type used to build that kind of tree.
+/** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  */
-abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] {
-  type X //some type used for building the tree part
-  def emptyx:X
-  def apply(v:Option[V],tree:X):Tree
-  final def apply(v:V,tree:X):Tree = apply(Some(v),tree)
-  final def apply(v:V):Tree        = apply(Some(v),emptyx)
+abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](val empty: Tree) extends Builder[(K,Tree),Tree] {
+  def apply(v:Option[V],tree:IterableLike[(K,Tree),_]):Tree
+  final def apply(v:V,tree:(K,Tree)*):Tree = apply(Some(v),tree)
+  final def apply(v:V,tree:IterableLike[(K,Tree),_]):Tree = apply(Some(v),tree)
+  final def apply(v:V):Tree = apply(Some(v),empty)
+  final def apply(tree:(K,Tree)*):Tree = apply(None,tree)
+  protected var elems: Tree = empty
+  def +=(x: (K, Tree)): this.type = { elems = elems + x; this }
+  def clear() { elems = empty }
+  def result: Tree = elems
 }
 
 /*************************************************************************/
@@ -405,43 +398,45 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] {
 
 /** The standard implementation sits on Maps.
  *  This opens up some opportunities by using Map operations.
+ *  Other esoteric implementation could exist, but this one should satisfy most needs, especially
+ *  when it can be subclassed while keeping the same subtype for operation return (such as + etc.)
+ *  See the StringTree subclass.
  */
 class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) extends AbstractPrefixTree[K,V,PrefixTree[K,V]] {
   def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](kv:(L,T),replace:Boolean): T = kv._2 match {
-    case t:PrefixTree[K,V]       => builder(value,tree+((kv._1, if (replace) t else tree.get(kv._1) match { case None=>t; case Some(t1)=>t.update(false,t1) } )))
+    case t:PrefixTree[K,V]       => newBuilder(value,tree+((kv._1, if (replace) t else tree.get(kv._1) match { case None=>t; case Some(t1)=>t.update(false,t1) } )))
     case t:PrefixTreeLike[K,_,T] => t.empty//.newBuilder()
   }
-  def -(key: K): Repr                    = builder(value,tree-key)
+  def -(key: K): Repr                    = newBuilder(value,tree-key)
   def get(key: K): Option[Repr]          = tree.get(key)
   def iterator:Iterator[(K, Repr)]       = tree.iterator
   override def size: Int                 = tree.size
-  override def empty: Repr               = builder(None,tree.empty)
-  def filterKeys(p: K => Boolean): Repr  = builder(value,tree.filterKeys(p))
+  override def empty: Repr               = newBuilder(None,tree.empty)
+  def filterKeys(p: K => Boolean): Repr  = newBuilder(value,tree.filterKeys(p))
 
-  protected[this] def builder:PrefixTreeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
+  protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
   
   /** A full map operation that can tranform key, value and Tree type.
    */
-  def map[W,L,T<:PrefixTree[L,W] with PrefixTreeLike[L,W,T]](f:V=>W, g:K=>L)(implicit builder:PrefixTreeBuilder[L,W,T]):T = {
+  def map[W,L,T<:PrefixTree[L,W] with PrefixTreeLike[L,W,T]](f:V=>W, g:K=>L)(implicit builder:PrefixTreeLikeBuilder[L,W,T]):T = {
     def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(g(x._1),h(x._2))))
     h(this)
   }
   /** A more usual map operation that only tranforms value and Tree type.
    */
-  def map[W,T<:PrefixTree[K,W] with PrefixTreeLike[K,W,T]](f:V=>W)(implicit builder:PrefixTreeBuilder[K,W,T]):T = {
+  def map[W,T<:PrefixTree[K,W] with PrefixTreeLike[K,W,T]](f:V=>W)(implicit builder:PrefixTreeLikeBuilder[K,W,T]):T = {
     def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(x._1,h(x._2))))
     h(this)
   }
   def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
-    def h(r:Repr):Repr = builder(r.value,r.tree.filter(p).map(x=>(x._1,h(x._2))))
+    def h(r:Repr):Repr = newBuilder(r.value,r.tree.filter(p).map(x=>(x._1,h(x._2))))
     h(this)
   }
 }
 
 object PrefixTree {
-  implicit def builder[K,V] = new PrefixTreeBuilder[K,V,PrefixTree[K,V]] {
-    def emptyx = Map.empty
-    def apply(v:Option[V],tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V] = new PrefixTree[K,V](v,tree)
+  implicit def builder[K,V] = new PrefixTreeLikeBuilder[K,V,PrefixTree[K,V]](new PrefixTree[K,V](None,Map.empty[K,PrefixTree[K,V]])) {
+    def apply(v: Option[V], tree: IterableLike[(K,PrefixTree[K,V]), _]):PrefixTree[K,V] = new PrefixTree[K,V](v,empty.tree++tree)
   }
   def apply[K,V](v:Option[V],tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V] = builder(v,tree)
   def apply[K,V](v:V,tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V]         = apply(Some(v),tree)
@@ -449,11 +444,6 @@ object PrefixTree {
   def apply[K,V](v:V):PrefixTree[K,V]                                     = apply(Some(v),Map.empty[K,PrefixTree[K,V]])
 }
 
-/** A specific Builder for PrefixTree, which uses maps.
- */
-abstract class PrefixTreeBuilder[K,V,Tree<:PrefixTree[K,V] with PrefixTreeLike[K,V,Tree]] extends PrefixTreeLikeBuilder[K,V,Tree] {
-  type X = Map[K,Tree]
-}
 
 /*************************************************************************/
 /*************************************************************************/
@@ -462,13 +452,12 @@ abstract class PrefixTreeBuilder[K,V,Tree<:PrefixTree[K,V] with PrefixTreeLike[K
 /** A common use case with String as key type.
  */
 class StringTree[+V](value: Option[V],override val tree: Map[String,StringTree[V]]) extends PrefixTree[String,V](value,tree) with PrefixTreeLike[String,V,StringTree[V]] {
-  protected[this] override def builder:PrefixTreeBuilder[String,V,Repr] = StringTree.builder[V]
+  protected[this] override def newBuilder:PrefixTreeLikeBuilder[String,V,Repr] = StringTree.builder[V]
 }
 
 object StringTree {
-  implicit def builder[V] = new PrefixTreeBuilder[String,V,StringTree[V]] {
-    def emptyx = Map.empty
-    def apply(v:Option[V],tree:Map[String,StringTree[V]]):StringTree[V] = new StringTree[V](v,tree)
+  implicit def builder[V] = new PrefixTreeLikeBuilder[String,V,StringTree[V]](new StringTree[V](None,Map.empty[String,StringTree[V]])) {
+    def apply(v: Option[V], tree: IterableLike[(String,StringTree[V]), _]):StringTree[V] = new StringTree[V](v,empty.tree++tree)
   }
   def apply[V](v:Option[V],tree:Map[String,StringTree[V]]):StringTree[V] = builder(v,tree)
   def apply[V](v:V,tree:Map[String,StringTree[V]]):StringTree[V]         = apply(Some(v),tree)
