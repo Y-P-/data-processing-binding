@@ -11,8 +11,8 @@ import scala.collection.AbstractIterator
 import scala.collection.AbstractIterable
 import scala.collection.GenTraversableOnce
 import scala.collection.MapLike
-
 import scala.annotation.tailrec
+import scala.collection.mutable.LinkedHashMap
 
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]
@@ -322,18 +322,58 @@ self:This =>
    *  This is very convenient to build the Tree and iterate through it.
    *  This view provides such a map-like interface.
    */
-  class SeqView extends PartialFunction[Seq[K], This] {
+  class SeqView extends PartialFunction[IterableLike[K,_], This] {
     def iterator(topFirst:Boolean,track:Boolean):Iterator[(Seq[K], Repr)] = new TreeIterator(Nil,topFirst,if (track) scala.collection.mutable.Set.empty else null)
-    def apply(keys:Seq[K]):Repr                             = keys.foldLeft(self)(_(_))
-    def get(keys:K*):Option[Repr]                           = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
-    def +[T>:Repr<:PrefixTreeLike[K,_,T]](kv:(Seq[K],T)):T  = if (kv._1.length==1) (self + ((kv._1(0),kv._2))) else (self(kv._1(0)).seqView + (kv._1.tail,kv._2))
-    def -(keys: Seq[K]): Repr                               = if (keys.length==1) (self - keys(0)) else (self(keys(0)).seqView - keys.tail)
-    def iterator: Iterator[(Seq[K], This)]                  = iterator(true,true)
-    def isDefinedAt(keys: Seq[K]):Boolean                   = get(keys:_*)!=None
     final def tree                                          = self
+    def iterator: Iterator[(Seq[K], This)]                  = iterator(true,true)
+    def apply(keys:IterableLike[K,_]):Repr                  = keys.foldLeft(self)(_(_))
+    def isDefinedAt(keys: IterableLike[K,_]):Boolean        = get(keys)!=None
+    def get(keys:IterableLike[K,_]):Option[Repr]            = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
+    def apply(keys:K*):Repr                                 = apply(keys)
+    def get(keys:K*):Option[Repr]                           = get(keys)
+    def +[I<:IterableLike[K,I]](kv:(I,V)):This = {
+      if (kv._1.isEmpty) self
+      val (h,t)=(kv._1.head,kv._1.tail)    //head and tail
+      self.get(h) match {                  //check current key in current tree
+        case Some(s) => s                  //exists ? use found tree
+        
+      }
+      if (t.isEmpty) (self + ((h,kv._2)))  //last key: update last tree with (key,value)
+      else (self.get(h) match {            
+        case Some(s) => s                  //exists ? use found tree
+        case None    => self+((h,empty))   //doesn't exist ? insert empty tree for that key
+      }).seqView + ((t,kv._2))             //update found subtree with tail
+    }
+    //XXX
+    def -(keys: Seq[K]): Repr                               = if (keys.length==1) (self - keys(0)) else (self(keys(0)).seqView - keys.tail)
   }
   object SeqView {
     implicit def toTree(s:SeqView) = s.tree
+    
+    /** inner utility : develops one level of data by tearing out the first elt of all inner iterables. */
+    protected def develop(data:Traversable[(Traversable[K],V)]) = {
+      val h = LinkedHashMap.empty[K,(Option[V],List[(Traversable[K],V)])]
+      for (x <- data; first=x._1.head; value=(x._1.tail,x._2)) h.put(first,(value._1.isEmpty,h.get(first)) match {
+        case (false,None)    => (None,List(value))    //create entry: intermediate leaf, init first child
+        case (true, None)    => (Some(value._2),Nil)  //create entry: final leaf, put value, no children
+        case (false,Some(l)) => (l._1,value::l._2)    //update entry: intermediate leaf, keep current value, update children
+        case (true, Some(l)) => (Some(value._2),l._2) //update entry: final leaf, put value, keep children
+      })
+      h //note that children lists are in reverse order
+    }
+    /** Develops data to build a 'Tree' beginning with the (name,cur) leaf, associated with data expanded as subtree */
+    def fromCanonical(data:Traversable[(Traversable[K],V)]):This = {
+      if (data.isEmpty)
+        empty
+      else {
+        var r = empty
+        develop(data).foreach { case (k,(v,l)) =>
+          r += ((k,if (l.isEmpty) newBuilder(v,empty) else newBuilder(v,fromCanonical(l))))
+        }
+        r
+      }
+    }
+    
   }
 
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
@@ -405,7 +445,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](val emp
 class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) extends AbstractPrefixTree[K,V,PrefixTree[K,V]] {
   def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](kv:(L,T),replace:Boolean): T = kv._2 match {
     case t:PrefixTree[K,V]       => newBuilder(value,tree+((kv._1, if (replace) t else tree.get(kv._1) match { case None=>t; case Some(t1)=>t.update(false,t1) } )))
-    case t:PrefixTreeLike[K,_,T] => t.empty//.newBuilder()
+    case t:PrefixTreeLike[K,_,T] => t.empty//XXX.newBuilder()
   }
   def -(key: K): Repr                    = newBuilder(value,tree-key)
   def get(key: K): Option[Repr]          = tree.get(key)
@@ -422,12 +462,14 @@ class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) ex
     def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(g(x._1),h(x._2))))
     h(this)
   }
+
   /** A more usual map operation that only tranforms value and Tree type.
    */
   def map[W,T<:PrefixTree[K,W] with PrefixTreeLike[K,W,T]](f:V=>W)(implicit builder:PrefixTreeLikeBuilder[K,W,T]):T = {
     def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(x._1,h(x._2))))
     h(this)
   }
+  
   def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
     def h(r:Repr):Repr = newBuilder(r.value,r.tree.filter(p).map(x=>(x._1,h(x._2))))
     h(this)
@@ -499,6 +541,7 @@ object X {
     println(c111.seqView.get("d","a","c"))
     println(c111("d"))
     println(c111.seqView(Seq("d","a")))
-    println(c111.seqView(Seq("d","a","c")))
+    try { println(c111.seqView(Seq("d","a","c"))) } catch { case e:java.util.NoSuchElementException => println("not found")}
+    println(c111.seqView + ((Seq("a","f"),7)))
   }
 }
