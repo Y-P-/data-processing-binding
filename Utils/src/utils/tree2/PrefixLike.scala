@@ -331,6 +331,7 @@ self:This =>
     def get(keys:IterableLike[K,_]):Option[Repr]            = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
     def apply(keys:K*):Repr                                 = apply(keys)
     def get(keys:K*):Option[Repr]                           = get(keys)
+    /*
     def +[I<:IterableLike[K,I]](kv:(I,V)):This = {
       if (kv._1.isEmpty) self
       val (h,t)=(kv._1.head,kv._1.tail)    //head and tail
@@ -344,36 +345,12 @@ self:This =>
         case None    => self+((h,empty))   //doesn't exist ? insert empty tree for that key
       }).seqView + ((t,kv._2))             //update found subtree with tail
     }
+    */
     //XXX
     def -(keys: Seq[K]): Repr                               = if (keys.length==1) (self - keys(0)) else (self(keys(0)).seqView - keys.tail)
   }
   object SeqView {
-    implicit def toTree(s:SeqView) = s.tree
-    
-    /** inner utility : develops one level of data by tearing out the first elt of all inner iterables. */
-    protected def develop(data:Traversable[(Traversable[K],V)]) = {
-      val h = LinkedHashMap.empty[K,(Option[V],List[(Traversable[K],V)])]
-      for (x <- data; first=x._1.head; value=(x._1.tail,x._2)) h.put(first,(value._1.isEmpty,h.get(first)) match {
-        case (false,None)    => (None,List(value))    //create entry: intermediate leaf, init first child
-        case (true, None)    => (Some(value._2),Nil)  //create entry: final leaf, put value, no children
-        case (false,Some(l)) => (l._1,value::l._2)    //update entry: intermediate leaf, keep current value, update children
-        case (true, Some(l)) => (Some(value._2),l._2) //update entry: final leaf, put value, keep children
-      })
-      h //note that children lists are in reverse order
-    }
-    /** Develops data to build a 'Tree' beginning with the (name,cur) leaf, associated with data expanded as subtree */
-    def fromCanonical(data:Traversable[(Traversable[K],V)]):This = {
-      if (data.isEmpty)
-        empty
-      else {
-        var r = empty
-        develop(data).foreach { case (k,(v,l)) =>
-          r += ((k,if (l.isEmpty) newBuilder(v,empty) else newBuilder(v,fromCanonical(l))))
-        }
-        r
-      }
-    }
-    
+    implicit def toTree(s:SeqView) = s.tree    
   }
 
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
@@ -429,6 +406,21 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](val emp
   def +=(x: (K, Tree)): this.type = { elems = elems + x; this }
   def clear() { elems = empty }
   def result: Tree = elems
+  
+  /** inner utility : develops one level of data by tearing out the first elt of all inner iterables. */
+  protected def develop(data:Traversable[(Traversable[K],V)]) = {
+    val h = LinkedHashMap.empty[K,(Option[V],List[(Traversable[K],V)])]
+    for (x <- data; first=x._1.head; value=(x._1.tail,x._2)) h.put(first,(value._1.isEmpty,h.get(first)) match {
+      case (false,None)    => (None,List(value))    //create entry: intermediate leaf, init first child
+      case (true, None)    => (Some(value._2),Nil)  //create entry: final leaf, put value, no children
+      case (false,Some(l)) => (l._1,value::l._2)    //update entry: intermediate leaf, keep current value, update children
+      case (true, Some(l)) => (Some(value._2),l._2) //update entry: final leaf, put value, keep children
+    })
+    h //note that children lists are in reverse order
+  }
+  /** Develops data to build a 'Tree' beginning with the (name,cur) leaf, associated with data expanded as subtree */
+  def fromCanonical(data:Traversable[(Traversable[K],V)]):Tree =
+    empty ++ (for ((k,(v,l)) <- develop(data)) yield (k,apply(v,fromCanonical(l))))
 }
 
 /*************************************************************************/
@@ -542,6 +534,14 @@ object X {
     println(c111("d"))
     println(c111.seqView(Seq("d","a")))
     try { println(c111.seqView(Seq("d","a","c"))) } catch { case e:java.util.NoSuchElementException => println("not found")}
-    println(c111.seqView + ((Seq("a","f"),7)))
+    println(StringTree.builder.fromCanonical(Seq(
+      (Seq("x","y"),1),
+      (Seq("x","y","z"),2),
+      (Seq("x"),3),
+      (Seq("x","v"),4),
+      (Seq("z"),5),
+      (Seq("z","a","b"),6),
+      (Seq("z"),7)
+    )))
   }
 }
