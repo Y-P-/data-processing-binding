@@ -3,6 +3,7 @@ package utils.tree2
 import scala.collection.mutable.LinkedHashMap
 import scala.collection.mutable.Builder
 import scala.collection.GenTraversableOnce
+import scala.collection.generic.CanBuildFrom
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  *  @param empty, an empty tree
@@ -62,6 +63,10 @@ object PrefixTreeLikeBuilder {
     final def apply[K,V](v:V,e:(K,T[K,V]),tree:(K,T[K,V])*):T[K,V]               = builder(v,e+:tree)
     final def apply[K,V](v:Option[V],e:(K,T[K,V]),tree:(K,T[K,V])*):T[K,V]       = builder(v,e+:tree)
     final def apply[K,V](tree:(K,T[K,V])*):T[K,V]                                = builder(None,tree)    
+    implicit def canBuildFrom[K, V] = new CanBuildFrom[PrefixTreeLike[_, _, _], (K, T[K,V]), T[K,V]] {
+      def apply(from: PrefixTreeLike[_, _, _]) = builder[K, V]
+      def apply() = builder[K,V]
+    }
   }
   /** a builder pattern for tree classes where V is free but K fixed (i.e. StringTree) */
   abstract class GenBuilder1[K,T[+v]<:PrefixTreeLike[K,v,T[v]]]  {
@@ -74,6 +79,10 @@ object PrefixTreeLikeBuilder {
     final def apply[V](v:V,e:(K,T[V]),tree:(K,T[V])*):T[V]                 = builder(v,e+:tree)
     final def apply[V](v:Option[V],e:(K,T[V]),tree:(K,T[V])*):T[V]         = builder(v,e+:tree)
     final def apply[V](tree:(K,T[V])*):T[V]                                = builder(None,tree)    
+    implicit def canBuildFrom[V] = new CanBuildFrom[PrefixTreeLike[K, _, _], (K, T[V]), T[V]] {
+      def apply(from: PrefixTreeLike[K, _, _]) = builder[V]
+      def apply() = builder[V]
+    }
   }
   /** a builder pattern for tree classes where both K and V are fixed */
   abstract class GenBuilder0[K,V,T<:PrefixTreeLike[K,V,T]]  {
@@ -86,5 +95,9 @@ object PrefixTreeLikeBuilder {
     final def apply(v:V,e:(K,T),tree:(K,T)*):T                    = builder(v,e+:tree)
     final def apply(v:Option[V],e:(K,T),tree:(K,T)*):T            = builder(v,e+:tree)
     final def apply(tree:(K,T)*):T                                = builder(None,tree)    
+    implicit def canBuildFrom = new CanBuildFrom[PrefixTreeLike[K, V, _], (K, T), T] {
+      def apply(from: PrefixTreeLike[K, V, _]) = builder
+      def apply() = builder
+    }
   }
 }

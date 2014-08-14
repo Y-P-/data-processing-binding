@@ -2,6 +2,8 @@ package utils.tree2
 
 import scala.collection.GenTraversableOnce
 import scala.collection.Map
+import scala.collection.generic.CanBuildFrom
+import scala.collection.immutable.IntMap
 
 /** The standard implementation sits on Maps.
  *  This opens up some opportunities by using Map operations.
@@ -48,7 +50,7 @@ class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) ex
 object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
   //note that the standard implementation uses the natural scala immutable Map as a support  
   implicit def builder[K,V] = apply(Map.empty[K,PrefixTree[K,V]])
-
+  
   /** A factory for working with varied map kinds if necessary.
    *  @see LinkedPrefixTree
    */
