@@ -295,8 +295,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   }
   
   /** The Tree can conveniently be viewed almost as a 'Map' with sequences of keys as key.
-   *  This is very convenient to build the Tree and iterate through it.
-   *  This view provides such a map-like interface.
+   *  This is very convenient to iterate through it.
    */
   class SeqView extends PartialFunction[GenTraversableOnce[K], This] with Iterable[(Seq[K], This)] {
     def iterator(topFirst:Boolean,track:Boolean):Iterator[(Seq[K], Repr)] = new TreeIterator(Nil,topFirst,if (track) scala.collection.mutable.Set.empty else null)
@@ -307,23 +306,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     def get(keys:GenTraversableOnce[K]):Option[Repr]     = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
     def apply(keys:K*):Repr                              = apply(keys)
     def get(keys:K*):Option[Repr]                        = get(keys)
-    /*
-    def +[I<:IterableLike[K,I]](kv:(I,V)):This = {
-      if (kv._1.isEmpty) self
-      val (h,t)=(kv._1.head,kv._1.tail)    //head and tail
-      self.get(h) match {                  //check current key in current tree
-        case Some(s) => s                  //exists ? use found tree
-        
-      }
-      if (t.isEmpty) (self + ((h,kv._2)))  //last key: update last tree with (key,value)
-      else (self.get(h) match {            
-        case Some(s) => s                  //exists ? use found tree
-        case None    => self+((h,empty))   //doesn't exist ? insert empty tree for that key
-      }).seqView + ((t,kv._2))             //update found subtree with tail
-    }
-    */
-    //XXX
-    def -(keys: Seq[K]): Repr                               = if (keys.length==1) (self - keys(0)) else (self(keys(0)).seqView - keys.tail)
   }
 
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
@@ -362,3 +344,96 @@ abstract class AbstractPrefixTreeLike[K, +V, +This <: AbstractPrefixTreeLike[K, 
   this:This=>
   override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
 }
+
+/*
+  def map[B, That](f: A => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    def builder = { // extracted to keep method size under 35 bytes, so that it can be JIT-inlined
+      val b = bf(repr)
+      b.sizeHint(this)
+      b
+    }
+    val b = builder
+    for (x <- this) b += f(x)
+    b.result
+  }
+
+  def flatMap[B, That](f: A => GenTraversableOnce[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    def builder = bf(repr) // extracted to keep method size under 35 bytes, so that it can be JIT-inlined
+    val b = builder
+    for (x <- this) b ++= f(x).seq
+    b.result
+  }
+
+  private def filterImpl(p: A => Boolean, isFlipped: Boolean): Repr = {
+    val b = newBuilder
+    for (x <- this)
+      if (p(x) != isFlipped) b += x
+
+    b.result
+  }
+
+  /** Selects all elements of this $coll which satisfy a predicate.
+   *
+   *  @param p     the predicate used to test elements.
+   *  @return      a new $coll consisting of all elements of this $coll that satisfy the given
+   *               predicate `p`. The order of the elements is preserved.
+   */
+  def filter(p: A => Boolean): Repr = filterImpl(p, isFlipped = false)
+
+  /** Selects all elements of this $coll which do not satisfy a predicate.
+   *
+   *  @param p     the predicate used to test elements.
+   *  @return      a new $coll consisting of all elements of this $coll that do not satisfy the given
+   *               predicate `p`. The order of the elements is preserved.
+   */
+  def filterNot(p: A => Boolean): Repr = filterImpl(p, isFlipped = true)
+
+  def collect[B, That](pf: PartialFunction[A, B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    foreach(pf.runWith(b += _))
+    b.result
+  }
+
+  /** Builds a new collection by applying an option-valued function to all
+   *  elements of this $coll on which the function is defined.
+   *
+   *  @param f      the option-valued function which filters and maps the $coll.
+   *  @tparam B     the element type of the returned collection.
+   *  @tparam That  $thatinfo
+   *  @param bf     $bfinfo
+   *  @return       a new collection of type `That` resulting from applying the option-valued function
+   *                `f` to each element and collecting all defined results.
+   *                The order of the elements is preserved.
+   *
+   *  @usecase def filterMap[B](f: A => Option[B]): $Coll[B]
+   *    @inheritdoc
+   *
+   *    @param pf     the partial function which filters and maps the $coll.
+   *    @return       a new $coll resulting from applying the given option-valued function
+   *                  `f` to each element and collecting all defined results.
+   *                  The order of the elements is preserved.
+  def filterMap[B, That](f: A => Option[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
+    val b = bf(repr)
+    for (x <- this)
+      f(x) match {
+        case Some(y) => b += y
+        case _ =>
+      }
+    b.result
+  }
+   */
+
+  /** Partitions this $coll in two ${coll}s according to a predicate.
+   *
+   *  @param p the predicate on which to partition.
+   *  @return  a pair of ${coll}s: the first $coll consists of all elements that
+   *           satisfy the predicate `p` and the second $coll consists of all elements
+   *           that don't. The relative order of the elements in the resulting ${coll}s
+   *           is the same as in the original $coll.
+   */
+  def partition(p: A => Boolean): (Repr, Repr) = {
+    val l, r = newBuilder
+    for (x <- this) (if (p(x)) l else r) += x
+    (l.result, r.result)
+  }
+ */

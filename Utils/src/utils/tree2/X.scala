@@ -7,6 +7,7 @@ object X {
   val c3 = StringTree(3)
   val c11 = StringTree(4,Map("a"->c1,"b"->c2))
   val c12 = StringTree(5,Map("c"->c3))
+  val c13 = StringTree(5,"d"->c2,"x"->c2)
   val c111 = StringTree(6,Map("d"->c11,"e"->c12))
     
   def f(x:StringTree[Int]):StringTree[String] = StringTree(x.value.map(_.toString+"x"),x.tree.mapValues(f))

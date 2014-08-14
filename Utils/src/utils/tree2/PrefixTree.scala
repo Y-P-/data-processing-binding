@@ -1,6 +1,7 @@
 package utils.tree2
 
 import scala.collection.GenTraversableOnce
+import scala.collection.Map
 
 /** The standard implementation sits on Maps.
  *  This opens up some opportunities by using Map operations.
@@ -44,12 +45,21 @@ class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) ex
   }
 }
 
-object PrefixTree {
-  implicit def builder[K,V] = new PrefixTreeLikeBuilder[K,V,PrefixTree[K,V]](new PrefixTree[K,V](None,Map.empty[K,PrefixTree[K,V]])) {
-    def apply(v: Option[V], tree: GenTraversableOnce[(K,PrefixTree[K,V])]):PrefixTree[K,V] = new PrefixTree[K,V](v,empty.tree++tree)
+object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
+  //note that the standard implementation uses the natural scala immutable Map as a support  
+  implicit def builder[K,V] = apply(Map.empty[K,PrefixTree[K,V]])
+
+  /** A factory for working with varied map kinds if necessary.
+   *  @see LinkedPrefixTree
+   */
+  def apply[K,V](emptyMap: Map[K, PrefixTree[K, V]]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] = {
+    def b: PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] = new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
+      //create a PrefixTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
+      def apply(v: Option[V], tree: GenTraversableOnce[(K, PrefixTree[K, V])]): PrefixTree[K, V] = new PrefixTree[K, V](v, emptyMap ++ tree) { 
+        override def newBuilder: PrefixTreeLikeBuilder[K, V, Repr] = b
+      }
+    }
+    b
   }
-  def apply[K,V](v:Option[V],tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V] = builder(v,tree)
-  def apply[K,V](v:V,tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V]         = apply(Some(v),tree)
-  def apply[K,V](tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V]             = apply(None,tree)
-  def apply[K,V](v:V):PrefixTree[K,V]                                     = apply(Some(v),Map.empty[K,PrefixTree[K,V]])
+  
 }

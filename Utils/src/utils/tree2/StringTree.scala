@@ -1,6 +1,7 @@
 package utils.tree2
 
 import scala.collection.GenTraversableOnce
+import scala.collection.Map
 
 /** A common use case with String as key type.
  */
@@ -8,12 +9,19 @@ class StringTree[+V](value: Option[V],override val tree: Map[String,StringTree[V
   protected[this] override def newBuilder:PrefixTreeLikeBuilder[String,V,Repr] = StringTree.builder[V]
 }
 
-object StringTree {
-  implicit def builder[V] = new PrefixTreeLikeBuilder[String,V,StringTree[V]](new StringTree[V](None,Map.empty[String,StringTree[V]])) {
-    def apply(v: Option[V], tree: GenTraversableOnce[(String,StringTree[V])]):StringTree[V] = new StringTree[V](v,empty.tree++tree)
+object StringTree extends PrefixTreeLikeBuilder.GenBuilder1[String,StringTree] {
+  implicit def builder[V] = apply(Map.empty)
+
+  /** A factory for working with varied map kinds if necessary.
+   *  @see LinkedPrefixTree
+   */
+  def apply[V](emptyMap: Map[String, StringTree[V]]):PrefixTreeLikeBuilder[String, V, StringTree[V]] = {
+    def b: PrefixTreeLikeBuilder[String, V, StringTree[V]] = new PrefixTreeLikeBuilder[String, V, StringTree[V]] {
+      //create a StringTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
+      def apply(v: Option[V], tree: GenTraversableOnce[(String, StringTree[V])]): StringTree[V] = new StringTree[V](v, emptyMap ++ tree) { 
+        override def newBuilder: PrefixTreeLikeBuilder[String, V, Repr] = b
+      }
+    }
+    b
   }
-  def apply[V](v:Option[V],tree:Map[String,StringTree[V]]):StringTree[V] = builder(v,tree)
-  def apply[V](v:V,tree:Map[String,StringTree[V]]):StringTree[V]         = apply(Some(v),tree)
-  def apply[V](tree:Map[String,StringTree[V]]):StringTree[V]             = apply(None,tree)
-  def apply[V](v:V):StringTree[V]                                        = apply(Some(v),Map.empty[String,StringTree[V]])
 }
