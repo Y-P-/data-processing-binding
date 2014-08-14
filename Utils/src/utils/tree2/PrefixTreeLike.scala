@@ -1,25 +1,21 @@
 package utils.tree2
 
-import scala.collection.generic.Subtractable
-import scala.collection.mutable.Builder
 import scala.collection.IterableLike
-import scala.collection.GenMapLike
-import scala.collection.Parallelizable
-import scala.collection.GenIterableLike
+import scala.collection.generic.Subtractable
 import scala.collection.AbstractSet
 import scala.collection.AbstractIterator
 import scala.collection.AbstractIterable
 import scala.collection.GenTraversableOnce
-import scala.collection.MapLike
 import scala.annotation.tailrec
-import scala.collection.mutable.LinkedHashMap
+import scala.runtime.AbstractPartialFunction
 
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]
      with IterableLike[(K, This), This]
      with Subtractable[K, This]
-     with Equals{
-self:This =>
+     with Equals { self:This =>
+  
+  /** The value for the current node */
   def value: Option[V]
   protected[this] type Repr = This
   override def repr:Repr = self
@@ -27,7 +23,14 @@ self:This =>
   /** The empty tree of the same type as this tree
    *   @return   an empty tree of type `This`.
    */
-  def empty: Repr
+  def empty: Repr = newBuilder.empty
+    
+  /** A common implementation of `newBuilder` for all maps in terms of `empty`.
+   *  Overridden for mutable maps in `mutable.MapLike`.
+   *  Note that this newBuilder cannot build a mapped Tree (i.e. K, V, Repr different from original.)
+   *  This limitation leads us to introduce a new kind of builder, which is more generic.
+   */
+  protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
   
   /** Removes a key from this tree, returning a new tree.
    *  @param    key the key to be removed
@@ -55,30 +58,8 @@ self:This =>
    *
    *  @return the new iterator
    */
-  
   def iterator: Iterator[(K, Repr)]
-  
-  /** Creates a new iterator over all key/value pairs of this tree.
-   *  This iterates only on all children and subchildren.
-   *
-   *  @return the new iterator
-   */
-  def deepIterator: Iterator[Repr] = new Iterator[Repr] {
-    private var cur=self
-    def hasNext: Boolean = cur!=null
-    def next(): Repr = {
-      val r=cur
-      r
-    }
-  }
-  
-  /** A common implementation of `newBuilder` for all maps in terms of `empty`.
-   *  Overridden for mutable maps in `mutable.MapLike`.
-   *  Note that this newBuilder cannot build a mapped Tree (i.e. K, V, Repr different from original.)
-   *  This limitation leads us to introduce a new kind of builder, which is more generic.
-   */
-  protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
-  
+
   /** Optionally returns the value associated with a key.
    *
    *  @param  key    the key value
@@ -100,11 +81,6 @@ self:This =>
     case None => default(key)
     case Some(value) => value
   }
-
-  /** Tests whether the tree is empty.
-   *  @return `true` if the tree does not contain any key/value binding, `false` otherwise.
-   */
-  override def isEmpty: Boolean = size == 0
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the tree.
    *   @param   key      the key.
@@ -190,8 +166,7 @@ self:This =>
    *  @param key the given key value for which a binding is missing.
    *  @throws `NoSuchElementException`
    */
-  def default(key: K): Repr =
-    throw new NoSuchElementException("key not found: " + key)
+  def default(key: K): Repr = throw new NoSuchElementException("key not found: " + key)
   
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
@@ -205,6 +180,7 @@ self:This =>
    *  @return a tree view which maps every element of this tree
    *          to `f(this)`. The resulting tree is a new tree.
    */
+  //XXX
   def map[C<:PrefixTreeLike[_,_,C]](f: Repr => C): C = f(this)  //yeah! that simple! but f is obviously recursive...
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
@@ -222,7 +198,7 @@ self:This =>
   
   /** Identical to the previous method, but elements are passed through an iterable like rather than a built Seq.
    */
-  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](replace:Boolean,kv:IterableLike[(L,T),_]): T =
+  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](replace:Boolean,kv:GenTraversableOnce[(L,T)]): T =
     kv.foldLeft[T](repr)(_.update(_,replace))
 
   /** Adds key/value pairs to this tree, returning a new tree.
@@ -322,15 +298,15 @@ self:This =>
    *  This is very convenient to build the Tree and iterate through it.
    *  This view provides such a map-like interface.
    */
-  class SeqView extends PartialFunction[IterableLike[K,_], This] {
+  class SeqView extends PartialFunction[GenTraversableOnce[K], This] with Iterable[(Seq[K], This)] {
     def iterator(topFirst:Boolean,track:Boolean):Iterator[(Seq[K], Repr)] = new TreeIterator(Nil,topFirst,if (track) scala.collection.mutable.Set.empty else null)
-    final def tree                                          = self
-    def iterator: Iterator[(Seq[K], This)]                  = iterator(true,true)
-    def apply(keys:IterableLike[K,_]):Repr                  = keys.foldLeft(self)(_(_))
-    def isDefinedAt(keys: IterableLike[K,_]):Boolean        = get(keys)!=None
-    def get(keys:IterableLike[K,_]):Option[Repr]            = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
-    def apply(keys:K*):Repr                                 = apply(keys)
-    def get(keys:K*):Option[Repr]                           = get(keys)
+    final def tree                                       = self
+    def iterator: Iterator[(Seq[K], This)]               = iterator(true,true)
+    def apply(keys:GenTraversableOnce[K]):Repr           = keys.foldLeft(self)(_(_))
+    def isDefinedAt(keys: GenTraversableOnce[K]):Boolean = get(keys)!=None
+    def get(keys:GenTraversableOnce[K]):Option[Repr]     = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
+    def apply(keys:K*):Repr                              = apply(keys)
+    def get(keys:K*):Option[Repr]                        = get(keys)
     /*
     def +[I<:IterableLike[K,I]](kv:(I,V)):This = {
       if (kv._1.isEmpty) self
@@ -348,9 +324,6 @@ self:This =>
     */
     //XXX
     def -(keys: Seq[K]): Repr                               = if (keys.length==1) (self - keys(0)) else (self(keys(0)).seqView - keys.tail)
-  }
-  object SeqView {
-    implicit def toTree(s:SeqView) = s.tree    
   }
 
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
@@ -383,165 +356,9 @@ object PrefixTreeLike {
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView
 }
 
-/*************************************************************************/
-/*************************************************************************/
-/*************************************************************************/
-
 /** An abstract class for the trait. Used to share code.
  */
-abstract class AbstractPrefixTree[K, +V, +This <: AbstractPrefixTree[K, V, This]] extends PrefixTreeLike[K, V, This] {
+abstract class AbstractPrefixTreeLike[K, +V, +This <: AbstractPrefixTreeLike[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] {
   this:This=>
-}
-
-
-/** A generic Builder for PrefixTreeLike which extends the standard Builder class.
- */
-abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](val empty: Tree) extends Builder[(K,Tree),Tree] {
-  def apply(v:Option[V],tree:IterableLike[(K,Tree),_]):Tree
-  final def apply(v:V,tree:(K,Tree)*):Tree = apply(Some(v),tree)
-  final def apply(v:V,tree:IterableLike[(K,Tree),_]):Tree = apply(Some(v),tree)
-  final def apply(v:V):Tree = apply(Some(v),empty)
-  final def apply(tree:(K,Tree)*):Tree = apply(None,tree)
-  protected var elems: Tree = empty
-  def +=(x: (K, Tree)): this.type = { elems = elems + x; this }
-  def clear() { elems = empty }
-  def result: Tree = elems
-  
-  /** inner utility : develops one level of data by tearing out the first elt of all inner iterables. */
-  protected def develop(data:Traversable[(Traversable[K],V)]) = {
-    val h = LinkedHashMap.empty[K,(Option[V],List[(Traversable[K],V)])]
-    for (x <- data; first=x._1.head; value=(x._1.tail,x._2)) h.put(first,(value._1.isEmpty,h.get(first)) match {
-      case (false,None)    => (None,List(value))    //create entry: intermediate leaf, init first child
-      case (true, None)    => (Some(value._2),Nil)  //create entry: final leaf, put value, no children
-      case (false,Some(l)) => (l._1,value::l._2)    //update entry: intermediate leaf, keep current value, update children
-      case (true, Some(l)) => (Some(value._2),l._2) //update entry: final leaf, put value, keep children
-    })
-    h //note that children lists are in reverse order
-  }
-  /** Develops data to build a 'Tree' beginning with the (name,cur) leaf, associated with data expanded as subtree */
-  def fromCanonical(data:Traversable[(Traversable[K],V)]):Tree =
-    empty ++ (for ((k,(v,l)) <- develop(data)) yield (k,apply(v,fromCanonical(l))))
-}
-
-/*************************************************************************/
-/*************************************************************************/
-/*************************************************************************/
-
-
-/** The standard implementation sits on Maps.
- *  This opens up some opportunities by using Map operations.
- *  Other esoteric implementation could exist, but this one should satisfy most needs, especially
- *  when it can be subclassed while keeping the same subtype for operation return (such as + etc.)
- *  See the StringTree subclass.
- */
-class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) extends AbstractPrefixTree[K,V,PrefixTree[K,V]] {
-  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](kv:(L,T),replace:Boolean): T = kv._2 match {
-    case t:PrefixTree[K,V]       => newBuilder(value,tree+((kv._1, if (replace) t else tree.get(kv._1) match { case None=>t; case Some(t1)=>t.update(false,t1) } )))
-    case t:PrefixTreeLike[K,_,T] => t.empty//XXX.newBuilder()
-  }
-  def -(key: K): Repr                    = newBuilder(value,tree-key)
-  def get(key: K): Option[Repr]          = tree.get(key)
-  def iterator:Iterator[(K, Repr)]       = tree.iterator
-  override def size: Int                 = tree.size
-  override def empty: Repr               = newBuilder(None,tree.empty)
-  def filterKeys(p: K => Boolean): Repr  = newBuilder(value,tree.filterKeys(p))
-
-  protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
-  
-  /** A full map operation that can tranform key, value and Tree type.
-   */
-  def map[W,L,T<:PrefixTree[L,W] with PrefixTreeLike[L,W,T]](f:V=>W, g:K=>L)(implicit builder:PrefixTreeLikeBuilder[L,W,T]):T = {
-    def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(g(x._1),h(x._2))))
-    h(this)
-  }
-
-  /** A more usual map operation that only tranforms value and Tree type.
-   */
-  def map[W,T<:PrefixTree[K,W] with PrefixTreeLike[K,W,T]](f:V=>W)(implicit builder:PrefixTreeLikeBuilder[K,W,T]):T = {
-    def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(x._1,h(x._2))))
-    h(this)
-  }
-  
-  def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
-    def h(r:Repr):Repr = newBuilder(r.value,r.tree.filter(p).map(x=>(x._1,h(x._2))))
-    h(this)
-  }
-}
-
-object PrefixTree {
-  implicit def builder[K,V] = new PrefixTreeLikeBuilder[K,V,PrefixTree[K,V]](new PrefixTree[K,V](None,Map.empty[K,PrefixTree[K,V]])) {
-    def apply(v: Option[V], tree: IterableLike[(K,PrefixTree[K,V]), _]):PrefixTree[K,V] = new PrefixTree[K,V](v,empty.tree++tree)
-  }
-  def apply[K,V](v:Option[V],tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V] = builder(v,tree)
-  def apply[K,V](v:V,tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V]         = apply(Some(v),tree)
-  def apply[K,V](tree:Map[K,PrefixTree[K,V]]):PrefixTree[K,V]             = apply(None,tree)
-  def apply[K,V](v:V):PrefixTree[K,V]                                     = apply(Some(v),Map.empty[K,PrefixTree[K,V]])
-}
-
-
-/*************************************************************************/
-/*************************************************************************/
-/*************************************************************************/
-
-/** A common use case with String as key type.
- */
-class StringTree[+V](value: Option[V],override val tree: Map[String,StringTree[V]]) extends PrefixTree[String,V](value,tree) with PrefixTreeLike[String,V,StringTree[V]] {
-  protected[this] override def newBuilder:PrefixTreeLikeBuilder[String,V,Repr] = StringTree.builder[V]
-}
-
-object StringTree {
-  implicit def builder[V] = new PrefixTreeLikeBuilder[String,V,StringTree[V]](new StringTree[V](None,Map.empty[String,StringTree[V]])) {
-    def apply(v: Option[V], tree: IterableLike[(String,StringTree[V]), _]):StringTree[V] = new StringTree[V](v,empty.tree++tree)
-  }
-  def apply[V](v:Option[V],tree:Map[String,StringTree[V]]):StringTree[V] = builder(v,tree)
-  def apply[V](v:V,tree:Map[String,StringTree[V]]):StringTree[V]         = apply(Some(v),tree)
-  def apply[V](tree:Map[String,StringTree[V]]):StringTree[V]             = apply(None,tree)
-  def apply[V](v:V):StringTree[V]                                        = apply(Some(v),Map.empty[String,StringTree[V]])
-}
-
-/*************************************************************************/
-/*************************************************************************/
-/*************************************************************************/
-
-object X {
-  val c1 = StringTree(1)
-  val c2 = StringTree(2)
-  val c3 = StringTree(3)
-  val c11 = StringTree(4,Map("a"->c1,"b"->c2))
-  val c12 = StringTree(5,Map("c"->c3))
-  val c111 = StringTree(6,Map("d"->c11,"e"->c12))
-    
-  def f(x:StringTree[Int]):StringTree[String] = StringTree(x.value.map(_.toString+"x"),x.tree.mapValues(f))
-  def g(x:(String,PrefixTree[String,_])):Boolean = x._1!="b"
-  def h(x:StringTree[Int]):PrefixTree[Int,String] = PrefixTree(x.value.map(_.toString+"x"),x.tree.map(x=>(x._1(0)-'a',h(x._2))))
-  
-  def main(a:Array[String]):Unit = {
-    println(c111)
-    val r = c111.map[StringTree[String]](f)      //deep
-    println(r)
-    val s = c111.filterAll(g)                    //one level
-    println(s)
-    val t = c111.map[PrefixTree[Int,String]](h)  //full mapping to other tree
-    println(t)
-    val q = c111.map(_.toString+"x",_(0) - 'a')
-    println(q)
-    val u = c111.map[String,StringTree[String]]((_:Int).toString+"x")
-    println(u)
-    for (z<-u.iterator(true,false)) println(z)
-    println(c111.get("d"))
-    println(c111.seqView.get("d","a"))
-    println(c111.seqView.get("d","a","c"))
-    println(c111("d"))
-    println(c111.seqView(Seq("d","a")))
-    try { println(c111.seqView(Seq("d","a","c"))) } catch { case e:java.util.NoSuchElementException => println("not found")}
-    println(StringTree.builder.fromCanonical(Seq(
-      (Seq("x","y"),1),
-      (Seq("x","y","z"),2),
-      (Seq("x"),3),
-      (Seq("x","v"),4),
-      (Seq("z"),5),
-      (Seq("z","a","b"),6),
-      (Seq("z"),7)
-    )))
-  }
+  override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
 }
