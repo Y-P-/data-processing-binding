@@ -8,6 +8,7 @@ import scala.collection.AbstractIterable
 import scala.collection.GenTraversableOnce
 import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
+import scala.collection.generic.CanBuildFrom
 
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]
@@ -182,6 +183,15 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   //XXX
   def map[C<:PrefixTreeLike[_,_,C]](f: Repr => C): C = f(this)  //yeah! that simple! but f is obviously recursive...
+
+  /** A more usual map operation that only tranforms value and Tree type.
+   */
+  def map0[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit canBuildFrom:CanBuildFrom[Repr,(K,T),T]):T = {
+    val b = canBuildFrom(this)
+    def h(r:Repr):T = { for (x <- this) b += ((x._1,x._2.map0(f))); b.result }
+    h(this) //XXX f(value)
+  }
+  
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
    *  @param    kv the key/value pair

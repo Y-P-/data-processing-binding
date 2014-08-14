@@ -19,9 +19,6 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   
   /** Common uses for building various trees, most notably leaves */
   final def apply(v:Option[V]):Tree                           = apply(v,empty)
-  final def apply(v:V,tree:GenTraversableOnce[(K,Tree)]):Tree = apply(Some(v),tree)
-  final def apply(v:V):Tree                                   = apply(Some(v),empty)
-  final def apply(v:V,tree:(K,Tree)*):Tree                    = apply(Some(v),tree)
   final def apply(tree:(K,Tree)*):Tree                        = apply(None,tree)
   
   /** Build a 'Tree' using the flat form. e.g.
@@ -52,31 +49,43 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   }
 }
 object PrefixTreeLikeBuilder {
+  implicit class Easy[K,V,Tree<:PrefixTreeLike[K,V,Tree]](b:PrefixTreeLikeBuilder[K,V,Tree]) {
+    //these methods could clash with the method with Option[V] ; we explicitely place them as a second choice
+    final def apply(v:V,tree:GenTraversableOnce[(K,Tree)]):Tree = b(Some(v),tree)
+    final def apply(v:V):Tree                                   = b(Some(v),b.empty)
+    final def apply(v:V,e:(K,Tree),tree:(K,Tree)*):Tree         = b(Some(v),e+:tree)    
+  }
   /** a builder pattern for tree classes where both K and V are free */
   abstract class GenBuilder2[T[k,+v]<:PrefixTreeLike[k,v,T[k,v]]] {
     implicit def builder[K,V]:PrefixTreeLikeBuilder[K,V,T[K,V]]
     final def apply[K,V](v:Option[V],tree:GenTraversableOnce[(K,T[K,V])]):T[K,V] = builder(v,tree)
-    final def apply[K,V](v:V,tree:GenTraversableOnce[(K,T[K,V])]):T[K,V]         = builder(Some(v),tree)
     final def apply[K,V](tree:GenTraversableOnce[(K,T[K,V])]):T[K,V]             = builder(None,tree)
-    final def apply[K,V](v:V):T[K,V]                                             = builder(v)
     final def apply[K,V](v:Option[V]):T[K,V]                                     = builder(v)
-    final def apply[K,V](v:V,e:(K,T[K,V]),tree:(K,T[K,V])*):T[K,V]               = builder(v,e+:tree)
     final def apply[K,V](v:Option[V],e:(K,T[K,V]),tree:(K,T[K,V])*):T[K,V]       = builder(v,e+:tree)
     final def apply[K,V](tree:(K,T[K,V])*):T[K,V]                                = builder(None,tree)    
-    implicit def canBuildFrom[K, V] = new CanBuildFrom[PrefixTreeLike[_, _, _], (K, T[K,V]), T[K,V]] {
-      def apply(from: PrefixTreeLike[_, _, _]) = builder[K, V]
-      def apply() = builder[K,V]
+    implicit def canBuildFrom[K, V] = new CanBuildFrom[PrefixTreeLike[_, _, _], (K, Option[V]), T[K,V]] {
+      def apply(from: PrefixTreeLike[_, _, _]) = apply()
+      def apply() = new Builder[(K, Option[V]), T[K,V]] {
+        var e = builder[K,V].empty
+        def +=(elem: (K, Option[V])) = { e += ((elem._1, builder(elem._2))); this }
+        def clear(): Unit = e = builder[K,V].empty
+        def result(): T[K,V] = e
+      }
     }
+  }
+  object GenBuilder2 {
+    implicit class Easy[T[k,+v]<:PrefixTreeLike[k,v,T[k,v]]](b:GenBuilder2[T]) {
+      final def apply[K,V](v:V,tree:GenTraversableOnce[(K,T[K,V])]):T[K,V]   = b(Some(v),tree)
+      final def apply[K,V](v:V):T[K,V]                                       = b(Some(v))
+      final def apply[K,V](v:V,e:(K,T[K,V]),tree:(K,T[K,V])*):T[K,V]         = b(v,e+:tree)
+    }    
   }
   /** a builder pattern for tree classes where V is free but K fixed (i.e. StringTree) */
   abstract class GenBuilder1[K,T[+v]<:PrefixTreeLike[K,v,T[v]]]  {
     implicit def builder[V]:PrefixTreeLikeBuilder[K,V,T[V]]
     final def apply[V](v:Option[V],tree:GenTraversableOnce[(K,T[V])]):T[V] = builder(v,tree)
-    final def apply[V](v:V,tree:GenTraversableOnce[(K,T[V])]):T[V]         = builder(Some(v),tree)
     final def apply[V](tree:GenTraversableOnce[(K,T[V])]):T[V]             = builder(None,tree)
-    final def apply[V](v:V):T[V]                                           = builder(v)
     final def apply[V](v:Option[V]):T[V]                                   = builder(v)
-    final def apply[V](v:V,e:(K,T[V]),tree:(K,T[V])*):T[V]                 = builder(v,e+:tree)
     final def apply[V](v:Option[V],e:(K,T[V]),tree:(K,T[V])*):T[V]         = builder(v,e+:tree)
     final def apply[V](tree:(K,T[V])*):T[V]                                = builder(None,tree)    
     implicit def canBuildFrom[V] = new CanBuildFrom[PrefixTreeLike[K, _, _], (K, T[V]), T[V]] {
@@ -84,20 +93,31 @@ object PrefixTreeLikeBuilder {
       def apply() = builder[V]
     }
   }
+  object GenBuilder1 {
+    implicit class Easy[K,T[+v]<:PrefixTreeLike[K,v,T[v]]](b:GenBuilder1[K,T]) {
+      final def apply[V](v:V,tree:GenTraversableOnce[(K,T[V])]):T[V] = b(Some(v),tree)
+      final def apply[V](v:V):T[V]                                   = b(Some(v))
+      final def apply[V](v:V,e:(K,T[V]),tree:(K,T[V])*):T[V]         = b(v,e+:tree)
+    }    
+  }
   /** a builder pattern for tree classes where both K and V are fixed */
   abstract class GenBuilder0[K,V,T<:PrefixTreeLike[K,V,T]]  {
     implicit def builder:PrefixTreeLikeBuilder[K,V,T]
     final def apply(v:Option[V],tree:GenTraversableOnce[(K,T)]):T = builder(v,tree)
-    final def apply(v:V,tree:GenTraversableOnce[(K,T)]):T         = builder(Some(v),tree)
     final def apply(tree:GenTraversableOnce[(K,T)]):T             = builder(None,tree)
-    final def apply(v:V):T                                        = builder(v)
     final def apply(v:Option[V]):T                                = builder(v)
-    final def apply(v:V,e:(K,T),tree:(K,T)*):T                    = builder(v,e+:tree)
     final def apply(v:Option[V],e:(K,T),tree:(K,T)*):T            = builder(v,e+:tree)
     final def apply(tree:(K,T)*):T                                = builder(None,tree)    
     implicit def canBuildFrom = new CanBuildFrom[PrefixTreeLike[K, V, _], (K, T), T] {
       def apply(from: PrefixTreeLike[K, V, _]) = builder
       def apply() = builder
     }
+  }
+  object GenBuilder0 {
+    implicit class Easy[K,V,T<:PrefixTreeLike[K,V,T]](b:GenBuilder0[K,V,T]) {
+      final def apply(v:V,tree:GenTraversableOnce[(K,T)]):T = b(Some(v),tree)
+      final def apply(v:V):T                                = b(Some(v))
+      final def apply(v:V,e:(K,T),tree:(K,T)*):T            = b(v,e+:tree)
+    }    
   }
 }
