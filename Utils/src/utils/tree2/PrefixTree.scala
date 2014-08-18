@@ -14,7 +14,7 @@ import scala.collection.immutable.IntMap
 class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) extends AbstractPrefixTreeLike[K,V,PrefixTree[K,V]] {
   protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
   
-  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](kv:(L,T),replace:Boolean): T = kv._2 match {
+  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](kv:(L,T))(implicit replace:Boolean): T = kv._2 match {
     case t:PrefixTree[K,V]       => newBuilder(value,tree+((kv._1, if (replace) t else tree.get(kv._1) match { case None=>t; case Some(t1)=>t.update(false,t1) } )))
     case t:PrefixTreeLike[K,_,T] => t.empty//XXX.newBuilder()
   }

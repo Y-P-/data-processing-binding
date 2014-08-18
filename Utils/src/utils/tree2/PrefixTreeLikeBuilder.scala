@@ -6,6 +6,8 @@ import scala.collection.GenTraversableOnce
 import scala.collection.GenTraversable
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
+ *  Builders method don't know about the replace/merge modes : they automatically replace.
+ *  This means you cannot pass two sub-trees for the same key and expect them to merge.
  *  @param empty, an empty tree
  */
 abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
@@ -26,13 +28,15 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    *  (a) 2
    *  (x,y) 3
    */
-  final def apply(flat:GenTraversable[(GenTraversable[K],V)]):Tree =
+  final def apply(flat:GenTraversable[(GenTraversable[K],V)]):Tree = {
+    implicit val replace = true
     empty ++ (for ((k,(v,l)) <- develop(flat)) yield (k,apply(v,apply(l))))
+  }
   
   /** Implementation of the common Builder from scala libs
    */
   protected var elems: Tree = empty
-  def +=(x: (K, Tree)): this.type = { elems = elems + x; this }
+  def +=(x: (K, Tree)): this.type = { implicit val replace = true; elems += x; this }
   def clear() { elems = empty }
   def result: Tree = elems
   
