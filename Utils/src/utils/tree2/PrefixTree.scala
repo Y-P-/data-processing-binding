@@ -26,21 +26,7 @@ class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) ex
   override def size: Int        = tree.size
   override def isEmpty: Boolean = tree.size == 0
   override def foreach[U](f: ((K,Repr)) => U): Unit = tree.foreach(f)
-  
-  /** A full map operation that can tranform key, value and Tree type.
-   */
-  def map[W,L,T<:PrefixTree[L,W] with PrefixTreeLike[L,W,T]](f:V=>W, g:K=>L)(implicit builder:PrefixTreeLikeBuilder[L,W,T]):T = {
-    def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(g(x._1),h(x._2))))
-    h(this)
-  }
-
-  /** A more usual map operation that only tranforms value and Tree type.
-   */
-  def map[W,T<:PrefixTree[K,W] with PrefixTreeLike[K,W,T]](f:V=>W)(implicit builder:PrefixTreeLikeBuilder[K,W,T]):T = {
-    def h(r:Repr):T = builder(r.value.map(f),r.tree.map(x=>(x._1,h(x._2))))
-    h(this)
-  }
-  
+    
   def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
     def h(r:Repr):Repr = newBuilder(r.value,r.tree.filter(p).map(x=>(x._1,h(x._2))))
     h(this)

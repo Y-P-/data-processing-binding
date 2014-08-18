@@ -10,20 +10,14 @@ object X {
   val c13 = StringTree(5,"d"->c2,"x"->c2)
   val c111 = StringTree(6,Map("d"->c11,"e"->c12))
     
-  def f(x:StringTree[Int]):StringTree[String] = StringTree(x.value.map(_.toString+"x"),x.tree.mapValues(f))
-  def g(x:(String,PrefixTree[String,_])):Boolean = x._1!="b"
-  def h(x:StringTree[Int]):PrefixTree[Int,String] = PrefixTree(x.value.map(_.toString+"x"),x.tree.map(x=>(x._1(0)-'a',h(x._2))))
-  
   def main(a:Array[String]):Unit = {
     println(c111)
-    val r = c111.map[StringTree[String]](f)      //deep
+    val r = c111.map[String,PrefixTree[String,String]]((_:Int).toString+"y")
     println(r)
-    val s = c111.filterAll(g)                    //one level
-    println(s)
-    val t = c111.map[PrefixTree[Int,String]](h)  //full mapping to other tree
+    val t = c111.map[Int,String,PrefixTree[Int,String]](_(0)-'a',_.toString+"y")  //full mapping to other tree
     println(t)
-    val q = c111.map(_.toString+"x",_(0) - 'a')
-    println(q)
+    val s = c111.filterAll(_._1!="b")                    //one level
+    println(s)
     val u = c111.map[String,StringTree[String]]((_:Int).toString+"x")
     println(u)
     for (z<-u.iterator(true,false)) println(z)

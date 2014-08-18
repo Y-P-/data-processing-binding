@@ -177,19 +177,26 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def filterKeys(p: K => Boolean): This
 
   /** Transforms this tree by applying a function to every retrieved value.
-   *  @param  f   the function used to transform values of this tree.
-   *  @return a tree view which maps every element of this tree
-   *          to `f(this)`. The resulting tree is a new tree.
+   *  @param  f   the function used to transform the values of this tree.
+   *  @return a tree which maps every element of this tree.
+   *            The resulting tree is a new tree.
    */
-  //XXX
-  def map[C<:PrefixTreeLike[_,_,C]](f: Repr => C): C = f(this)  //yeah! that simple! but f is obviously recursive...
-
-  /** A more usual map operation that only tranforms value and Tree type.
+  def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
+    var b = bf(value.map(f))
+    for (x <- this) b += ((x._1,x._2.map(f)))
+    b
+  }
+  
+  /** Transforms this tree by applying a function to every retrieved value and key.
+   *  @param  f   the function used to transform the keys of this tree.
+   *  @param  g   the function used to transform the values of this tree.
+   *  @return a tree which maps every element of this tree.
+   *          The resulting tree is a new tree.
    */
-  def map0[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit canBuildFrom:CanBuildFrom[Repr,(K,T),T]):T = {
-    val b = canBuildFrom(this)
-    def h(r:Repr):T = { for (x <- this) b += ((x._1,x._2.map0(f))); b.result }
-    h(this) //XXX f(value)
+  def map[L,W,T<:PrefixTreeLike[L,W,T]](f:K=>L,g:V=>W)(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
+    var b = bf(value.map(g))
+    for (x <- this) b += ((f(x._1),x._2.map(f,g)))
+    b
   }
   
   
