@@ -24,7 +24,7 @@ object ClassMap {
     def build[Y<:X](c:Class[Y]):R     //builds the value for c
     def apply(c:Class[_]):Option[R] = if (max>c) Some(build(c.asSubclass(max.c))) else None
   }
-  
+
   private[this] class F[R](f:Factory[_,R]*) extends (Class[_]=>Option[R]) {
     def apply(c:Class[_]):Option[R] = { for (f0<-f) { val r=f0(c); if (r!=None) return r }; None }
   }

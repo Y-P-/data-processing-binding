@@ -41,7 +41,7 @@ object Converters {
     def this(s:utils.StringConverter[V]) = this(s.dst)
     val src = classOf[String]
   }
-  object FromString {
+  object FromString { 
     implicit def toX[R](cz:FromString[R]):utils.ClassMap.Factory[_,FromString[_]] = new utils.ClassMap.Factory[R,FromString[R]] {
       def build[Y <: R](c: Class[Y]): FromString[R] = cz
       def max: RichClass[R] = cz.dst

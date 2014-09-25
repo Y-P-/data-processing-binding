@@ -12,6 +12,15 @@ import scala.collection.generic.CanBuildFrom
 import scala.collection.GenTraversable
 import scala.collection.mutable.ListBuffer
 
+/** Describes a tree where data is reached through a succession of keys.
+ *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
+ *  empty leaves. Using the methods with (GenTraversable[K],V) parameters (flat view of the tree) rely
+ *  on that property (they will omit to output such degenerate branches, and will not build them.)
+ *  
+ *  Operations on trees are not to take lightly ; the recursive nature of trees usually involves that
+ *  any transformation be done by rebuilding it. This is even true of the withFilter operation : at this
+ *  stage, there is yet no `view` for trees.
+ */
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]
      with IterableLike[(K, This), This]
@@ -194,30 +203,34 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree. 
    */
-  def map[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T], replace:Boolean):T = {
+  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T], replace:Boolean):T = {
     var b = bf(value.map(f._2))
-    for (x <- this) b += ((f._1(x._1),x._2.map(f)))
+    for (x <- this) b += ((f._1(x._1),x._2.mapFull(f)))
     b
   }
   
-  /** Transforms this tree by applying a function to every retrieved value and key.
-   *  The result can be easily explained as follows:
-   *  (1) watch the tree as its canonical sequence of Key, ending with its value
-   *  (2) transform each key to its L value
-   *  (3) expend each such sequence into as many sequences as there are for the image of V,
-   *      concatenating each found (in f(V)) entry with the current element entry (from input)
-   *  (4) build the whole new sequence of (Seq[L],W) and form the resulting tree
-   *  @param  f the function used to transform the keys and values of this tree.
+  /** Transforms this tree by applying a function to every key.
+   *  @param  f the function used to transform the keys of this tree.
    *  @return a tree which maps every element of this tree.
-   *          The resulting tree is a new tree. 
+   *          The resulting tree is a new tree.
    */
-  def flatMap[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](f:V=>GenTraversable[(GenTraversable[K],W)])(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
-    val buf = new ListBuffer[(Seq[K],W)]
-    for (x <- seqView; r <- x._2.value.map(f); y <- r)
-      buf += ((x._1 ++ y._1, y._2))
-    bf(buf)
+  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:K=>L)(implicit bf:PrefixTreeLikeBuilder[L,W,T], replace:Boolean):T = {
+    var b = bf(value)
+    for (x <- this) b += ((f(x._1),x._2.mapKeys[L,W,T](f)))
+    b
   }
-  
+    
+  /** Transforms this tree by applying a function to every retrieved value.
+   *  @param  f   the function used to transform the values of this tree.
+   *  @return a tree which maps every element of this tree.
+   *            The resulting tree is a new tree.
+   */
+  def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T], replace:Boolean):T = {
+    var b = bf.empty
+    for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
+    if (value.isDefined) b += f(value.get)
+    b
+  }
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
    *  @param    kv the key/value pair
@@ -294,14 +307,19 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     result
   }
   
-  def seqView = new SeqView
+  /** Creates the canonical flat representation of the tree.
+   *  Working with this supposes that your tree doesn't use degenerate branches (with no children and no value,
+   *  i.e. with empty as a node somewhere in the tree)
+   *  @return the canonical view of the tree
+   */
+  def seqView(topFirst:Boolean=true,trackDuplicate:Boolean=false) = new SeqView(topFirst,trackDuplicate)
   
   /** This class is used to iterate deeply through the tree.
-   *  @param cur the current sequence of key for the current element
+   *  @param cur the current sequence of key for the current element (from bottom to top!)
    *  @param topFirst is true if an element appears before its children, false otherwise
    *  @param seen is a set that is updated to track internal cross references ; if null, no such tracking happens (performance gain, but infinite loops possible)
    */
-  protected class TreeIterator(val cur:Seq[K],topFirst:Boolean,seen:scala.collection.mutable.Set[Repr]) extends AbstractIterator[(Seq[K], This)] {
+  protected class TreeIterator(cur:Seq[K],topFirst:Boolean,seen:scala.collection.mutable.Set[Repr]) extends AbstractIterator[(Seq[K], This)] {
     if (seen!=null) seen.add(repr)                             //remember that this tree is already being processed, to avoid loops in trees containing self-references 
     protected[this] val iter = iterator                        //iterator for this level
     protected[this] var i:Iterator[(Seq[K], This)] = getSub    //current sub-iterator
@@ -332,21 +350,35 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   /** The Tree can conveniently be viewed almost as a 'Map' with sequences of keys as key.
    *  This is very convenient to iterate through it.
+   *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
+   *  a new canonical form and build a new tree from that.
    */
-  class SeqView extends PartialFunction[GenTraversableOnce[K], This] with Iterable[(Seq[K], This)] {
-    def iterator(topFirst:Boolean,track:Boolean):Iterator[(Seq[K], Repr)] = new TreeIterator(Nil,topFirst,if (track) scala.collection.mutable.Set.empty else null)
+  protected class SeqView(topFirst:Boolean,trackDuplicate:Boolean) extends PartialFunction[GenTraversableOnce[K], This] with Iterable[(GenTraversable[K], V)] {
+    def iterator:Iterator[(GenTraversable[K], V)] = new Iterator[(GenTraversable[K], V)] {
+      val i = new TreeIterator(Nil,topFirst,if (trackDuplicate) scala.collection.mutable.Set.empty else null)
+      @tailrec def fetch:(Seq[K], This) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
+      var cur = fetch
+      def hasNext: Boolean = cur!=null
+      def next(): (Seq[K], V) = { val c=cur; cur=fetch; (c._1.reverse,c._2.value.get) }
+    }
     final def tree                                       = self
-    def iterator: Iterator[(Seq[K], This)]               = iterator(true,true)
     def apply(keys:GenTraversableOnce[K]):Repr           = keys.foldLeft(self)(_(_))
     def isDefinedAt(keys: GenTraversableOnce[K]):Boolean = get(keys)!=None
     def get(keys:GenTraversableOnce[K]):Option[Repr]     = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
     def apply(keys:K*):Repr                              = apply(keys)
     def get(keys:K*):Option[Repr]                        = get(keys)
+    /** Transforms this seqView by applying a function to every retrieved value and key.
+     *  @param  f the function used to transform the keys and values of this tree.
+     *  @return a tree which maps every element of this tree.
+     *          The resulting tree is a new tree. 
+     */
+    def flatMap[W](f:V=>GenTraversable[(GenTraversable[K],W)]):GenTraversable[(GenTraversable[K],W)] =
+      for (x <- iterator.toTraversable; r <- f(x._2)) yield ((x._1 ++ r._1, r._2))
   }
-
+  
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
-   *  The written text begins with the string `start` and ends with the string
-   *  `end`. Inside, the string representations of all bindings of this tree
+   *  The written text begins with the string `start` and ends with the string `end`.
+   *  Inside, the string representations of all bindings of this tree.
    *  in the form of `key -> value` are separated by the string `sep`.
    *
    *  @param b     the builder to which strings are appended.
@@ -371,7 +403,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 }
 
 object PrefixTreeLike {
-  implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView
+  implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
 }
 
 /** An abstract class for the trait. Used to share code.
@@ -382,48 +414,6 @@ abstract class AbstractPrefixTreeLike[K, +V, +This <: AbstractPrefixTreeLike[K, 
 }
 
 /*
-  def map[B, That](f: A => B)(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    def builder = { // extracted to keep method size under 35 bytes, so that it can be JIT-inlined
-      val b = bf(repr)
-      b.sizeHint(this)
-      b
-    }
-    val b = builder
-    for (x <- this) b += f(x)
-    b.result
-  }
-
-  def flatMap[B, That](f: A => GenTraversableOnce[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    def builder = bf(repr) // extracted to keep method size under 35 bytes, so that it can be JIT-inlined
-    val b = builder
-    for (x <- this) b ++= f(x).seq
-    b.result
-  }
-
-  private def filterImpl(p: A => Boolean, isFlipped: Boolean): Repr = {
-    val b = newBuilder
-    for (x <- this)
-      if (p(x) != isFlipped) b += x
-
-    b.result
-  }
-
-  /** Selects all elements of this $coll which satisfy a predicate.
-   *
-   *  @param p     the predicate used to test elements.
-   *  @return      a new $coll consisting of all elements of this $coll that satisfy the given
-   *               predicate `p`. The order of the elements is preserved.
-   */
-  def filter(p: A => Boolean): Repr = filterImpl(p, isFlipped = false)
-
-  /** Selects all elements of this $coll which do not satisfy a predicate.
-   *
-   *  @param p     the predicate used to test elements.
-   *  @return      a new $coll consisting of all elements of this $coll that do not satisfy the given
-   *               predicate `p`. The order of the elements is preserved.
-   */
-  def filterNot(p: A => Boolean): Repr = filterImpl(p, isFlipped = true)
-
   def collect[B, That](pf: PartialFunction[A, B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
     val b = bf(repr)
     foreach(pf.runWith(b += _))
