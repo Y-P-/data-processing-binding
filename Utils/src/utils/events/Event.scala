@@ -47,10 +47,7 @@ abstract class Emitter[-A,+S<:EventSource[_]](val event:Event) extends Tracked w
   
   def source:S
   def tracker = event
-  def emit(a:A):Unit = {
-    event.self.foreach(_.receive(a))
-    foreach(_.receive(a))
-  }
+  def emit(a:A):Unit = foreach(_.receive(a))
 }
 
 //a watcher for that specific emitter
@@ -70,7 +67,8 @@ class EventSource[+S](val source:S) extends Tracker2 {
   def attach[A](e:Event):Emitter[A,this.type] = new Emitter[A,this.type](e) with Tracked2 {
     def tracker2 = EventSource.this
     def source:EventSource.this.type = EventSource.this
-    override def emit(a:A):Unit = { super.emit(a); self.self.emit(null) }
+    //standard Emitter emits ; source emitter emits ; event emitter emits.
+    override def emit(a:A):Unit = { super.emit(a); self.self.emit(a); e.self.emit(a) }
   }
 }
 

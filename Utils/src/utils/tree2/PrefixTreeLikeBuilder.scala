@@ -6,11 +6,9 @@ import scala.collection.GenTraversableOnce
 import scala.collection.GenTraversable
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
- *  Builders method don't know about the replace/merge modes : they automatically replace.
- *  This means you cannot pass two sub-trees for the same key and expect them to merge.
- *  @param empty, an empty tree
+ *  @param replace indicates the merge mode used. You want it here, implicit, because it is used by += which signature you cannot change.
  */
-abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
+abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](implicit val replace:Boolean) extends Builder[(K,Tree),Tree] {
   /** This is the generic builder method for trees.
    *  Any Tree Builder class must implement this.
    */
@@ -27,29 +25,50 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    *  (a,b,c) 1
    *  (a) 2
    *  (x,y) 3
+   *  () 4
    */
   final def apply(flat:GenTraversable[(GenTraversable[K],V)]):Tree = {
-    implicit val replace = true
-    empty ++ (for ((k,(v,l)) <- develop(flat)) yield (k,apply(v,apply(l))))
+    val r = deepen(flat)
+    apply(r._1,r._2)
+  } 
+  
+  /** utility to build the map of trees for a flat representation
+   */
+  protected def deepen(flat:GenTraversable[(GenTraversable[K],V)]):(Option[V],LinkedHashMap[K,Tree]) = {
+    val d = develop(flat)
+    (d._1, for ((k,(v,l)) <- d._2) yield (k,apply(v,apply(l.reverse))))  //put back the list in the right order
   }
   
   /** Implementation of the common Builder from scala libs
    */
   protected var elems: Tree = empty
-  def +=(x: (K, Tree)): this.type = { implicit val replace = true; elems += x; this }
-  def clear() { elems = empty }
+  def +=(x: (K, Tree)): this.type = { elems += x; this }
+  def clear():Unit = { elems = empty }
   def result: Tree = elems
   
-  /** inner utility : develops one level of data by tearing out the first elt of all inner iterables. */
-  protected def develop(data:GenTraversable[(GenTraversable[K],V)]) = {
+  /** inner utility : develops one level of data by tearing out the first elt of all inner iterables.
+   *  @return (value for empty GenTraversable[K] if any, subtree in which children lists are in reverse order)
+   */
+  protected def develop(data:GenTraversable[(GenTraversable[K],V)]):(Option[V],LinkedHashMap[K,(Option[V],List[(GenTraversable[K],V)])]) = {
+    //We use a linked map to preserve the input order. This doesn't preclude the final representation,
+    //but obviously, this means that the last entries will squash previous entries if any.
     val h = LinkedHashMap.empty[K,(Option[V],List[(GenTraversable[K],V)])]
-    for (x <- data; first=x._1.head; value=(x._1.tail,x._2)) h.put(first,(value._1.isEmpty,h.get(first)) match {
-      case (false,None)    => (None,List(value))    //create entry: intermediate leaf, init first child
-      case (true, None)    => (Some(value._2),Nil)  //create entry: final leaf, put value, no children
-      case (false,Some(l)) => (l._1,value::l._2)    //update entry: intermediate leaf, keep current value, update children
-      case (true, Some(l)) => (Some(value._2),l._2) //update entry: final leaf, put value, keep children
-    })
-    h //note that children lists are in reverse order
+    var v:Option[V] = None
+    for (x <- data) {
+      if (x._1.isEmpty) {
+        v = Some(x._2)
+      } else {
+        val first=x._1.head
+        val value=(x._1.tail,x._2)
+        h.put(first,(value._1.isEmpty,h.get(first)) match {
+          case (false,None)    => (None,List(value))    //create entry: intermediate leaf, init first child
+          case (true, None)    => (Some(value._2),Nil)  //create entry: final leaf, put value, no children
+          case (false,Some(l)) => (l._1,value::l._2)    //update entry: intermediate leaf, keep current value, update children
+          case (true, Some(l)) => (Some(value._2),l._2) //update entry: final leaf, put value, keep children
+        })
+      }
+    }
+    (v,h) //note that children lists are in reverse order
   }
 }
 object PrefixTreeLikeBuilder {

@@ -33,7 +33,8 @@ object Test extends Observer {
 	  {
 		  obs(mouseButton.clicks.m)    { (e,a) => println("received "+a) }
 		  obs(Quit)                    { (e,a) => println("Quit detected") }
-		  obs(mouseButton.clicks.self) { (e,a) => println("mouse detected") }
+		  obs(mouseButton.clicks.self) { (e,a) =>
+		    println("mouse detected") }
 		}
 		  //{ case (src,ev,a) =>
 		  //  if (a.label.equals("quitter")) src.emit(Quit,null)

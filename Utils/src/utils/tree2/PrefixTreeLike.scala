@@ -122,7 +122,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param key the key
    *  @return    `true` if there is a binding for `key` in this tree, `false` otherwise.
    */
-  def isDefinedAt(key: K) = contains(key)
+  def isDefinedAt(key: K): Boolean = contains(key)
   
   def seq: Repr = this
 
@@ -222,14 +222,22 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     
   /** Transforms this tree by applying a function to every retrieved value.
    *  @param  f   the function used to transform the values of this tree.
-   *  @return a tree which maps every element of this tree.
-   *            The resulting tree is a new tree.
+   *  @return a tree which maps every value of this tree to a new tree with same key type
+   *            The resulting tree is a new tree with the same key type, the new value type,
+   *            which expands this tree values to new subtrees.
    */
-  def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T], replace:Boolean):T = {
-    var b = bf.empty
-    for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
-    if (value.isDefined) b += f(value.get)
-    b
+  def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T], replace:Boolean):T = {
+    if (value.isDefined) {
+      val r = f(value.get)
+      var b = bf(r.value)
+      for (x <- r) b += x
+      for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
+      b
+    } else {
+      var b = bf.empty
+      for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
+      b
+    }
   }
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
@@ -324,7 +332,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     protected[this] val iter = iterator                        //iterator for this level
     protected[this] var i:Iterator[(Seq[K], This)] = getSub    //current sub-iterator
     protected[this] var done:Boolean = false                   //true when this item has been provided
-    @tailrec final def hasNext:Boolean = !done || i!=null && (i.hasNext || {i=getSub; hasNext})
+    @tailrec final def hasNext():Boolean = !done || i!=null && (i.hasNext || {i=getSub; hasNext})
       //some clarifications: if this item has not been processed, there is a next
       //if there is no sub-iterator available and this item has been processed, we are finished
       //but if there is a sub-iterator with a next element, then there is a next
@@ -353,8 +361,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
    *  a new canonical form and build a new tree from that.
    */
-  protected class SeqView(topFirst:Boolean,trackDuplicate:Boolean) extends PartialFunction[GenTraversableOnce[K], This] with Iterable[(GenTraversable[K], V)] {
-    def iterator:Iterator[(GenTraversable[K], V)] = new Iterator[(GenTraversable[K], V)] {
+  protected class SeqView(topFirst:Boolean,trackDuplicate:Boolean) extends PartialFunction[GenTraversableOnce[K], This] with Iterable[(Seq[K], V)] {
+    def iterator:Iterator[(Seq[K], V)] = new Iterator[(Seq[K], V)] {
       val i = new TreeIterator(Nil,topFirst,if (trackDuplicate) scala.collection.mutable.Set.empty else null)
       @tailrec def fetch:(Seq[K], This) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
       var cur = fetch
