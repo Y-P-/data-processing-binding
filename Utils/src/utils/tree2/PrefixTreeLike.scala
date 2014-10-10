@@ -1,16 +1,18 @@
 package utils.tree2
 
 import scala.collection.IterableLike
-import scala.collection.generic.Subtractable
 import scala.collection.AbstractSet
 import scala.collection.AbstractIterator
 import scala.collection.AbstractIterable
 import scala.collection.GenTraversableOnce
+import scala.collection.GenTraversable
+import scala.collection.generic.CanBuildFrom
+import scala.collection.generic.Subtractable
+import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.ArrayBuffer
 import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
-import scala.collection.generic.CanBuildFrom
-import scala.collection.GenTraversable
-import scala.collection.mutable.ListBuffer
+import scala.collection.mutable.Buffer
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -54,7 +56,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def - (key: K): Repr
   
   /** Adds a key/(value,tree) pair to this tree, returning a new tree.
-   *  This standard operation uses the merge choice rather than the replace choice.
    *  Enlarge subtrees without losing information is usualy the expected operation on trees.
    *  @param    kv the key/(value,tree) pair
    *  @tparam   T1 the type of the added tree
@@ -63,7 +64,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *
    *  @usecase  def + (kv: (K, (V,T)): T
    */
-  def + [L>:K,T>:Repr<:PrefixTreeLike[L,_,T]] (kv:(L,T))(implicit replace:Boolean): T = update(kv)
+  def + [W>:V,T>:Repr<:PrefixTreeLike[K,W,T]] (kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv)
 
   /** Creates a new iterator over all key/value pairs of this tree.
    *  This iterates only on the immediate children.
@@ -117,7 +118,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Tests whether this tree contains a binding for a key. This method,
    *  which implements an abstract method of trait `PartialFunction`,
-   *  is equivalent to `contains`.
+   *  is equivalent to `contains`. Note that the default function doesn't 
+   *  qualify for the success of `isDefinedAt` in the standard implementation.
+   *  However it is possible to overload this method to account for the values
+   *  covered by the default.
    *
    *  @param key the key
    *  @return    `true` if there is a binding for `key` in this tree, `false` otherwise.
@@ -169,6 +173,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     def hasNext = iter.hasNext
     def next() = iter.next()._2
   }
+  
+  def orElse[L <: K, T >: This](that: T): T = null.asInstanceOf[T] 
 
   /** Defines the default value computation for the tree,
    *  returned when a key is not found
@@ -178,6 +184,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param key the given key value for which a binding is missing.
    *  @throws `NoSuchElementException`
    */
+  @throws(classOf[NoSuchElementException])
   def default(key: K): Repr = throw new NoSuchElementException("key not found: " + key)
   
   /** Filters this map by retaining only keys satisfying a predicate.
@@ -186,13 +193,37 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *          the predicate `p`. The resulting map wraps the original tree without copying any elements.
    */
   def filterKeys(p: K => Boolean): This
+  
+  /** Transform this tree with another tree using a transformer tree.
+   *  All trees are explored 'in parallel' and each sub-node of this tree is transformed using the
+   *  corresponding sub-node of the transformer tree.
+   *  Only the iterable elements of this tree are transformed (not the defaults) 
+   *  If a node has no corresponding transformer node, it is discarded, but default are explored
+   *  for values where the transformer.isDefinedAt method is true.
+   *  @param t   the transformer tree
+   *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
+   *  @return the resulting transformed tree
+   */
+  def zip[W,T<:PrefixTreeLike[K,W,T],O<:PrefixTreeLike[K,(T, Repr, TraversableOnce[(K,T)])=>T,O]](t0:T)(op0:O):T = {
+    def recur(t:T,cur:Repr,op:O):T =
+      op.value.get(t, cur, (for (x <- cur if op.isDefinedAt(x._1) && t.isDefinedAt(x._1)) yield ((x._1, recur(t(x._1), x._2, op(x._1))))))
+    recur(t0,this,op0)
+  }
+  /** Similar to the previous method, but the operation is constant throughout the trees and
+   *  the resulting call can be made more efficient.
+   */
+  def zip[W,T<:PrefixTreeLike[K,W,T]](t0:T)(op:(T,Repr,TraversableOnce[(K,T)])=>T):T = {
+    def recur(t:T,cur:Repr):T =
+      op(t, cur, (for (x <- cur if t.isDefinedAt(x._1)) yield ((x._1, recur(t(x._1),x._2)))))
+    recur(t0,this)
+  }
 
   /** Transforms this tree by applying a function to every retrieved value.
    *  @param  f   the function used to transform the values of this tree.
    *  @return a tree which maps every element of this tree.
    *            The resulting tree is a new tree.
    */
-  def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T], replace:Boolean):T = {
+  def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
     var b = bf(value.map(f))
     for (x <- this) b += ((x._1,x._2.map(f)))
     b
@@ -203,7 +234,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree. 
    */
-  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T], replace:Boolean):T = {
+  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
     var b = bf(value.map(f._2))
     for (x <- this) b += ((f._1(x._1),x._2.mapFull(f)))
     b
@@ -214,7 +245,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */
-  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:K=>L)(implicit bf:PrefixTreeLikeBuilder[L,W,T], replace:Boolean):T = {
+  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:K=>L)(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
     var b = bf(value)
     for (x <- this) b += ((f(x._1),x._2.mapKeys[L,W,T](f)))
     b
@@ -226,7 +257,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *            The resulting tree is a new tree with the same key type, the new value type,
    *            which expands this tree values to new subtrees.
    */
-  def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T], replace:Boolean):T = {
+  def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
     if (value.isDefined) {
       val r = f(value.get)
       var b = bf(r.value)
@@ -242,21 +273,20 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
    *  @param    kv the key/value pair
-   *  @param    replace if true, the existing value is discarded, if false it is merged
    *  @tparam   L the type of the new keys
    *  @tparam   T the type of the added value
    *  @return   A new tree with the new key/value mapping added to this map.
    */
-  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](kv:(L,T))(implicit replace:Boolean): T
+  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T
   
   /** Identical to the previous method, but more than one element is updated.
    */
-  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](replace:Boolean,kv:(L,T)*): T = update(replace,kv:_*)
+  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T)*)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv:_*)
   
   /** Identical to the previous method, but elements are passed through an iterable like rather than a built Seq.
    */
-  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](replace:Boolean,kv:GenTraversableOnce[(L,T)]): T =
-    kv.foldLeft[T](repr)(_.update(_)(replace))
+  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
+    kv.foldLeft[T](repr)(_.update[W,T](_))
 
   /** Adds key/value pairs to this tree, returning a new tree.
    *
@@ -274,10 +304,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *    @inheritdoc
    *    @param    kvs the key/value pairs
    */
-  def + [L>:K,T>:Repr<:PrefixTreeLike[L,_,T]] (kv1:(L,T), kv2:(L,T), kvs:(L,T) *)(implicit replace:Boolean): T =
-    this + kv1 + kv2 ++ kvs
+  def + [W>:V,T>:Repr<:PrefixTreeLike[K,W,T]] (kv1:(K,T), kv2:(K,T), kvs:(K,T) *)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
+    this +[W,T] kv1 + kv2 ++ kvs
 
-  /** Adds all key/value pairs in a traversable collection to this tree, returning a new map.
+  /** Adds all key/value pairs in a traversable collection to this tree, returning a new tree.
    *
    *  @param    xs  the collection containing the added key/value pairs
    *  @tparam   B1  the type of the added values
@@ -286,7 +316,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @usecase  def ++ (xs: Traversable[(A, B)]): Map[A, B]
    *    @inheritdoc
    */
-  def ++[T1 >: Repr <: PrefixTreeLike[K,_,T1]](xs: GenTraversableOnce[(K, T1)])(implicit replace:Boolean): T1 =
+  def ++[W>:V, T1 >: Repr <: PrefixTreeLike[K,W,T1]](xs: GenTraversableOnce[(K, T1)])(implicit bf:PrefixTreeLikeBuilder[K,W,T1]): T1 =
     ((repr: T1) /: xs.seq) (_ + _)
 
   /** Returns a new tree obtained by removing all key/value pairs for which the predicate
@@ -309,8 +339,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /* Overridden for efficiency. */
   override def toSeq: Seq[(K, Repr)] = toBuffer[(K, Repr)]
-  override def toBuffer[C >: (K, Repr)]: scala.collection.mutable.Buffer[C] = {
-    val result = new scala.collection.mutable.ArrayBuffer[C](size)
+  override def toBuffer[C >: (K, Repr)]: ArrayBuffer[C] = {
+    val result = new ArrayBuffer[C](size)
     copyToBuffer[C](result)
     result
   }
@@ -411,7 +441,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 }
 
 object PrefixTreeLike {
-  implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
+  implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()  
 }
 
 /** An abstract class for the trait. Used to share code.

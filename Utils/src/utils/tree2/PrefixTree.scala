@@ -5,6 +5,7 @@ import scala.collection.Map
 import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.IntMap
 import scala.collection.mutable.LinkedHashMap
+import scala.collection.mutable.ArrayBuffer
 
 /** The standard implementation sits on Maps.
  *  This opens up some opportunities by using Map operations.
@@ -15,10 +16,8 @@ import scala.collection.mutable.LinkedHashMap
 class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) extends AbstractPrefixTreeLike[K,V,PrefixTree[K,V]] {
   protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
   
-  def update[L>:K,T>:Repr<:PrefixTreeLike[L,_,T]](kv:(L,T))(implicit replace:Boolean): T = kv._2 match {
-    case t:PrefixTree[K,V]       => newBuilder(value,tree+((kv._1, if (replace) t else tree.get(kv._1) match { case None=>t; case Some(t1)=>t.update(false,t1) } )))
-    case t:PrefixTreeLike[K,V,T] => t.empty //XXX (value,tree+((kv._1, if (replace) t else tree.get(kv._1) match { case None=>t; case Some(t1)=>t.update(false,t1) } )))
-  }
+  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = 
+    bf(value,tree+kv)
   def -(key: K): Repr                    = newBuilder(value,tree-key)
   def get(key: K): Option[Repr]          = tree.get(key)
   def iterator:Iterator[(K, Repr)]       = tree.iterator
@@ -37,19 +36,17 @@ class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]]) ex
 object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
   //note that the standard implementation uses LinkedHashMap to preserve the canonical order
   //another map kind could be used, even an immutable one
-  implicit def builder[K,V] = apply(LinkedHashMap.empty[K,PrefixTree[K,V]])(true)
+  implicit def builder[K,V] = apply(LinkedHashMap.empty[K,PrefixTree[K,V]])
   
   /** A factory for working with varied map kinds if necessary.
    *  @see LinkedPrefixTree
    */
-  def apply[K,V](emptyMap: Map[K, PrefixTree[K, V]])(implicit replace:Boolean):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] = {
-    def b: PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] = new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
+  def apply[K,V](emptyMap: Map[K, PrefixTree[K, V]]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] =
+    new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { self=>
       //create a PrefixTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
       def apply(v: Option[V], tree: GenTraversableOnce[(K, PrefixTree[K, V])]): PrefixTree[K, V] = new PrefixTree[K, V](v, emptyMap ++ tree) { 
-        override def newBuilder: PrefixTreeLikeBuilder[K, V, Repr] = b
+        override def newBuilder: PrefixTreeLikeBuilder[K, V, Repr] = self
       }
     }
-    b
-  }
   
 }

@@ -12,18 +12,16 @@ class StringTree[+V](value: Option[V],override val tree: Map[String,StringTree[V
 
 object StringTree extends PrefixTreeLikeBuilder.GenBuilder1[String,StringTree] {
   //using LinkedHashMap as the repesentation to preserve canonical order
-  implicit def builder[V] = apply[V](LinkedHashMap.empty[String, StringTree[V]])(true)
+  implicit def builder[V] = apply[V](LinkedHashMap.empty[String, StringTree[V]])
 
   /** A factory for working with varied map kinds if necessary.
    *  @see LinkedPrefixTree
    */
-  def apply[V](emptyMap: Map[String, StringTree[V]])(implicit replace:Boolean):PrefixTreeLikeBuilder[String, V, StringTree[V]] = {
-    def b: PrefixTreeLikeBuilder[String, V, StringTree[V]] = new PrefixTreeLikeBuilder[String, V, StringTree[V]] {
+  def apply[V](emptyMap: Map[String, StringTree[V]]):PrefixTreeLikeBuilder[String, V, StringTree[V]] =
+    new PrefixTreeLikeBuilder[String, V, StringTree[V]] { self=>
       //create a StringTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
       def apply(v: Option[V], tree: GenTraversableOnce[(String, StringTree[V])]): StringTree[V] = new StringTree[V](v, emptyMap ++ tree) { 
-        override def newBuilder: PrefixTreeLikeBuilder[String, V, Repr] = b
+        override def newBuilder: PrefixTreeLikeBuilder[String, V, Repr] = self
       }
     }
-    b
-  }
 }

@@ -6,20 +6,24 @@ import scala.collection.GenTraversableOnce
 import scala.collection.GenTraversable
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
- *  @param replace indicates the merge mode used. You want it here, implicit, because it is used by += which signature you cannot change.
  */
-abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](implicit val replace:Boolean) extends Builder[(K,Tree),Tree] {
+abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
+  implicit final def self:this.type = this
   /** This is the generic builder method for trees.
    *  Any Tree Builder class must implement this.
    */
-  def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree
+  def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
   
   /** The empty value is often used */
-  val empty: Tree = apply(None,Nil)
+  val empty: Tree = apply(None,Nil,null)
   
   /** Common uses for building various trees, most notably leaves */
-  final def apply(v:Option[V]):Tree     = apply(v,empty)
-  final def apply(tree:(K,Tree)*):Tree  = apply(None,tree)
+  final def apply(v:Option[V]):Tree                                   = apply(v,empty,null)
+  final def apply(tree:(K,Tree)*):Tree                                = apply(None,tree,null)
+  //final def apply(default:K=>Tree):Tree                               = apply(None,empty,default)
+  //final def apply(v:Option[V],default:K=>Tree):Tree                   = apply(v,empty,default)
+  final def apply(default:K=>Tree,tree:(K,Tree)*):Tree                = apply(None,tree,default)
+  final def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree = apply(v,tree,null)
   
   /** Build a 'Tree' using the flat form. e.g.
    *  (a,b,c) 1
@@ -29,21 +33,22 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](implici
    */
   final def apply(flat:GenTraversable[(GenTraversable[K],V)]):Tree = {
     val r = deepen(flat)
-    apply(r._1,r._2)
+    apply(r._1,r._2,null)
   } 
   
-  /** utility to build the map of trees for a flat representation
+  /** utility to build the map of trees for a flat representation.
+   *  such a tree has no default!
    */
   protected def deepen(flat:GenTraversable[(GenTraversable[K],V)]):(Option[V],LinkedHashMap[K,Tree]) = {
     val d = develop(flat)
-    (d._1, for ((k,(v,l)) <- d._2) yield (k,apply(v,apply(l.reverse))))  //put back the list in the right order
+    (d._1, for ((k,(v,l)) <- d._2) yield (k,apply(v,null,apply(l.reverse))))  //put back the list in the right order
   }
   
   /** Implementation of the common Builder from scala libs
    */
   protected var elems: Tree = empty
   def +=(x: (K, Tree)): this.type = { elems += x; this }
-  def clear():Unit = { elems = empty }
+  def clear():Unit = elems = empty
   def result: Tree = elems
   
   /** inner utility : develops one level of data by tearing out the first elt of all inner iterables.
@@ -55,7 +60,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](implici
     val h = LinkedHashMap.empty[K,(Option[V],List[(GenTraversable[K],V)])]
     var v:Option[V] = None
     for (x <- data) {
-      if (x._1.isEmpty) {
+      if (x._1.isEmpty) { //deal with the case where the seq is empty: we fetch the value
         v = Some(x._2)
       } else {
         val first=x._1.head
