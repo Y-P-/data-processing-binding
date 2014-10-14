@@ -78,7 +78,14 @@ object TreeTests2 {
     
   def testConstant(implicit out:PrintWriter) = {
     val c = StringTree.builder[Int].constant(3)
-    out.println(c(""))
+    out.println(c)
+    out.println(c("a"))
+    out.println(c("a")("b")("c"))
+  }
+  
+  def testConstantMap(implicit out:PrintWriter) = {
+    val c = StringTree.builder[Int].constant(3).map[String,StringTree[String]]((_:Int).toString)
+    out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
   }
@@ -98,6 +105,7 @@ object TreeTests2 {
       testSeqFlatMap
       testFlatMap
       testConstant
+      testConstantMap
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
       //println(r1.seqView().mkString("\n"))
     }
