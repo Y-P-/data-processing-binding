@@ -61,7 +61,7 @@ object TreeTests2 {
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
-  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.builder[Int](m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
+  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.builder[Int](m.seqView().flatMap(mapper _),null).seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
   def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _).seqView().foreach(out.println)
@@ -74,7 +74,7 @@ object TreeTests2 {
       (Seq("z"),5),         //Note: squashed by the 7 below
       (Seq("z","a","b"),6),
       (Seq("z"),7)
-    )))
+    ),null))
   
   @Test class TreeTest2 extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {

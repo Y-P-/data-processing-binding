@@ -28,11 +28,23 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
      with IterableLike[(K, This), This]
      with Subtractable[K, This]
      with Equals { self:This =>
+       
+  protected[this] type Repr = This
+  override def repr:Repr = self
   
   /** The value for the current node */
   def value: Option[V]
-  protected[this] type Repr = This
-  override def repr:Repr = self
+  /** Defines the default value computation for the tree,
+   *  returned when a key is not found
+   *  The method implemented here throws an exception,
+   *  but it might be overridden in subclasses.
+   *
+   *  @param key the given key value for which a binding is missing.
+   *  @throws `NoSuchElementException`
+   */
+  @throws(classOf[NoSuchElementException])
+  def default: K=>Repr = key => throw new NoSuchElementException("key not found: " + key)
+  
 
   /** The empty tree of the same type as this tree
    *   @return   an empty tree of type `This`.
@@ -91,7 +103,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *              tree's `default` method, if none exists.
    */
   def apply(key: K): Repr = get(key) match {
-    case None => default(key)
+    case None => if (default==null) throw new NoSuchElementException(s"key not found $key") else default(key)
     case Some(value) => value
   }
 
@@ -176,17 +188,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   def orElse[L <: K, T >: This](that: T): T = null.asInstanceOf[T] 
 
-  /** Defines the default value computation for the tree,
-   *  returned when a key is not found
-   *  The method implemented here throws an exception,
-   *  but it might be overridden in subclasses.
-   *
-   *  @param key the given key value for which a binding is missing.
-   *  @throws `NoSuchElementException`
-   */
-  @throws(classOf[NoSuchElementException])
-  def default(key: K): Repr = throw new NoSuchElementException("key not found: " + key)
-  
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
    *  @return an immutable map consisting only of those key value pairs of this map where the key satisfies
