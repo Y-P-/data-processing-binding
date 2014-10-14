@@ -35,7 +35,7 @@ object TreeTests2 {
   def testMap2(implicit out:PrintWriter)  = out.println(m.map[String,StringTree[String]]((_:Int).toString+"y"))
   
   //tests the map operation to PrefixTree[Int,String] (full mapping of key and value)
-  def testMap3(implicit out:PrintWriter)  = out.println(m.mapFull[Int,String,PrefixTree[Int,String]](_(0)-'a',_.toString+"y"))
+  def testMap3(implicit out:PrintWriter)  = out.println(m.mapFull[Int,String,PrefixTree[Int,String]](_(0)-'a',null,_.toString+"y"))
   
   //tests filterAll
   def testFilter1(implicit out:PrintWriter) = out.println(m.filterAll(_._1!="b"))
@@ -61,7 +61,7 @@ object TreeTests2 {
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
-  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.builder[Int](m.seqView().flatMap(mapper _),null).seqView().foreach(out.println)
+  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.builder[Int](m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
   def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _).seqView().foreach(out.println)
@@ -74,7 +74,14 @@ object TreeTests2 {
       (Seq("z"),5),         //Note: squashed by the 7 below
       (Seq("z","a","b"),6),
       (Seq("z"),7)
-    ),null))
+    )))
+    
+  def testConstant(implicit out:PrintWriter) = {
+    val c = StringTree.builder[Int].constant(3)
+    out.println(c(""))
+    out.println(c("a"))
+    out.println(c("a")("b")("c"))
+  }
   
   @Test class TreeTest2 extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
@@ -90,6 +97,7 @@ object TreeTests2 {
       testBuildFromCanonical
       testSeqFlatMap
       testFlatMap
+      testConstant
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
       //println(r1.seqView().mkString("\n"))
     }

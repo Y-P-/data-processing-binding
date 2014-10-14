@@ -105,3 +105,6 @@ Tree(x -> Tree{3}(y -> Tree{1}(z -> Tree{2}()), v -> Tree{4}()), z -> Tree{7}(a 
 (List(f, x, a),1)
 (List(f, x, b),2)
 (List(f, x, c),2)
+Tree{3}()
+Tree{3}()
+Tree{3}()

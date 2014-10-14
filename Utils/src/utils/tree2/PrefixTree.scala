@@ -13,7 +13,7 @@ import scala.collection.mutable.ArrayBuffer
  *  when it can be subclassed while keeping the same subtype for operation return (such as + etc.)
  *  See the StringTree subclass.
  */
-class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V]) extends AbstractPrefixTreeLike[K,V,PrefixTree[K,V]] {
+class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V]) extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {
   protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
   
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = 
@@ -47,6 +47,8 @@ object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
       def apply(v: Option[V], tree: GenTraversableOnce[(K, PrefixTree[K, V])], default: K=>PrefixTree[K, V]): PrefixTree[K, V] = new PrefixTree[K, V](v, emptyMap ++ tree, default) { 
         override def newBuilder: PrefixTreeLikeBuilder[K, V, Repr] = self
       }
+      override def withValue(t:PrefixTree[K, V],v:Option[V]):PrefixTree[K, V] = new PrefixTree(v,t.tree,t.default)
+      override def withDefault(t:PrefixTree[K, V],default:K=>PrefixTree[K, V]):PrefixTree[K, V] = new PrefixTree(t.value,t.tree,default)
     }
   
 }

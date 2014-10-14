@@ -45,7 +45,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   @throws(classOf[NoSuchElementException])
   def default: K=>Repr = key => throw new NoSuchElementException("key not found: " + key)
   
-
   /** The empty tree of the same type as this tree
    *   @return   an empty tree of type `This`.
    */
@@ -57,6 +56,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  This limitation leads us to introduce a new kind of builder, which is more generic.
    */
   protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
+  
+  /** rebuilds this tree with a specific default */
+  final def withDefault[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](default:K=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withDefault(this, default)
+  /** rebuilds this tree with a specific value */
+  final def withValue[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](value:Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withValue(this, value)
   
   /** Removes a key from this tree, returning a new tree.
    *  @param    key the key to be removed
@@ -103,7 +107,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *              tree's `default` method, if none exists.
    */
   def apply(key: K): Repr = get(key) match {
-    case None => if (default==null) throw new NoSuchElementException(s"key not found $key") else default(key)
+    case None => default(key)
     case Some(value) => value
   }
 
@@ -115,10 +119,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *   @return  the value associated with `key` if it exists,
    *            otherwise the result of the `default` computation.
    *
-   *   @usecase def getOrElse(key: A, default: => B): B
+   *   @usecase def getOrElse(key: A, default: A => B): B
    *     @inheritdoc
    */
-  def getOrElse[T>:Repr](key: K, default: => T): T= get(key).getOrElse(default)
+  def getOrElse[T>:Repr](key: K, default: K => T): T = get(key).getOrElse(default(key))
 
 
   /** Tests whether this tree contains a binding for a key.
@@ -152,8 +156,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   protected class DefaultKeySet extends AbstractSet[K] with Set[K] with Serializable {
     def contains(key : K) = self.contains(key)
     def iterator = keysIterator
-    def + (elem: K): Set[K] = Set[K]() ++ this + elem
-    def - (elem: K): Set[K] = Set[K]() ++ this - elem
+    def + (elem: K): Set[K] = Set.empty[K] ++ this + elem
+    def - (elem: K): Set[K] = Set.empty[K] ++ this - elem
     override def size = self.size
     override def foreach[C](f: K => C) = self.keysIterator foreach f
   }
@@ -173,7 +177,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   protected class DefaultValuesIterable extends AbstractIterable[Repr] with Iterable[Repr] with Serializable {
     def iterator = valuesIterator
     override def size = self.size
-    override def foreach[C](f: Repr => C) = self.valuesIterator foreach f
+    override def foreach[C](f: Repr => C) = self.valuesIterator.foreach(f)
   }
 
   /** Creates an iterator for all values in this tree.
@@ -186,6 +190,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     def next() = iter.next()._2
   }
   
+  //XXX
   def orElse[L <: K, T >: This](that: T): T = null.asInstanceOf[T] 
 
   /** Filters this map by retaining only keys satisfying a predicate.
@@ -220,39 +225,50 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   }
 
   /** Transforms this tree by applying a function to every retrieved value.
+   *  It works also on default values, but be aware that using deep trees
+   *  in the default results may lead to a severe performance load.
    *  @param  f   the function used to transform the values of this tree.
    *  @return a tree which maps every element of this tree.
    *            The resulting tree is a new tree.
    */
   def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
-    var b = bf(value.map(f))
+    var b = bf(value.map(f),default(_).map(f))
     for (x <- this) b += ((x._1,x._2.map(f)))
     b
   }
   
   /** Transforms this tree by applying a function to every retrieved value and key.
+   *  It works also on default values, but be aware that using deep trees
+   *  in the default results may lead to a severe performance load.
    *  @param  f the function used to transform the keys and values of this tree.
+   *            it must be bijective in K<=>L if there are any default involved,
+   *            and in that case, f._2 must be given ; otherwise it can be null
+   *            and bijectivity is not compulsory
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree. 
    */
-  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
-    var b = bf(value.map(f._2))
+  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
+    var b = bf(value.map(f._3),l=>default(f._2(l)).mapFull(f))
     for (x <- this) b += ((f._1(x._1),x._2.mapFull(f)))
     b
   }
   
   /** Transforms this tree by applying a function to every key.
+   *  It works also on default values, but be aware that using deep trees
+   *  in the default results may lead to a severe performance load.
    *  @param  f the function used to transform the keys of this tree.
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */
-  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:K=>L)(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
-    var b = bf(value)
-    for (x <- this) b += ((f(x._1),x._2.mapKeys[L,W,T](f)))
+  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
+    var b = bf(value,l=>default(f._2(l)).mapKeys[L,W,T](f))
+    for (x <- this) b += ((f._1(x._1),x._2.mapKeys[L,W,T](f)))
     b
   }
     
   /** Transforms this tree by applying a function to every retrieved value.
+   *  It works also on default values, but be aware that using deep trees
+   *  in the default results may lead to a severe performance load.
    *  @param  f   the function used to transform the values of this tree.
    *  @return a tree which maps every value of this tree to a new tree with same key type
    *            The resulting tree is a new tree with the same key type, the new value type,
@@ -261,12 +277,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
     if (value.isDefined) {
       val r = f(value.get)
-      var b = bf(r.value)
+      var b = bf(r.value,default(_).flatMap[W,T](f))
       for (x <- r) b += x
       for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
       b
     } else {
-      var b = bf.empty
+      var b = bf(default(_:K).flatMap[W,T](f))
       for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
       b
     }
@@ -443,14 +459,15 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
 object PrefixTreeLike {
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()  
+  /** An abstract class for the trait. Used to share code.
+   */
+  abstract class Abstract[K, +V, +This <: Abstract[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] {
+    this:This=>
+    override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
+  }
 }
 
-/** An abstract class for the trait. Used to share code.
- */
-abstract class AbstractPrefixTreeLike[K, +V, +This <: AbstractPrefixTreeLike[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] {
-  this:This=>
-  override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
-}
+
 
 /*
   def collect[B, That](pf: PartialFunction[A, B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {

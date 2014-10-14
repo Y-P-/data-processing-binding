@@ -23,5 +23,7 @@ object StringTree extends PrefixTreeLikeBuilder.GenBuilder1[String,StringTree] {
       def apply(v: Option[V], tree: GenTraversableOnce[(String, StringTree[V])], default: String=>StringTree[V]): StringTree[V] = new StringTree[V](v, emptyMap ++ tree, default) { 
         override def newBuilder: PrefixTreeLikeBuilder[String, V, Repr] = self
       }
+      override def withValue(t:StringTree[V],v:Option[V]):StringTree[V] = new StringTree(v,t.tree,t.default)
+      override def withDefault(t:StringTree[V],default:String=>StringTree[V]):StringTree[V] = new StringTree(t.value,t.tree,default)
     }
 }
