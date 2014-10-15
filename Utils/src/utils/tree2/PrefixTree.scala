@@ -16,21 +16,14 @@ import scala.collection.mutable.ArrayBuffer
 class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V]) extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {
   protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
   
-  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = 
-    bf(value,tree+kv,null)
-  def -(key: K): Repr                    = newBuilder(value,tree-key,default)
-  def get(key: K): Option[Repr]          = tree.get(key)
-  def iterator:Iterator[(K, Repr)]       = tree.iterator
-  def filterKeys(p: K => Boolean): Repr  = newBuilder(value,tree.filterKeys(p),default)
+  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =  bf(value,tree+kv,default)
+  def -(key: K): Repr              = newBuilder(value,tree-key,default)
+  def get(key: K): Option[Repr]    = tree.get(key)
+  def iterator:Iterator[(K, Repr)] = tree.iterator
   /* overridden for efficiency */
   override def size: Int        = tree.size
-  override def isEmpty: Boolean = tree.size == 0
+  override def isEmpty: Boolean = tree.isEmpty
   override def foreach[U](f: ((K,Repr)) => U): Unit = tree.foreach(f)
-    
-  def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
-    def h(r:Repr):Repr = newBuilder(r.value,r.tree.filter(p).map(x=>(x._1,h(x._2))),default)
-    h(this)
-  }
 }
 
 object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {

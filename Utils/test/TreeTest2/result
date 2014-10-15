@@ -1,8 +1,14 @@
+----01--------
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
+----02--------
 Tree{7y}(d -> Tree{4y}(a -> Tree{1y}(), b -> Tree{2y}()), e -> Tree{5y}(c -> Tree{3y}()), f -> Tree{6y}(d -> Tree{4y}(a -> Tree{1y}(), b -> Tree{2y}()), x -> Tree{5y}(c -> Tree{3y}())))
+----03--------
 Tree{7y}(d -> Tree{4y}(a -> Tree{1y}(), b -> Tree{2y}()), e -> Tree{5y}(c -> Tree{3y}()), f -> Tree{6y}(d -> Tree{4y}(a -> Tree{1y}(), b -> Tree{2y}()), x -> Tree{5y}(c -> Tree{3y}())))
+----04--------
 Tree{7y}(3 -> Tree{4y}(0 -> Tree{1y}(), 1 -> Tree{2y}()), 4 -> Tree{5y}(2 -> Tree{3y}()), 5 -> Tree{6y}(3 -> Tree{4y}(0 -> Tree{1y}(), 1 -> Tree{2y}()), 23 -> Tree{5y}(2 -> Tree{3y}())))
+----05--------
 Tree{7}(d -> Tree{4}(a -> Tree{1}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}()), x -> Tree{5}(c -> Tree{3}())))
+----06--------
 (List(),7)
 (List(d),4)
 (List(d, a),1)
@@ -15,14 +21,18 @@ Tree{7}(d -> Tree{4}(a -> Tree{1}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}
 (List(f, d, b),2)
 (List(f, x),5)
 (List(f, x, c),3)
+----07--------
 Some(Tree{4}(a -> Tree{1}(), b -> Tree{2}()))
 Tree{4}(a -> Tree{1}(), b -> Tree{2}())
+----08--------
 Some(Tree{1}())
 Tree{1}()
 Tree{1}()
 None
 d.a.c not found
+----09--------
 Tree(x -> Tree{3}(y -> Tree{1}(z -> Tree{2}()), v -> Tree{4}()), z -> Tree{7}(a -> Tree(b -> Tree{6}())))
+----10--------
 (List(),6)
 (List(d),3)
 (List(d, a),7)
@@ -64,6 +74,7 @@ Tree(x -> Tree{3}(y -> Tree{1}(z -> Tree{2}()), v -> Tree{4}()), z -> Tree{7}(a 
 (List(f, x, a),1)
 (List(f, x, b),2)
 (List(f, x, c),2)
+----11--------
 (List(),6)
 (List(d),3)
 (List(d, a),7)
@@ -105,6 +116,16 @@ Tree(x -> Tree{3}(y -> Tree{1}(z -> Tree{2}()), v -> Tree{4}()), z -> Tree{7}(a 
 (List(f, x, a),1)
 (List(f, x, b),2)
 (List(f, x, c),2)
+----12--------
 Tree{3}()
 Tree{3}()
 Tree{3}()
+----13--------
+Tree{3}()
+Tree{3}()
+Tree{3}()
+----14--------
+Some(5)
+Some(1)
+Some(7)
+----15--------

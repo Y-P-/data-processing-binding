@@ -22,13 +22,17 @@ import scala.collection.mutable.Buffer
  *  Operations on trees are not to take lightly ; the recursive nature of trees usually involves that
  *  any transformation be done by rebuilding it. This is even true of the withFilter operation : at this
  *  stage, there is yet no `view` for trees.
+ *  
+ *  The `default` operation usually suggests that it can handle any other value not listed in the
+ *  iterable part of the tree
+ *  It must be differentiated from the `orElse` operation which links on a fallback tree.
  */
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]
      with IterableLike[(K, This), This]
      with Subtractable[K, This]
      with Equals { self:This =>
-       
+  //an alias that concrete classes can use as shrotcut to refer to themselves ; necessary too to get the appropriate overload on apply
   protected[this] type Repr = This
   override def repr:Repr = self
   
@@ -90,12 +94,30 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def iterator: Iterator[(K, Repr)]
 
   /** Optionally returns the value associated with a key.
+   *  The basic supposition is that keys found in the iterator yield a value, others yield a None.
    *
    *  @param  key    the key value
    *  @return an option value containing the value associated with `key` in this tree,
    *          or `None` if none exists.
    */
   def get(key: K): Option[Repr]
+
+  /** Filters this map by retaining only keys satisfying a predicate.
+   *  @param  p   the predicate used to test keys
+   *  @return an immutable map consisting only of those key value pairs of this map where the key satisfies
+   *          the predicate `p`. This results in a new tree.
+   */
+  def filterKeys(p: K => Boolean): Repr  = newBuilder(value,iterator.filter(x=>p(x._1)),default)
+  
+  /** Filters this map by retaining only key/value satisfying a predicate.
+   *  @param  p   the predicate used to test key/value
+   *  @return an immutable map consisting only of those key value pairs of this map where the key/value satisfies
+   *          the predicate `p`. This results in a new tree.
+   */
+  def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
+    def h(r:Repr):Repr = newBuilder(r.value,r.filter(p).map((x:(K,Repr))=>(x._1,h(x._2))),default)
+    h(this)
+  }
   
   /** Retrieves the value which is associated with the given key. This
    *  method invokes the `default` method of the tree if there is no mapping
@@ -122,7 +144,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *   @usecase def getOrElse(key: A, default: A => B): B
    *     @inheritdoc
    */
-  def getOrElse[T>:Repr](key: K, default: K => T): T = get(key).getOrElse(default(key))
+  def getOrElse[T>:Repr](key: K, default: => T): T = get(key).getOrElse(default)
 
 
   /** Tests whether this tree contains a binding for a key.
@@ -146,11 +168,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   def seq: Repr = this
 
-  /** Collects all keys of this tree in a set.
-   * @return  a set containing all keys of this tree.
-   */
-  def keySet: Set[K] = new DefaultKeySet
-
   /** The implementation class of the set returned by `keySet`.
    */
   protected class DefaultKeySet extends AbstractSet[K] with Set[K] with Serializable {
@@ -163,7 +180,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   }
 
   /** Creates an iterator for all keys.
-   *
    *  @return an iterator over all keys.
    */
   def keysIterator: Iterator[K] = new AbstractIterator[K] {
@@ -171,34 +187,38 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     def hasNext = iter.hasNext
     def next() = iter.next()._1
   }
+  /** Creates an iterator for all values in this tree.
+   *  @return an iterator over all values that are associated with some key in this tree.
+   */
+  def valuesIterator: Iterator[Repr] = new AbstractIterator[Repr] {
+    val iter = iterator
+    def hasNext = iter.hasNext
+    def next() = iter.next()._2
+  }
 
   /** The implementation class of the iterable returned by `values`.
    */
   protected class DefaultValuesIterable extends AbstractIterable[Repr] with Iterable[Repr] with Serializable {
     def iterator = valuesIterator
     override def size = self.size
-    override def foreach[C](f: Repr => C) = self.valuesIterator.foreach(f)
-  }
-
-  /** Creates an iterator for all values in this tree.
-   *
-   *  @return an iterator over all values that are associated with some key in this tree.
-   */
-  def valuesIterator: Iterator[Repr] = new AbstractIterator[Repr] {
-    val iter = self.iterator
-    def hasNext = iter.hasNext
-    def next() = iter.next()._2
+    override def foreach[C](f: Repr => C) = iterator.foreach(f)
   }
   
-  //XXX
-  def orElse[L <: K, T >: This](that: T): T = null.asInstanceOf[T] 
-
-  /** Filters this map by retaining only keys satisfying a predicate.
-   *  @param  p   the predicate used to test keys
-   *  @return an immutable map consisting only of those key value pairs of this map where the key satisfies
-   *          the predicate `p`. The resulting map wraps the original tree without copying any elements.
+  /** Collects all keys of this tree in a set.
+   * @return  a set containing all keys of this tree.
    */
-  def filterKeys(p: K => Boolean): This
+  def keySet: Set[K] = new DefaultKeySet
+  
+  /** Returns an iterable over the defined values, these for which isDefinedAt is true.
+   */
+  def values:Iterable[Repr] = new DefaultValuesIterable
+
+  
+  /** Creates a new tree by combining this tree with a fallback tree.
+   *  This builds a new tree, which keeps the value and default of this tree.
+   */
+  def orElse[W>:V, T>:Repr<:PrefixTreeLike[K,W,T]](that: T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
+    bf(value,that ++ this,default)
   
   /** Transform this tree with another tree using a transformer tree.
    *  All trees are explored 'in parallel' and each sub-node of this tree is transformed using the
@@ -374,24 +394,24 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param topFirst is true if an element appears before its children, false otherwise
    *  @param seen is a set that is updated to track internal cross references ; if null, no such tracking happens (performance gain, but infinite loops possible)
    */
-  protected class TreeIterator(cur:Seq[K],topFirst:Boolean,seen:scala.collection.mutable.Set[Repr]) extends AbstractIterator[(Seq[K], This)] {
+  protected class TreeIterator(cur:Seq[K],topFirst:Boolean,seen:scala.collection.mutable.Set[Repr]) extends AbstractIterator[(Seq[K], Repr)] {
     if (seen!=null) seen.add(repr)                             //remember that this tree is already being processed, to avoid loops in trees containing self-references 
     protected[this] val iter = iterator                        //iterator for this level
-    protected[this] var i:Iterator[(Seq[K], This)] = getSub    //current sub-iterator
+    protected[this] var i:Iterator[(Seq[K], Repr)] = getSub    //current sub-iterator
     protected[this] var done:Boolean = false                   //true when this item has been provided
     @tailrec final def hasNext():Boolean = !done || i!=null && (i.hasNext || {i=getSub; hasNext})
       //some clarifications: if this item has not been processed, there is a next
       //if there is no sub-iterator available and this item has been processed, we are finished
       //but if there is a sub-iterator with a next element, then there is a next
       //otherwise fetch the next sub-iterator (which could be null) and then check if it has a next element
-    final def next(): (Seq[K], This) = {
+    final def next(): (Seq[K], Repr) = {
       if (!done && (topFirst || i==null || !i.hasNext)) {      //give current item immediately if topFirst or wait for no more items
         done = true                                            //once processed, mark this
         (cur,repr)
       } else                                                   //if the next is not the current item, then it is the current sub-iterator next element
         i.next
     }
-    final def getSub:Iterator[(Seq[K], This)] = {
+    final def getSub:Iterator[(Seq[K], Repr)] = {
       if (iter.hasNext) {                                      //move to next element
         val (k,t)=iter.next
         if (seen==null || !seen.contains(t))                   //if not already processed
@@ -408,10 +428,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
    *  a new canonical form and build a new tree from that.
    */
-  protected class SeqView(topFirst:Boolean,trackDuplicate:Boolean) extends PartialFunction[GenTraversableOnce[K], This] with Iterable[(Seq[K], V)] {
+  protected class SeqView(topFirst:Boolean,trackDuplicate:Boolean) extends PartialFunction[GenTraversableOnce[K], Repr] with Iterable[(Seq[K], V)] {
     def iterator:Iterator[(Seq[K], V)] = new Iterator[(Seq[K], V)] {
       val i = new TreeIterator(Nil,topFirst,if (trackDuplicate) scala.collection.mutable.Set.empty else null)
-      @tailrec def fetch:(Seq[K], This) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
+      @tailrec def fetch:(Seq[K], Repr) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
       var cur = fetch
       def hasNext: Boolean = cur!=null
       def next(): (Seq[K], V) = { val c=cur; cur=fetch; (c._1.reverse,c._2.value.get) }
@@ -419,7 +439,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     final def tree                                       = self
     def apply(keys:GenTraversableOnce[K]):Repr           = keys.foldLeft(self)(_(_))
     def isDefinedAt(keys: GenTraversableOnce[K]):Boolean = get(keys)!=None
-    def get(keys:GenTraversableOnce[K]):Option[Repr]     = keys.foldLeft[Option[This]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
+    def get(keys:GenTraversableOnce[K]):Option[Repr]     = keys.foldLeft[Option[Repr]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
     def apply(keys:K*):Repr                              = apply(keys)
     def get(keys:K*):Option[Repr]                        = get(keys)
     /** Transforms this seqView by applying a function to every retrieved value and key.
