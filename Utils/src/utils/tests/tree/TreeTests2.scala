@@ -23,7 +23,7 @@ object TreeTests2 {
   /*
    * The same basic tree with complex default everywhere
    */
-  val m1 = {
+  val (m1,amap1) = {
     var c1:StringTree[Int]  = null
     var c2:StringTree[Int]  = null
     var c3:StringTree[Int]  = null
@@ -58,7 +58,7 @@ object TreeTests2 {
     c12 = StringTree(5,Seq("c"->c3),f1)
     c13 = StringTree(6,Seq("d"->c11,"x"->c12),f2)
     m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13),f3)
-    m
+    (m,Array(m,c1,c2,c3,c11,c12,c13)) //an array for mapping operation from Int => StringTree[Int]
   }  
   
   val amap = Array(m,c1,c2,c3,c11,c12,c13) //an array for mapping operation from Int => StringTree[Int]
@@ -116,8 +116,10 @@ object TreeTests2 {
 
   //tests FlatMap for map with default
   def testDefFlatMap(implicit out:PrintWriter) = {
-    val m2 = m1.flatMap[Int,StringTree[Int]](mapper1 _)
-    val r = m2("x")
+    val m2 = m1.flatMap[Int,StringTree[Int]]((i:Int)=>amap1(i-1))
+    out.println(m1.default("x").flatMap[Int,StringTree[Int]]((i:Int)=>amap1(i-1)).value)
+    out.println(m2.default("Y").value)
+    out.println(m2("o").value)
     out.println(m2("x").value)            //5
     out.println(m2("x")("a").value)       //1
     out.println(m2("x")("a")("z").value)  //7

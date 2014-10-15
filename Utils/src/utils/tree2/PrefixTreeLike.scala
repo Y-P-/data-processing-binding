@@ -295,17 +295,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *            which expands this tree values to new subtrees.
    */
   def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
-    if (value.isDefined) {
-      val r = f(value.get)
-      var b = bf(r.value,default(_).flatMap[W,T](f))
-      for (x <- r) b += x
-      for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
-      b
-    } else {
-      var b = bf(default(_:K).flatMap[W,T](f))
-      for (x <- this) b += ((x._1,x._2.flatMap[W,T](f)))
-      b
-    }
+    var r =  if (value.isDefined) f(value.get).withDefault(default(_).flatMap[W,T](f))
+             else                 bf(default(_:K).flatMap[W,T](f))
+    for (x <- this) r += ((x._1,x._2.flatMap[W,T](f)))
+    r
   }
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
