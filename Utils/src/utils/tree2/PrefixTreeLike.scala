@@ -13,6 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 import scala.collection.mutable.Buffer
+import scala.collection.TraversableOnce
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -267,11 +268,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree. 
    */
-  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
-    var b = bf(value.map(f._3),l=>default(f._2(l)).mapFull(f))
-    for (x <- this) b += ((f._1(x._1),x._2.mapFull(f)))
-    b
-  }
+  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T =
+    bf(value.map(f._3), for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapFull(f))), l=>default(f._2(l)).mapFull(f))
   
   /** Transforms this tree by applying a function to every key.
    *  It works also on default values, but be aware that using deep trees
@@ -280,25 +278,25 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */
-  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
-    var b = bf(value,l=>default(f._2(l)).mapKeys[L,W,T](f))
-    for (x <- this) b += ((f._1(x._1),x._2.mapKeys[L,W,T](f)))
-    b
-  }
+  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T =
+    bf(value, for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapKeys[L,W,T](f))), l=>default(f._2(l)).mapKeys[L,W,T](f))
     
   /** Transforms this tree by applying a function to every retrieved value.
-   *  It works also on default values, but be aware that using deep trees
-   *  in the default results may lead to a severe performance load.
-   *  @param  f   the function used to transform the values of this tree.
+   *  It works also on default values.
+   *  This is a non intuitive transformation that should be handled with care.
+   *  In case of conflict on expansion, the old value is preserved.
+   *  Note: this is best used to expand trees with only leaves with values: in that case
+   *        the transformation makes sense:
+   *        - intermediate nodes are unaffected (no value to expand)
+   *        - terminal nodes are expanded downward with the trees attached to the held value
+   *  @param  f  the function used to transform the values of this tree.
    *  @return a tree which maps every value of this tree to a new tree with same key type
    *            The resulting tree is a new tree with the same key type, the new value type,
    *            which expands this tree values to new subtrees.
    */
   def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
-    var r =  if (value.isDefined) f(value.get).withDefault(default(_).flatMap[W,T](f))
-             else                 bf(default(_:K).flatMap[W,T](f))
-    for (x <- this) r += ((x._1,x._2.flatMap[W,T](f)))
-    r
+    val e = (if (value.isDefined) f(value.get) else bf.empty)
+    bf(e.value, e++(for (x:(K,This) <- this) yield ((x._1,x._2.flatMap[W,T](f)))), default(_).flatMap[W,T](f))
   }
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.

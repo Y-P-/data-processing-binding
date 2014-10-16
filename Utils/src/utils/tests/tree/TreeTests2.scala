@@ -21,7 +21,8 @@ object TreeTests2 {
   val m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13))
 
   /*
-   * The same basic tree with complex default everywhere
+   * The same basic tree with complex default everywhere.
+   * This is an extremely convoulted tree which loops on itself in several ways.
    */
   val (m1,amap1) = {
     var c1:StringTree[Int]  = null
@@ -116,13 +117,30 @@ object TreeTests2 {
 
   //tests FlatMap for map with default
   def testDefFlatMap(implicit out:PrintWriter) = {
+    //we have to take a looks at the flat development of the tree with no default first
+    //we remember that flatMap enriches the existing tree, and replaces the current value with the value of the mapped tree
     val m2 = m1.flatMap[Int,StringTree[Int]]((i:Int)=>amap1(i-1))
-    out.println(m1.default("x").flatMap[Int,StringTree[Int]]((i:Int)=>amap1(i-1)).value)
-    out.println(m2.default("Y").value)
+    //the value of the map for 7 will replace m1 value => 6
+    out.println(m2.value)
+    //"x" is not a key for m1, but it is for c13 which was expended straight into m1 : m2("x") = c13("x") = c12
+    out.println(m2("x").value)            //value for c12 (5)
+    out.println(m2("x")("a").value)       //'a' is a default for c12 => f1(a) = c1 (1)
+    out.println(m2("x")("a")("z").value)  //'z' is no value for c1 => f1(z) = old top (7)  --remember: this subtree is expanded straight ; no subexpension within
+    out.println(m2("x")("a")("x").value)  //'x' is no value => f1(x) = c2 (2)
+    //"o" is not a key in m1, nor in map(7) ; its value is m1.default("o") = f3("o") = m1, expanded with flatmap => value of 6
+    //now, this default behaves as above : the transformation happens once only
+    //the itch of course is that each call to m2("o") rebuilds the image
     out.println(m2("o").value)
-    out.println(m2("x").value)            //5
-    out.println(m2("x")("a").value)       //1
-    out.println(m2("x")("a")("z").value)  //7
+    out.println(m2("o")("x").value)            //value for c12 (5)
+    out.println(m2("o")("x")("a").value)       //'a' is a default for c12 => f1(a) = c1 (1)
+    out.println(m2("o")("x")("a")("z").value)  //'z' is no value for c1 => f1(z) = old top (7)  --remember: this subtree is expanded straight ; no subexpension within
+    out.println(m2("o")("x")("a")("x").value)  //'x' is no value => f1(x) = c2 (2)
+    //check that the flapMap propagates down
+    out.println(m2("d").value)                 //was 4, replaced by 3
+    out.println(m2("d")("a").value)            //was 1, replaced by 7
+    out.println(m2("d")("a")("x").value)       //apply flatMap on f1("x")=c2 => c1 (1)
+    out.println(m2("d")("a")("a").value)       //apply flatMap on f1("a")=c1 => old top (7)
+    out.println(m2("d")("a")("o").value)       //apply flatMap on f1("o")=old top => c13 (6)
   }
   
   def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.builder[Int](Seq(
@@ -137,9 +155,16 @@ object TreeTests2 {
     
   def testConstant(implicit out:PrintWriter) = {
     val c = StringTree.builder[Int].constant(3)
+    //test that constant works
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
+    //tests that constant works on flatmap as expected
+    val c2 = StringTree.builder[Double].constant(5.01)
+    val c1 = c.flatMap[Double,StringTree[Double]]((i:Int)=> if (i==3) c2 else null)
+    out.println(c1)
+    out.println(c1("a"))
+    out.println(c1("a")("b")("c"))
   }
   
   def testConstantMap(implicit out:PrintWriter) = {
