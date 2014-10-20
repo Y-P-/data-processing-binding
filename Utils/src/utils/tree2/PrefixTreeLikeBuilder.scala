@@ -14,15 +14,17 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    */
   def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
   
-  /** The empty value is often used ; you can override this if you want another default `default` method than PrefixTreeLikeBuilder.noElt */
-  val empty: Tree = apply(None,Nil,PrefixTreeLikeBuilder.noElt)
+  /** You can override this if you want another default `default` method than PrefixTreeLikeBuilder.noElt */
+  def noDefault:K=>Tree = PrefixTreeLikeBuilder.noElt
+  /** The empty value is often used ; share it */
+  val empty: Tree = apply(None,Nil,null)
   
   /** Common uses for building various trees, most notably leaves */
-  final def apply(v:Option[V]):Tree                                   = apply(v,Nil,empty.default)
-  final def apply(tree:(K,Tree)*):Tree                                = apply(None,tree,empty.default)
+  final def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
+  final def apply(tree:(K,Tree)*):Tree                                = apply(None,tree,null)
   final def apply(default:K=>Tree):Tree                               = apply(None,Nil,default)
   final def apply(default:K=>Tree,tree:(K,Tree)*):Tree                = apply(None,tree,default)
-  final def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree = apply(v,tree,empty.default)
+  final def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree = apply(v,tree,null)
   final def apply(v:Option[V],default:K=>Tree):Tree                   = apply(v,Nil,default)
   
   /** rebuilds t with a specific, different value ; can usefully be overridden for perfs */

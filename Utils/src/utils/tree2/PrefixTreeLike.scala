@@ -48,7 +48,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @throws `NoSuchElementException`
    */
   @throws(classOf[NoSuchElementException])
-  def default: K=>Repr = key => throw new NoSuchElementException("key not found: " + key)
+  def default: K=>Repr
   
   /** The empty tree of the same type as this tree
    *   @return   an empty tree of type `This`.
@@ -236,6 +236,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       op.value.get(t, cur, (for (x <- cur if op.isDefinedAt(x._1) && t.isDefinedAt(x._1)) yield ((x._1, recur(t(x._1), x._2, op(x._1))))))
     recur(t0,this,op0)
   }
+  
   /** Similar to the previous method, but the operation is constant throughout the trees and
    *  the resulting call can be made more efficient.
    */

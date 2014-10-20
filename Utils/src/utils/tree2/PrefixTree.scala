@@ -13,9 +13,9 @@ import scala.collection.mutable.ArrayBuffer
  *  when it can be subclassed while keeping the same subtype for operation return (such as + etc.)
  *  See the StringTree subclass.
  */
-class PrefixTree[K,+V](val value:Option[V], val tree: Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V]) extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {
-  protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = PrefixTree.builder[K,V]
-  
+abstract class PrefixTree[K,+V] extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {  
+  def value:Option[V] = None
+  def tree: Map[K,Repr] = Map.empty[K,Repr]
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =  bf(value,tree+kv,default)
   def -(key: K): Repr              = newBuilder(value,tree-key,default)
   def get(key: K): Option[Repr]    = tree.get(key)
@@ -32,16 +32,26 @@ object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
   implicit def builder[K,V] = apply(LinkedHashMap.empty[K,PrefixTree[K,V]])
   
   /** A factory for working with varied map kinds if necessary.
-   *  @see LinkedPrefixTree
+   *  We choose to internally subclass StringTree so as to minimize the memory footprint.
    */
-  def apply[K,V](emptyMap: Map[K, PrefixTree[K, V]]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] =
+  def apply[K,V](emptyMap: Map[K, PrefixTree[K, V]]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] = {
     new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { self=>
-      //create a PrefixTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
-      def apply(v: Option[V], tree: GenTraversableOnce[(K, PrefixTree[K, V])], default: K=>PrefixTree[K, V]): PrefixTree[K, V] = new PrefixTree[K, V](v, emptyMap ++ tree, default) { 
-        override def newBuilder: PrefixTreeLikeBuilder[K, V, Repr] = self
+      class Abstract extends PrefixTree[K, V] {
+        def newBuilder: PrefixTreeLikeBuilder[K, V, Repr] = self
+        def default = noDefault
       }
-      override def withValue(t:PrefixTree[K, V],v:Option[V]):PrefixTree[K, V] = new PrefixTree(v,t.tree,t.default)
-      override def withDefault(t:PrefixTree[K, V],default:K=>PrefixTree[K, V]):PrefixTree[K, V] = new PrefixTree(t.value,t.tree,default)
+      //create a PrefixTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
+      def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = (v==None,t.isEmpty,d==null) match {
+        case (true,true,true)    => new Abstract
+        case (true,true,false)   => new Abstract { override val default = d }
+        case (true,false,true)   => new Abstract { override val tree = emptyMap ++ t }
+        case (true,false,false)  => new Abstract { override val tree = emptyMap ++ t; override val default = d }
+        case (false,true,true)   => new Abstract { override val value = v }
+        case (false,true,false)  => new Abstract { override val value = v; override val default = d }
+        case (false,false,true)  => new Abstract { override val value = v; override val tree = emptyMap ++ t }
+        case (false,false,false) => new Abstract { override val value = v; override val tree = emptyMap ++ t; override val default = d }
+      }
     }
+  }
   
 }
