@@ -20,20 +20,20 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   val empty: Tree = apply(None,Nil,null)
   
   /** Common uses for building various trees, most notably leaves */
-  final def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
-  final def apply(tree:(K,Tree)*):Tree                                = apply(None,tree,null)
-  final def apply(default:K=>Tree):Tree                               = apply(None,Nil,default)
-  final def apply(default:K=>Tree,tree:(K,Tree)*):Tree                = apply(None,tree,default)
-  final def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree = apply(v,tree,null)
-  final def apply(v:Option[V],default:K=>Tree):Tree                   = apply(v,Nil,default)
+  def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
+  def apply(tree:(K,Tree)*):Tree                                = apply(None,tree,null)
+  def apply(default:K=>Tree):Tree                               = apply(None,Nil,default)
+  def apply(default:K=>Tree,tree:(K,Tree)*):Tree                = apply(None,tree,default)
+  def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree = apply(v,tree,null)
+  def apply(v:Option[V],default:K=>Tree):Tree                   = apply(v,Nil,default)
   
-  /** rebuilds t with a specific, different value ; can usefully be overridden for perfs */
+  /** rebuilds t with a specific, different value */
   def withValue(t:Tree,v:Option[V]):Tree = apply(v,t,t.default)
-  /** rebuilds t with a specific, different value ; can usefully be overridden for perfs */
+  /** rebuilds t with a specific, different value ; use null to fallback on the 'default' default */
   def withDefault(t:Tree,default:K=>Tree):Tree = apply(t.value,t,default)
   
-  /** an interesting tree which recursively binds to itself whatever the input
-   *  This tree only holds one value.
+  /** an interesting tree which recursively binds to itself whatever the input.
+   *  This tree only holds one value which is returned on any key sequence.
    */
   final def constant(v:V):Tree = selfDefault(apply(v))
   

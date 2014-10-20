@@ -14,6 +14,7 @@ import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 import scala.collection.mutable.Buffer
 import scala.collection.TraversableOnce
+import scala.util.Try
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -214,36 +215,58 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def values:Iterable[Repr] = new DefaultValuesIterable
 
-  
   /** Creates a new tree by combining this tree with a fallback tree.
    *  This builds a new tree, which keeps the value and default of this tree.
    */
   def orElse[W>:V, T>:Repr<:PrefixTreeLike[K,W,T]](that: T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
     bf(value,that ++ this,default)
   
-  /** Transform this tree with another tree using a transformer tree.
-   *  All trees are explored 'in parallel' and each sub-node of this tree is transformed using the
-   *  corresponding sub-node of the transformer tree.
-   *  Only the iterable elements of this tree are transformed (not the defaults) 
-   *  If a node has no corresponding transformer node, it is discarded, but default are explored
-   *  for values where the transformer.isDefinedAt method is true.
+  /** Transform this tree with another tree.
+   *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
+   *  corresponding sub-node of the transformer tree using the provided `op`.
+   *  Default values for the second tree are used but exceptions will end the transformation ungracefully.
+   *  The resulting tree contains no default.
+   *  @param t   the transformer tree
+   *  @param op  an operator that transforms a T node with a This node giving the expected U result
+   *  @return the resulting transformed tree
+   */
+  def zip[U,W,T<:PrefixTreeLike[K,W,T],R<:PrefixTreeLike[K,U,R]](t:T)(op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(tt:T,cur:Repr):R = bf(op(tt,cur),for (x:(K,This) <- cur) yield (x._1, recur(tt(x._1),x._2)))
+    recur(t,this)
+  }
+  
+  /** Similar to the previous method, but the operation is provided through a third tree which is explored
+   *  'in parallel' too.
+   *  Default values for both trees are used but exceptions will end the transformation ungracefully.
+   *  The resulting tree contains no default.
+   *  Using a constant transformer tree (for op) achieves the same result as `zip` above, but is more costly.
    *  @param t   the transformer tree
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  def zip[W,T<:PrefixTreeLike[K,W,T],O<:PrefixTreeLike[K,(T, Repr, TraversableOnce[(K,T)])=>T,O]](t0:T)(op0:O):T = {
-    def recur(t:T,cur:Repr,op:O):T =
-      op.value.get(t, cur, (for (x <- cur if op.isDefinedAt(x._1) && t.isDefinedAt(x._1)) yield ((x._1, recur(t(x._1), x._2, op(x._1))))))
-    recur(t0,this,op0)
+  def zip2[U,W,T<:PrefixTreeLike[K,W,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T)(op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(tt:T,cur:Repr,opp:O):R = bf(opp.value.flatMap(_(tt,cur)),for (x:(K,This) <- cur) yield (x._1, recur(tt(x._1),x._2,opp(x._1))))
+    recur(t,this,op)
   }
   
-  /** Similar to the previous method, but the operation is constant throughout the trees and
-   *  the resulting call can be made more efficient.
+  /** Similar to `zip` above.
+   *  However, errors in fetching the T tree elements that result in NoSuchElementException are simply removed from
+   *  the final result and do not stop the computation. Other exceptions still apply normally.
+   *  Note that using this method is more costly than the above and the previous 'zip' should be preferred whener possible.
    */
-  def zip[W,T<:PrefixTreeLike[K,W,T]](t0:T)(op:(T,Repr,TraversableOnce[(K,T)])=>T):T = {
-    def recur(t:T,cur:Repr):T =
-      op(t, cur, (for (x <- cur if t.isDefinedAt(x._1)) yield ((x._1, recur(t(x._1),x._2)))))
-    recur(t0,this)
+  def zipPartial[U,W,T<:PrefixTreeLike[K,W,T],R<:PrefixTreeLike[K,U,R]](t:T)(op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(tt:T,cur:Repr):R = bf(op(tt,cur),for (x:(K,This) <- cur; v <- try { Buffer(tt(x._1)) } catch { case _:NoSuchElementException => Nil }) yield (x._1, recur(v,x._2)))
+    recur(t,this)
+  }
+  
+  /** Similar to `zip` above.
+   *  However, errors in fetching the T or O trees elements that result in NoSuchElementException are simply removed from
+   *  the final result and do not stop the computation. Other exceptions still apply normally.
+   *  Note that using this method is more costly than the above and the previous 'zip' should be preferred whener possible.
+   */
+  def zip2Partial[U,W,T<:PrefixTreeLike[K,W,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T)(op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(tt:T,cur:Repr,opp:O):R = bf(opp.value.flatMap(_(tt,cur)),for (x:(K,This) <- cur; v <- try { List((tt(x._1),opp(x._1))) } catch { case _:NoSuchElementException => Nil }) yield (x._1, recur(v._1,x._2,v._2)))
+    recur(t,this,op)
   }
 
   /** Transforms this tree by applying a function to every retrieved value.
