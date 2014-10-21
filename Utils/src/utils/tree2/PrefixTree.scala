@@ -45,7 +45,7 @@ object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
       def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = {
         val i = (if (v==None) 0x100 else 0)+(if (t.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0)
         (i: @switch) match {
-          case 0x111 => new Abstract
+          case 0x111 => new Abstract { override def isNonSignificant = true }
           case 0x110 => new Abstract { override val default = d }
           case 0x101 => new Abstract { override val tree = emptyMap ++ t }
           case 0x100 => new Abstract { override val tree = emptyMap ++ t; override val default = d }

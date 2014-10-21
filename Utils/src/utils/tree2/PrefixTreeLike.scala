@@ -103,6 +103,24 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *          or `None` if none exists.
    */
   def get(key: K): Option[Repr]
+  
+  /** Retrieves the value which is associated with the given key. This
+   *  method invokes the `default` method of the tree if there is no mapping
+   *  from the given key to a value. Unless overridden, the `default` method throws a
+   *  `NoSuchElementException`.
+   *
+   *  @param  key the key
+   *  @return     the value associated with the given key, or the result of the
+   *              tree's `default` method, if none exists.
+   */
+  def apply(key: K): Repr = get(key) match {
+    case None => default(key)
+    case Some(value) => value
+  }
+  
+  /** true if this is a tree which contains no information (no value, no children, no significant default)
+   */
+  def isNonSignificant = false 
 
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
@@ -119,20 +137,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
     def h(r:Repr):Repr = newBuilder(r.value,r.filter(p).map((x:(K,Repr))=>(x._1,h(x._2))),r.default)
     h(this)
-  }
-  
-  /** Retrieves the value which is associated with the given key. This
-   *  method invokes the `default` method of the tree if there is no mapping
-   *  from the given key to a value. Unless overridden, the `default` method throws a
-   *  `NoSuchElementException`.
-   *
-   *  @param  key the key
-   *  @return     the value associated with the given key, or the result of the
-   *              tree's `default` method, if none exists.
-   */
-  def apply(key: K): Repr = get(key) match {
-    case None => default(key)
-    case Some(value) => value
   }
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the tree.
