@@ -6,6 +6,7 @@ import scala.collection.generic.CanBuildFrom
 import scala.collection.immutable.IntMap
 import scala.collection.mutable.LinkedHashMap
 import scala.collection.mutable.ArrayBuffer
+import scala.annotation.switch
 
 /** The standard implementation sits on Maps.
  *  This opens up some opportunities by using Map operations.
@@ -40,16 +41,21 @@ object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
         def newBuilder: PrefixTreeLikeBuilder[K, V, Repr] = self
         def default = noDefault
       }
+      val empty = new Abstract
+      protected var elems: PrefixTree[K, V] = empty
       //create a PrefixTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
-      def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = (v==None,t.isEmpty,d==null) match {
-        case (true,true,true)    => new Abstract
-        case (true,true,false)   => new Abstract { override val default = d }
-        case (true,false,true)   => new Abstract { override val tree = emptyMap ++ t }
-        case (true,false,false)  => new Abstract { override val tree = emptyMap ++ t; override val default = d }
-        case (false,true,true)   => new Abstract { override val value = v }
-        case (false,true,false)  => new Abstract { override val value = v; override val default = d }
-        case (false,false,true)  => new Abstract { override val value = v; override val tree = emptyMap ++ t }
-        case (false,false,false) => new Abstract { override val value = v; override val tree = emptyMap ++ t; override val default = d }
+      def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = {
+        val i = (if (v==None) 0x100 else 0)+(if (t.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0)
+        (i: @switch) match {
+          case 0x111 => empty
+          case 0x110 => new Abstract { override val default = d }
+          case 0x101 => new Abstract { override val tree = emptyMap ++ t }
+          case 0x100 => new Abstract { override val tree = emptyMap ++ t; override val default = d }
+          case 0x011 => new Abstract { override val value = v }
+          case 0x010 => new Abstract { override val value = v; override val default = d }
+          case 0x001 => new Abstract { override val value = v; override val tree = emptyMap ++ t }
+          case 0x000 => new Abstract { override val value = v; override val tree = emptyMap ++ t; override val default = d }
+        }
       }
     }
   }

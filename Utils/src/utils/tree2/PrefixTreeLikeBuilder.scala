@@ -11,13 +11,14 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   implicit final def self:this.type = this
   /** This is the generic builder method for trees.
    *  Any Tree Builder class must implement this.
+   *  apply(None,tree,null) must return the shared value empty if tree is empty
    */
   def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
   
   /** You can override this if you want another default `default` method than PrefixTreeLikeBuilder.noElt */
   def noDefault:K=>Tree = PrefixTreeLikeBuilder.noElt
   /** The empty value is often used ; share it */
-  val empty: Tree = apply(None,Nil,null)
+  val empty: Tree
   
   /** Common uses for building various trees, most notably leaves */
   def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
@@ -67,10 +68,10 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   
   /** Implementation of the common Builder from scala libs
    */
-  protected var elems: Tree = empty
+  protected var elems: Tree
   def +=(x: (K, Tree)): this.type = { elems += x; this }
   def clear():Unit = elems = empty
-  def result: Tree = elems
+  def result: Tree = { val r=elems; clear(); r }
   
   /** inner utility : develops one level of data by tearing out the first elt of all inner iterables.
    *  @return (value for empty GenTraversable[K] if any, subtree in which children lists are in reverse order)

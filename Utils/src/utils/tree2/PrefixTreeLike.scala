@@ -52,7 +52,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def default: K=>Repr
   
   /** The empty tree of the same type as this tree
-   *   @return   an empty tree of type `This`.
+   *  @return   an empty tree of type `This`.
    */
   def empty: Repr = newBuilder.empty
     
@@ -106,7 +106,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
-   *  @return an immutable map consisting only of those key value pairs of this map where the key satisfies
+   *  @return an immutable tree consisting only of those key where the key satisfies
    *          the predicate `p`. This results in a new tree.
    */
   def filterKeys(p: K => Boolean): Repr  = newBuilder(value,iterator.filter(x=>p(x._1)),default)
@@ -117,7 +117,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *          the predicate `p`. This results in a new tree.
    */
   def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
-    def h(r:Repr):Repr = newBuilder(r.value,r.filter(p).map((x:(K,Repr))=>(x._1,h(x._2))),default)
+    def h(r:Repr):Repr = newBuilder(r.value,r.filter(p).map((x:(K,Repr))=>(x._1,h(x._2))),r.default)
     h(this)
   }
   
@@ -227,7 +227,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     trait Recur[+RR<:Recur[RR]] { this:RR=>
       def value(t:T,cur:Repr):Option[U]
       def next(k:K):RR
-      def default(t:T,cur:Repr):K=>R  = k=>recur(t(k),cur.default(k),next(k))
+      def default(t:T,cur:Repr):K=>R  = if (cur.default==null) null else k=>recur(t(k),cur.default(k),next(k))
       def loop(cur:Repr,t:T,r:RR)     = for (x:(K,This) <- cur) yield (x._1, recur(t(x._1),x._2,next(x._1)))
       def recur(t:T,cur:Repr,r:RR):R  = bf(value(t,cur),loop(cur,t,r),default(t,cur))
       def apply(t:T,cur:Repr):R       = recur(t,cur,this)
