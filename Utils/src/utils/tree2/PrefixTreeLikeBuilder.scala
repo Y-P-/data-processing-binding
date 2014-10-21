@@ -18,6 +18,8 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   
   /** The empty value is often used */
   def empty: Tree = apply(None,Nil,null)
+  /** Used for the default 'default' method */
+  def noDefault:K=>Tree
   
   /** Common uses for building various trees, most notably leaves */
   def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
