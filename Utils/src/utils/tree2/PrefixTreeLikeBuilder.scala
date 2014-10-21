@@ -17,8 +17,8 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   
   /** You can override this if you want another default `default` method than PrefixTreeLikeBuilder.noElt */
   def noDefault:K=>Tree = PrefixTreeLikeBuilder.noElt
-  /** The empty value is often used ; share it */
-  val empty: Tree
+  /** The empty value is often used */
+  def empty: Tree = apply(None,Nil,null)
   
   /** Common uses for building various trees, most notably leaves */
   def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
@@ -68,7 +68,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   
   /** Implementation of the common Builder from scala libs
    */
-  protected var elems: Tree
+  protected var elems: Tree = empty
   def +=(x: (K, Tree)): this.type = { elems += x; this }
   def clear():Unit = elems = empty
   def result: Tree = { val r=elems; clear(); r }
