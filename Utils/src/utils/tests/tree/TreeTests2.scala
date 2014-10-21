@@ -174,6 +174,15 @@ object TreeTests2 {
     out.println(c("a")("b")("c"))
   }
   
+  def testBasicZip(implicit out:PrintWriter) = {
+    //running zip against itself shows that zip basically works
+    val r = m1.zip[String,StringTree[Int],StringTree[String]](m, (t1,t2) =>
+      for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
+    )
+    out.println(r)
+    out.println(r("e"))
+  }
+  
   @Test class TreeTest2 extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       implicit val o = out
@@ -208,6 +217,8 @@ object TreeTests2 {
       testBasicDefault
       println("----15--------")
       testDefFlatMap
+      println("----16--------")
+      testBasicZip
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
       //println(r1.seqView().mkString("\n"))
     }
