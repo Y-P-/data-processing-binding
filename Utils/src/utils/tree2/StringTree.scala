@@ -11,17 +11,17 @@ abstract class StringTree[+V] extends PrefixTree[String,V] with PrefixTreeLike[S
 
 object StringTree extends PrefixTreeLikeBuilder.GenBuilder1[String,StringTree] {
   //using LinkedHashMap as the repesentation to preserve canonical order
-  implicit def builder[V] = apply[V](LinkedHashMap.empty[String, StringTree[V]])
-
+  implicit def builder[V] = apply[V](LinkedHashMap.empty[String, StringTree[V]],PrefixTreeLikeBuilder.noElt)
+  
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
    */
-  def apply[V](emptyMap: Map[String, StringTree[V]]):PrefixTreeLikeBuilder[String, V, StringTree[V]] =
-    new PrefixTreeLikeBuilder[String, V, StringTree[V]] { self=>
-      class Abstract extends StringTree[V] {
-        def newBuilder: PrefixTreeLikeBuilder[String, V, Repr] = self      
-        def default = noDefault
-      }
+  def apply[V](emptyMap: Map[String, StringTree[V]],noDefault:String=>StringTree[V]):PrefixTreeLikeBuilder[String, V, StringTree[V]] = {
+    class Abstract extends StringTree[V] {
+      def newBuilder = StringTree(tree.empty,noDefault)
+      def default:String=>Repr = noDefault
+    }
+    new PrefixTreeLikeBuilder[String, V, StringTree[V]] {
       //create a PrefixTree subclass using that builder so that the Trees produced by the factory will use the same builder, hence map kind
       def apply(v: Option[V], t: GenTraversableOnce[(String, StringTree[V])], d: String=>StringTree[V]) = {
         val i = (if (v==None) 0x100 else 0)+(if (t.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0)
@@ -37,4 +37,5 @@ object StringTree extends PrefixTreeLikeBuilder.GenBuilder1[String,StringTree] {
         }
       }
     }
+  }
 }

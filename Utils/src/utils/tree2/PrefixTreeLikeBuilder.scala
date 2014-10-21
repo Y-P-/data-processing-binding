@@ -4,6 +4,7 @@ import scala.collection.mutable.LinkedHashMap
 import scala.collection.mutable.Builder
 import scala.collection.GenTraversableOnce
 import scala.collection.GenTraversable
+import scala.collection.mutable.ArrayBuffer
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  */
@@ -15,8 +16,6 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    */
   def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
   
-  /** You can override this if you want another default `default` method than PrefixTreeLikeBuilder.noElt */
-  def noDefault:K=>Tree = PrefixTreeLikeBuilder.noElt
   /** The empty value is often used */
   def empty: Tree = apply(None,Nil,null)
   
@@ -68,10 +67,10 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   
   /** Implementation of the common Builder from scala libs
    */
-  protected var elems: Tree = empty
+  protected var elems: ArrayBuffer[(K, Tree)] = ArrayBuffer.empty
   def +=(x: (K, Tree)): this.type = { elems += x; this }
-  def clear():Unit = elems = empty
-  def result: Tree = { val r=elems; clear(); r }
+  def clear():Unit = elems = ArrayBuffer.empty
+  def result: Tree = { val r=elems; clear(); empty.update(r) }
   
   /** inner utility : develops one level of data by tearing out the first elt of all inner iterables.
    *  @return (value for empty GenTraversable[K] if any, subtree in which children lists are in reverse order)
