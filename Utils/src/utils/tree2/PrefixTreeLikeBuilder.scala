@@ -9,7 +9,7 @@ import scala.collection.mutable.ArrayBuffer
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  */
 abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
-  implicit final def self:this.type = this
+    
   /** This is the generic builder method for trees.
    *  Any Tree Builder class must implement this.
    *  apply(None,tree,null) must return the shared value empty if tree is empty
@@ -18,8 +18,6 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   
   /** The empty value is often used */
   def empty: Tree = apply(None,Nil,null)
-  /** Used for the default 'default' method */
-  def noDefault:K=>Tree
   
   /** Common uses for building various trees, most notably leaves */
   def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
@@ -42,7 +40,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   /** an interesting tree which recursively binds to itself for default */
   final def selfDefault(t:Tree):Tree = {
     var e = t
-    e = t.withDefault(k=>e)
+    e = t.withDefault(k=>e)(this)
     e
   }
   
@@ -72,7 +70,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   protected var elems: ArrayBuffer[(K, Tree)] = ArrayBuffer.empty
   def +=(x: (K, Tree)): this.type = { elems += x; this }
   def clear():Unit = elems = ArrayBuffer.empty
-  def result: Tree = { val r=elems; clear(); empty.update(r) }
+  def result: Tree = { val r=elems; clear(); empty.update(r)(this) }
   
   /** inner utility : develops one level of data by tearing out the first elt of all inner iterables.
    *  @return (value for empty GenTraversable[K] if any, subtree in which children lists are in reverse order)
