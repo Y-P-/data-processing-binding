@@ -103,7 +103,7 @@ object TreeTests2 {
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
-  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.builder[Int](m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
+  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.build[Int].apply(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
   def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _).seqView().foreach(out.println)
@@ -143,7 +143,7 @@ object TreeTests2 {
     out.println(m2("d")("a")("o").value)       //apply flatMap on f1("o")=old top => c13 (6)
   }
   
-  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.builder[Int](Seq(
+  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.build[Int].apply(Seq(
       (Seq("x","y"),1),
       (Seq("x","y","z"),2),
       (Seq("x"),3),
@@ -154,13 +154,13 @@ object TreeTests2 {
     )))
     
   def testConstant(implicit out:PrintWriter) = {
-    val c = StringTree.builder[Int].constant(3)
+    val c = StringTree.build[Int].constant(3)
     //test that constant works
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
     //tests that constant works on flatmap as expected
-    val c2 = StringTree.builder[Double].constant(5.01)
+    val c2 = StringTree.build[Double].constant(5.01)
     val c1 = c.flatMap[Double,StringTree[Double]]((i:Int)=> if (i==3) c2 else null)
     out.println(c1)
     out.println(c1("a"))
@@ -168,7 +168,7 @@ object TreeTests2 {
   }
   
   def testConstantMap(implicit out:PrintWriter) = {
-    val c = StringTree.builder[Int].constant(3).map[String,StringTree[String]]((_:Int).toString)
+    val c = StringTree.build[Int].constant(3).map[String,StringTree[String]]((_:Int).toString)
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))

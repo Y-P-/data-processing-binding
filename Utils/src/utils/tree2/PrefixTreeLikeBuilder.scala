@@ -99,6 +99,11 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
 }
 object PrefixTreeLikeBuilder {
   val noElt = (x:Any) => throw new NoSuchElementException(s"key not found $x")
+
+  class TreeParams[K,V,T<:PrefixTreeLike[K,V,T]](val emptyMap: scala.collection.Map[K, T], val noDefault:K=>Nothing)
+  object TreeParams {
+    implicit def default[K,V,T<:PrefixTreeLike[K,V,T]] = new TreeParams[K,V,T](LinkedHashMap.empty[K, T],noElt)
+  }
   
   implicit final class ValueBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]](b:PrefixTreeLikeBuilder[K,V,Tree]) {
     //these methods could clash with the method with Option[V] ; we explicitely place them as a second choice
@@ -132,24 +137,24 @@ object PrefixTreeLikeBuilder {
   }
   /** a builder pattern for tree classes where V is free but K fixed (i.e. StringTree) */
   abstract class GenBuilder1[K,T[+v]<:PrefixTreeLike[K,v,T[v]]]  {
-    implicit def builder[V]:PrefixTreeLikeBuilder[K,V,T[V]]
-    final def apply[V](v:Option[V],tree:GenTraversableOnce[(K,T[V])]):T[V] = builder(v,tree)
-    final def apply[V](tree:GenTraversableOnce[(K,T[V])]):T[V]             = builder(None,tree)
-    final def apply[V](v:Option[V]):T[V]                                   = builder(v)
-    final def apply[V](v:Option[V],e:(K,T[V]),tree:(K,T[V])*):T[V]         = builder(v,e+:tree)
-    final def apply[V](tree:(K,T[V])*):T[V]                                = builder(None,tree)    
-    final def apply[V](default:K=>T[V]):T[V]                               = builder(None,Nil,default)
-    final def apply[V](default:K=>T[V],tree:(K,T[V])*):T[V]                = builder(None,tree,default)
-    final def apply[V](v:Option[V],default:K=>T[V]):T[V]                   = builder(v,Nil,default)
-    final def apply[V](v:Option[V],tree:GenTraversableOnce[(K,T[V])],default:K=>T[V]):T[V] = builder(v,tree,default)
+    implicit def build[V](implicit p:TreeParams[K,V,T[V]]):PrefixTreeLikeBuilder[K,V,T[V]]
+    final def apply[V](v:Option[V],tree:GenTraversableOnce[(K,T[V])])(implicit p:TreeParams[K,V,T[V]]):T[V] = build(p)(v,tree)
+    final def apply[V](tree:GenTraversableOnce[(K,T[V])])(implicit p:TreeParams[K,V,T[V]]):T[V]             = build(p)(None,tree)
+    final def apply[V](v:Option[V])(implicit p:TreeParams[K,V,T[V]]):T[V]                                   = build(p)(v)
+    final def apply[V](v:Option[V],e:(K,T[V]),tree:(K,T[V])*)(implicit p:TreeParams[K,V,T[V]]):T[V]         = build(p)(v,e+:tree)
+    final def apply[V](tree:(K,T[V])*)(implicit p:TreeParams[K,V,T[V]]):T[V]                                = build(p)(None,tree)    
+    final def apply[V](default:K=>T[V])(implicit p:TreeParams[K,V,T[V]]):T[V]                               = build(p)(None,Nil,default)
+    final def apply[V](default:K=>T[V],tree:(K,T[V])*)(implicit p:TreeParams[K,V,T[V]]):T[V]                = build(p)(None,tree,default)
+    final def apply[V](v:Option[V],default:K=>T[V])(implicit p:TreeParams[K,V,T[V]]):T[V]                   = build(p)(v,Nil,default)
+    final def apply[V](v:Option[V],tree:GenTraversableOnce[(K,T[V])],default:K=>T[V])(implicit p:TreeParams[K,V,T[V]]):T[V] = build(p)(v,tree,default)
   }
   object GenBuilder1 {
     implicit final class ValueBuilder[K,T[+v]<:PrefixTreeLike[K,v,T[v]]](b:GenBuilder1[K,T]) {
-      final def apply[V](v:V,tree:GenTraversableOnce[(K,T[V])]):T[V] = b(Some(v),tree)
-      final def apply[V](v:V):T[V]                                   = b(Some(v))
-      final def apply[V](v:V,e:(K,T[V]),tree:(K,T[V])*):T[V]         = b(Some(v),e+:tree)
-      final def apply[V](v:V,default:K=>T[V]):T[V]                   = b(Some(v),default)
-      final def apply[V](v:V,tree:GenTraversableOnce[(K,T[V])],default:K=>T[V]):T[V] = b(Some(v),tree,default)
+      final def apply[V](v:V,tree:GenTraversableOnce[(K,T[V])])(implicit p:TreeParams[K,V,T[V]]):T[V] = b(Some(v),tree)
+      final def apply[V](v:V)(implicit p:TreeParams[K,V,T[V]]):T[V]                                   = b(Some(v))
+      final def apply[V](v:V,e:(K,T[V]),tree:(K,T[V])*)(implicit p:TreeParams[K,V,T[V]]):T[V]         = b(Some(v),e+:tree)
+      final def apply[V](v:V,default:K=>T[V])(implicit p:TreeParams[K,V,T[V]]):T[V]                   = b(Some(v),default)
+      final def apply[V](v:V,tree:GenTraversableOnce[(K,T[V])],default:K=>T[V])(implicit p:TreeParams[K,V,T[V]]):T[V] = b(Some(v),tree,default)
     }    
   }
   /** a builder pattern for tree classes where both K and V are fixed */
