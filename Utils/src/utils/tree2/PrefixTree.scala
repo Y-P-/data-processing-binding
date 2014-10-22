@@ -33,6 +33,9 @@ object PrefixTree extends PrefixTreeLikeBuilder.GenBuilder2[PrefixTree] {
   //another map kind could be used, even an immutable one
   implicit def builder[K,V] = apply(LinkedHashMap.empty[K,PrefixTree[K,V]],PrefixTreeLikeBuilder.noElt)
   
+  /** We opt to have several subclasses, depending on the situation (default or not, value or not,
+   *  subtrees or not, in order to minimize the memory footprint.
+   */
   protected class Abstract[K,V](val genericDefault:K=>Nothing) extends PrefixTree[K, V] {
     def newBuilder = PrefixTree(tree.empty,genericDefault)
     def empty      = Abstract.empty[K,V](genericDefault)

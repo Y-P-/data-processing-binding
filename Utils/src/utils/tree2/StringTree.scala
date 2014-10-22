@@ -13,6 +13,9 @@ object StringTree extends PrefixTreeLikeBuilder.GenBuilder1[String,StringTree] {
   //using LinkedHashMap as the repesentation to preserve canonical order
   implicit def builder[V] = apply[V](LinkedHashMap.empty[String, StringTree[V]],PrefixTreeLikeBuilder.noElt)
   
+  /** We opt to have several subclasses, depending on the situation (default or not, value or not,
+   *  subtrees or not, in order to minimize the memory footprint.
+   */
   protected class Abstract[V](val genericDefault:String=>Nothing) extends StringTree[V] {
     def newBuilder = StringTree(tree.empty,genericDefault)
     def empty      = Abstract.empty[V](genericDefault)
