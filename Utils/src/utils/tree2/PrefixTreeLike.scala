@@ -38,6 +38,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   protected[this] type Repr = This
   override def repr:Repr = self
   
+  /** The general parameters used for building the tree.
+   */
+  type P <: PrefixTreeLike.Params[K,V,Repr]
+  def params:P
+  
   /** The value for the current node */
   def value: Option[V]
   
@@ -48,11 +53,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param key the given key value for which a binding is missing.
    */
   def default: K=>Repr = null
-  
-  /** Used in place of default when the latter is null.
-   *  This is not a significant method (it throws an exception.)
-   */
-  def genericDefault: K=>Nothing
       
   /** The empty tree of the same type as this tree
    *  @return   an empty tree of type `This`.
@@ -115,7 +115,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *              tree's `default` method, if none exists.
    */
   def apply(key: K): Repr = get(key) match {
-    case None => if (default!=null) default(key) else genericDefault(key)
+    case None => if (default!=null) default(key) else params.noDefault(key)
     case Some(value) => value
   }
   
@@ -347,7 +347,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */
-  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T =
+  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTreeLikeBuilder[L,W,T],p:T#P):T =
     bf(value, for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapKeys[L,W,T](f))), if (default==null) null else (l:L)=>default(f._2(l)).mapKeys[L,W,T](f))
     
   /** Transforms this tree by applying a function to every retrieved value.
@@ -539,6 +539,9 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
 object PrefixTreeLike {
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()  
+  trait Params[K,+V,+T<:PrefixTreeLike[K,V,T]] {
+    def noDefault:K=>Nothing
+  }
   /** An abstract class for the trait. Used to share code.
    */
   abstract class Abstract[K, +V, +This <: Abstract[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] {

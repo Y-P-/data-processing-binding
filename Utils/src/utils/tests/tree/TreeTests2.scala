@@ -12,13 +12,16 @@ object TreeTests2 {
    * Testing with tree:
    * /(7) => { d/4 => { a/1, b/2 }, e/5 => { c/3 }, f/6 => { d/4 => { a/1, b/2 }, x/5 => { c/3 } } }
    */
-  val c1  = StringTree(1)
-  val c2  = StringTree(2)
-  val c3  = StringTree(3)
-  val c11 = StringTree(4,Seq("a"->c1,"b"->c2))
-  val c12 = StringTree(5,Seq("c"->c3))
-  val c13 = StringTree(6,"d"->c11,"x"->c12)
-  val m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13))
+  val b = StringTree[Int]
+  val y = new PrefixTreeLikeBuilder.ValueBuilder(b)
+  val x = new PrefixTreeLikeBuilder.EllipsisBuilder(b)
+  val c1  = b(1)
+  val c2  = b(2)
+  val c3  = b(3)
+  val c11 = y(4,Seq("a"->c1,"b"->c2))
+  val c12 = x(5,"c"->c3)
+  val c13 = x(6,"d"->c11,"x"->c12)
+  val m   = y(7,Seq("d"->c11,"e"->c12,"f"->c13))
 
   /*
    * The same basic tree with complex default everywhere.
@@ -52,13 +55,13 @@ object TreeTests2 {
       case "r" => c12
       case _   => c1
     }
-    c1  = StringTree(1,f1)
-    c2  = StringTree(2,f2)
-    c3  = StringTree(3,f3)
-    c11 = StringTree(4,Seq("a"->c1,"b"->c2),f4)
-    c12 = StringTree(5,Seq("c"->c3),f1)
-    c13 = StringTree(6,Seq("d"->c11,"x"->c12),f2)
-    m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13),f3)
+    c1  = b(1,f1)
+    c2  = b(2,f2)
+    c3  = b(3,f3)
+    c11 = y(4,Seq("a"->c1,"b"->c2),f4)
+    c12 = y(5,Seq("c"->c3),f1)
+    c13 = y(6,Seq("d"->c11,"x"->c12),f2)
+    m   = y(7,Seq("d"->c11,"e"->c12,"f"->c13),f3)
     (m,Array(m,c1,c2,c3,c11,c12,c13)) //an array for mapping operation from Int => StringTree[Int]
   }  
   
@@ -71,13 +74,13 @@ object TreeTests2 {
   def testPrint(implicit out:PrintWriter) = out.println(m)
   
   //tests the map operation to PrefixTree[String,String]
-  def testMap1(implicit out:PrintWriter)  = out.println(m.map[String,PrefixTree[String,String]]((_:Int).toString+"y"))
+  def testMap1(implicit out:PrintWriter)  = out.println(m.map[String,PrefixTree[String,String]]((_:Int).toString+"y")(PrefixTree.apply(PrefixTree.Params.default)))
   
   //tests the map operation to StringTree[String]
-  def testMap2(implicit out:PrintWriter)  = out.println(m.map[String,StringTree[String]]((_:Int).toString+"y"))
+  def testMap2(implicit out:PrintWriter)  = out.println(m.map[String,StringTree[String]]((_:Int).toString+"y")(StringTree.apply(StringTree.Params.default)))
   
   //tests the map operation to PrefixTree[Int,String] (full mapping of key and value)
-  def testMap3(implicit out:PrintWriter)  = out.println(m.mapFull[Int,String,PrefixTree[Int,String]](_(0)-'a',null,_.toString+"y"))
+  def testMap3(implicit out:PrintWriter)  = out.println(m.mapFull[Int,String,PrefixTree[Int,String]](_(0)-'a',null,_.toString+"y")(PrefixTree.apply(PrefixTree.Params.default)))
   
   //tests filterAll
   def testFilter1(implicit out:PrintWriter) = out.println(m.filterAll(_._1!="b"))
@@ -103,10 +106,10 @@ object TreeTests2 {
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
-  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.build[Int].apply(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
+  def testSeqFlatMap(implicit out:PrintWriter) = StringTree[Int].apply(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
-  def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _).seqView().foreach(out.println)
+  def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _)(StringTree.apply(StringTree.Params.default)).seqView().foreach(out.println)
 
   //tests FlatMap for map with default
   def testBasicDefault(implicit out:PrintWriter) = {
@@ -119,7 +122,7 @@ object TreeTests2 {
   def testDefFlatMap(implicit out:PrintWriter) = {
     //we have to take a looks at the flat development of the tree with no default first
     //we remember that flatMap enriches the existing tree, and replaces the current value with the value of the mapped tree
-    val m2 = m1.flatMap[Int,StringTree[Int]]((i:Int)=>amap1(i-1))
+    val m2 = m1.flatMap[Int,StringTree[Int]]((i:Int)=>amap1(i-1))(StringTree.apply(StringTree.Params.default))
     //the value of the map for 7 will replace m1 value => 6
     out.println(m2.value)
     //"x" is not a key for m1, but it is for c13 which was expended straight into m1 : m2("x") = c13("x") = c12
@@ -143,7 +146,7 @@ object TreeTests2 {
     out.println(m2("d")("a")("o").value)       //apply flatMap on f1("o")=old top => c13 (6)
   }
   
-  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.build[Int].apply(Seq(
+  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree[Int].apply(Seq(
       (Seq("x","y"),1),
       (Seq("x","y","z"),2),
       (Seq("x"),3),
@@ -154,21 +157,21 @@ object TreeTests2 {
     )))
     
   def testConstant(implicit out:PrintWriter) = {
-    val c = StringTree.build[Int].constant(3)
+    val c = StringTree[Int].constant(3)
     //test that constant works
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
     //tests that constant works on flatmap as expected
-    val c2 = StringTree.build[Double].constant(5.01)
-    val c1 = c.flatMap[Double,StringTree[Double]]((i:Int)=> if (i==3) c2 else null)
+    val c2 = StringTree[Double].constant(5.01)
+    val c1 = c.flatMap[Double,StringTree[Double]]((i:Int)=> if (i==3) c2 else null)(StringTree.apply(StringTree.Params.default))
     out.println(c1)
     out.println(c1("a"))
     out.println(c1("a")("b")("c"))
   }
   
   def testConstantMap(implicit out:PrintWriter) = {
-    val c = StringTree.build[Int].constant(3).map[String,StringTree[String]]((_:Int).toString)
+    val c = StringTree[Int].constant(3).map[String,StringTree[String]]((_:Int).toString)(StringTree.apply(StringTree.Params.default))
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
@@ -178,7 +181,7 @@ object TreeTests2 {
     //running zip against itself shows that zip basically works
     val r = m1.zip[String,StringTree[Int],StringTree[String]](m, (t1,t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
-    )
+    )(StringTree.apply(StringTree.Params.default))
     out.println(r)
     out.println(r("e"))
   }
