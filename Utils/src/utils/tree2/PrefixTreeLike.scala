@@ -14,7 +14,6 @@ import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 import scala.collection.mutable.Buffer
 import scala.collection.TraversableOnce
-import scala.util.Try
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -57,7 +56,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** The empty tree of the same type as this tree
    *  @return   an empty tree of type `This`.
    */
-  def empty: Repr
+  def empty: Repr = newBuilder(None,Nil,null)
+
     
   /** A new instance of builder similar to the one used to build this tree element.
    *  It can be used to build elements of the same tree kind.
@@ -322,7 +322,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *            The resulting tree is a new tree.
    */
   def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
-    var b = bf(value.map(f),if (default==null) null else default(_:K).map(f))
+    var b = bf(value.map(f),Nil,if (default==null) null else default(_:K).map(f))
     for (x <- this) b += ((x._1,x._2.map(f)))
     b
   }

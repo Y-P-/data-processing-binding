@@ -38,7 +38,6 @@ object PrefixTree {
   protected class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] {
     type P = P0[K,V]
     def newBuilder = params.b1(params)
-    def empty      = newBuilder(None)
   }
   
   class Params[K,+V,+T<:PrefixTree[K,V] with PrefixTreeLike[K,V,T]] extends PrefixTreeLike.Params[K,V,T] {
@@ -55,7 +54,7 @@ object PrefixTree {
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
    */
-  def apply[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type P=P0[K,V] } = {
+  implicit def apply[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type P=P0[K,V] } = {
     new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
       type P = P0[K,V]
       def params:P = p

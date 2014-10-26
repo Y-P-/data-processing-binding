@@ -9,7 +9,11 @@ import scala.annotation.switch
  */
 abstract class StringTree[+V] extends PrefixTree[String,V] with PrefixTreeLike[String,V,StringTree[V]]
 
-object StringTree {
+object StringTree extends Gen1 {
+  type K       = String
+  type Tree[v] = StringTree[v]
+  type P0[V]   = Params[V,StringTree[V]]
+
   /** We opt to have several subclasses, depending on the situation (default or not, value or not,
    *  subtrees or not, in order to minimize the memory footprint.
    *  note that the standard implementation uses LinkedHashMap to preserve the canonical order
@@ -17,8 +21,7 @@ object StringTree {
    */
   protected class Abstract[V](implicit val params:P0[V]) extends StringTree[V] {
     type P = P0[V]
-    def newBuilder = params.b2(params)
-    def empty      = newBuilder(None)
+    def newBuilder = params.b2.builder[V](params)
   }
   
   /** Required parameters and appropriate default.
@@ -30,12 +33,11 @@ object StringTree {
     implicit def default[V,T<:StringTree[V] with PrefixTreeLike[String,V,T]] = new Params[V,T]
   }
   
-  type P0[V] = Params[V,StringTree[V]]
   
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
    */
-  def apply[V](implicit p:P0[V]):PrefixTreeLikeBuilder[String, V, StringTree[V]] { type P=P0[V] } = {
+  implicit def builder[V](implicit p:P0[V]):PrefixTreeLikeBuilder[String, V, StringTree[V]] { type P=P0[V] } = {
     new PrefixTreeLikeBuilder[String, V, StringTree[V]] {
       type P = P0[V]
       def params:P = p
@@ -54,4 +56,24 @@ object StringTree {
       }
     }
   }
+  
+  implicit final class X[V](o:StringTree.type)(implicit p:P0[V]) {
+    type K = String
+    type Tree = StringTree[V]
+    def apply(v:Option[V],tree:GenTraversableOnce[(String,Tree)],default:K=>Tree):Tree = o.builder[V](p)(v,tree,default)
+    def empty: Tree                                               = apply(None,Nil,null)
+    def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
+    def apply(tree:(K,Tree)*):Tree                                = apply(None,tree,null)
+    def apply(default:K=>Tree):Tree                               = apply(None,Nil,default)
+    def apply(default:K=>Tree,tree:(K,Tree)*):Tree                = apply(None,tree,default)
+    def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree = apply(v,tree,null)
+    def apply(v:Option[V],default:K=>Tree):Tree                   = apply(v,Nil,default)
+    
+    def apply(v:V,tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree = apply(Some(v),tree,default)
+    def apply(v:V,tree:GenTraversableOnce[(K,Tree)]):Tree                 = apply(Some(v),tree)
+    def apply(v:V):Tree                                                   = apply(Some(v))
+    def apply(v:V,default:K=>Tree):Tree                                   = apply(Some(v),default)
+    def apply(v:V,tree:(K,Tree)*):Tree                                    = apply(v,tree.asInstanceOf[GenTraversableOnce[(K,Tree)]])  //fine: choice of method call
+  }
+  
 }
