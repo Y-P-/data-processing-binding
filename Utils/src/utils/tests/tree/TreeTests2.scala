@@ -105,7 +105,7 @@ object TreeTests2 {
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
-  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.builder.apply(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
+  def testSeqFlatMap(implicit out:PrintWriter) = StringTree(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
   
   //tests FlatMap for SeqView
   def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _).seqView().foreach(out.println)
@@ -145,7 +145,7 @@ object TreeTests2 {
     out.println(m2("d")("a")("o").value)       //apply flatMap on f1("o")=old top => c13 (6)
   }
   
-  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.builder[Int].apply(Seq(
+  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree(Seq(
       (Seq("x","y"),1),
       (Seq("x","y","z"),2),
       (Seq("x"),3),
@@ -156,13 +156,13 @@ object TreeTests2 {
     )))
     
   def testConstant(implicit out:PrintWriter) = {
-    val c = StringTree.builder[Int].constant(3)
+    val c = StringTree.constant(3)
     //test that constant works
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
     //tests that constant works on flatmap as expected
-    val c2 = StringTree.builder[Double].constant(5.01)
+    val c2 = StringTree.constant(5.01)
     val c1 = c.flatMap[Double,StringTree[Double]]((i:Int)=> if (i==3) c2 else null)
     out.println(c1)
     out.println(c1("a"))
@@ -170,7 +170,7 @@ object TreeTests2 {
   }
   
   def testConstantMap(implicit out:PrintWriter) = {
-    val c = StringTree.builder[Int].constant(3).map[String,StringTree[String]]((_:Int).toString)
+    val c = StringTree.constant(3).map[String,StringTree[String]]((_:Int).toString)
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
@@ -180,7 +180,7 @@ object TreeTests2 {
     //running zip against itself shows that zip basically works
     val r = m1.zip[String,StringTree[Int],StringTree[String]](m, (t1,t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
-    )(StringTree.builder(StringTree.Params.default))
+    )
     out.println(r)
     out.println(r("e"))
   }

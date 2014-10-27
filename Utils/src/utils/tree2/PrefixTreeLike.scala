@@ -68,6 +68,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   final def withDefault[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](default:K=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withDefault(this, default)
   /** rebuilds this tree with a specific value */
   final def withValue[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](value:Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withValue(this, value)
+  /** rebuilds this tree as defaulting to itself */
+  final def selfDefault:Repr = newBuilder.selfDefault(this)
   
   /** Removes a key from this tree, returning a new tree.
    *  @param    key the key to be removed
@@ -222,6 +224,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Creates a new tree by combining this tree with a fallback tree.
    *  This builds a new tree, which keeps the value and default of this tree.
+   *  This differs from using 'that' as default, in which case 'that' default would be used
+   *  if the key was not found neither in 'this' nor 'that'.
    */
   def orElse[W>:V, T>:Repr<:PrefixTreeLike[K,W,T]](that: T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
     bf(value,that ++ this,default)
@@ -538,14 +542,17 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 }
 
 object PrefixTreeLike {
-  implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()  
+  implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
+  
+  /** The minimum for building the Params used by the Tree implementation.
+   */
   trait Params[K,+V,+T<:PrefixTreeLike[K,V,T]] {
-    def noDefault:K=>Nothing
+    def noDefault:K=>T
   }
+  
   /** An abstract class for the trait. Used to share code.
    */
-  abstract class Abstract[K, +V, +This <: Abstract[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] {
-    this:This=>
+  abstract class Abstract[K, +V, +This <: PrefixTreeLike[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] { this:This=>
     override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
   }
 }

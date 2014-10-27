@@ -29,32 +29,29 @@ abstract class PrefixTree[K,+V] extends PrefixTreeLike.Abstract[K,V,PrefixTree[K
   override def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = bf(value,tree ++ kv,default)
 }
 
-object PrefixTree {
-  /** We opt to have several subclasses, depending on the situation (default or not, value or not,
-   *  subtrees or not, in order to minimize the memory footprint.
-   *  note that the standard implementation uses LinkedHashMap to preserve the canonical order
-   *  another map kind could be used, even an immutable one
-   */
-  protected class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] {
-    type P = P0[K,V]
-    def newBuilder = params.b1(params)
+object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
+  type Tree[k,+v] = PrefixTree[k, v]
+  type P0[k,+v]   = Params[k,v,PrefixTree[k, v]]
+  
+  protected class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V]
+  
+  abstract class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] extends PrefixTreeLike.Params[K,V,T] with super.Params[K,V,T] {
+    def emptyMap: scala.collection.Map[K,T]
+  }
+  object Params {
+    protected val p0 = new Params[Any,Any,Tree[Any,Any]] {
+      val noDefault: Any=>Nothing = PrefixTreeLikeBuilder.noElt
+      def emptyMap: scala.collection.Map[Any,Tree[Any,Any]] = LinkedHashMap.empty[Any,Tree[Any,Any]]
+    }
+    //the default value implies the LinkedHashMap Map implementation ; we share it.
+    implicit def default[K,V,T<:PrefixTree[K,V] with PrefixTreeLike[K,V,T]] = p0.asInstanceOf[Params[K,V,T]]
   }
   
-  class Params[K,+V,+T<:PrefixTree[K,V] with PrefixTreeLike[K,V,T]] extends PrefixTreeLike.Params[K,V,T] {
-    def noDefault:K=>Nothing                = PrefixTreeLikeBuilder.noElt
-    def emptyMap: scala.collection.Map[K,T] = LinkedHashMap.empty[K,T]
-    private[PrefixTree] def b1              = PrefixTree
-  }
-  object Params{
-    implicit def default[K,V,T<:PrefixTree[K,V] with PrefixTreeLike[K,V,T]] = new Params[K,V,T]
-  }
-  
-  type P0[K,V] = Params[K,V,PrefixTree[K, V]]
   
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
    */
-  implicit def apply[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type P=P0[K,V] } = {
+  implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type P=P0[K,V] } = {
     new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
       type P = P0[K,V]
       def params:P = p

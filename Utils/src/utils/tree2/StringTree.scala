@@ -9,30 +9,22 @@ import scala.annotation.switch
  */
 abstract class StringTree[+V] extends PrefixTree[String,V] with PrefixTreeLike[String,V,StringTree[V]]
 
-object StringTree extends Gen1 {
-  type K       = String
-  type Tree[v] = StringTree[v]
-  type P0[V]   = Params[V,StringTree[V]]
+object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
+  type Tree[+v] = StringTree[v]
+  type P0[+v]   = Params[v,Tree[v]]
 
-  /** We opt to have several subclasses, depending on the situation (default or not, value or not,
-   *  subtrees or not, in order to minimize the memory footprint.
-   *  note that the standard implementation uses LinkedHashMap to preserve the canonical order
-   *  another map kind could be used, even an immutable one
-   */
-  protected class Abstract[V](implicit val params:P0[V]) extends StringTree[V] {
-    type P = P0[V]
-    def newBuilder = params.b2.builder[V](params)
-  }
+  protected class Abstract[V](implicit val params:P0[V]) extends StringTree[V] with super.Abstract[V]
   
   /** Required parameters and appropriate default.
    */
-  class Params[+V,+T<:StringTree[V] with PrefixTreeLike[String,V,T]] extends PrefixTree.Params[String,V,T] with PrefixTreeLike.Params[String,V,StringTree[V]]  {
-    private[StringTree] def b2 = StringTree
-  }
+  abstract class Params[+V,+T<:StringTree[V] with PrefixTreeLike[String,V,T]] extends PrefixTree.Params[String,V,T] with super.Params[V,StringTree[V]]
   object Params{
-    implicit def default[V,T<:StringTree[V] with PrefixTreeLike[String,V,T]] = new Params[V,T]
+    protected val p0 = new Params[Any,Tree[Any]] {
+      val noDefault: Any=>Nothing = PrefixTreeLikeBuilder.noElt
+      def emptyMap: scala.collection.Map[String,Tree[Any]] = LinkedHashMap.empty[String,Tree[Any]]
+    }
+    implicit def default[V,T<:StringTree[V] with PrefixTreeLike[String,V,T]] = p0.asInstanceOf[Params[V,T]]
   }
-  
   
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
@@ -55,25 +47,6 @@ object StringTree extends Gen1 {
         }
       }
     }
-  }
-  
-  implicit final class X[V](o:StringTree.type)(implicit p:P0[V]) {
-    type K = String
-    type Tree = StringTree[V]
-    def apply(v:Option[V],tree:GenTraversableOnce[(String,Tree)],default:K=>Tree):Tree = o.builder[V](p)(v,tree,default)
-    def empty: Tree                                               = apply(None,Nil,null)
-    def apply(v:Option[V]):Tree                                   = apply(v,Nil,null)
-    def apply(tree:(K,Tree)*):Tree                                = apply(None,tree,null)
-    def apply(default:K=>Tree):Tree                               = apply(None,Nil,default)
-    def apply(default:K=>Tree,tree:(K,Tree)*):Tree                = apply(None,tree,default)
-    def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)]):Tree = apply(v,tree,null)
-    def apply(v:Option[V],default:K=>Tree):Tree                   = apply(v,Nil,default)
-    
-    def apply(v:V,tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree = apply(Some(v),tree,default)
-    def apply(v:V,tree:GenTraversableOnce[(K,Tree)]):Tree                 = apply(Some(v),tree)
-    def apply(v:V):Tree                                                   = apply(Some(v))
-    def apply(v:V,default:K=>Tree):Tree                                   = apply(Some(v),default)
-    def apply(v:V,tree:(K,Tree)*):Tree                                    = apply(v,tree.asInstanceOf[GenTraversableOnce[(K,Tree)]])  //fine: choice of method call
   }
   
 }
