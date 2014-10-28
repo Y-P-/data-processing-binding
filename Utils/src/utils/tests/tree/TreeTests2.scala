@@ -9,6 +9,8 @@ import scala.collection.GenTraversableOnce
 
 
 object TreeTests2 {
+  // test stripEmpty
+  
   import scala.language.implicitConversions
   /*
    * Testing with tree:

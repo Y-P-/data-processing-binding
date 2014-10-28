@@ -17,7 +17,7 @@ import scala.annotation.switch
 abstract class PrefixTree[K,+V] extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {  
   implicit def params:P  //make params implicit so that it is automatically used by these methods that rely on it
   def value:Option[V] = None
-  def tree: Map[K,Repr] = Map.empty[K,Repr]
+  def tree: Map[K,Repr]
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = bf(value,tree+kv,default)
   def -(key: K): Repr              = newBuilder(value,tree-key,default)
   def get(key: K): Option[Repr]    = tree.get(key)
@@ -33,20 +33,24 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
   type Tree[k,+v] = PrefixTree[k, v]
   type P0[k,+v]   = Params[k,v,PrefixTree[k, v]]
   
-  protected class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V]
+  /** The full actual PrefixTree class used. It is designed to be sub-classed to minimize memory footprint.
+   */
+  protected class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V] {
+    def tree: Map[K,Repr] = params.emptyMap
+  }
   
-  abstract class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] extends PrefixTreeLike.Params[K,V,T] with super.Params[K,V,T] {
-    def emptyMap: scala.collection.Map[K,T]
+  /** The actual Parameters required to build a PrefixTree.
+   */
+  class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]](noDefault:K=>T,stripEmpty:Boolean,mapKind:scala.collection.Map[K,T])
+        extends super.Params[K,V,T](noDefault,stripEmpty) {
+    def emptyMap: scala.collection.Map[K,T] = mapKind.empty
   }
   object Params {
-    protected val p0 = new Params[Any,Any,Tree[Any,Any]] {
-      val noDefault: Any=>Nothing = PrefixTreeLikeBuilder.noElt
-      def emptyMap: scala.collection.Map[Any,Tree[Any,Any]] = LinkedHashMap.empty[Any,Tree[Any,Any]]
-    }
     //the default value implies the LinkedHashMap Map implementation ; we share it.
-    implicit def default[K,V,T<:PrefixTree[K,V] with PrefixTreeLike[K,V,T]] = p0.asInstanceOf[Params[K,V,T]]
+    //The cast is OK because in this case, neither V nor K are actually used.
+    protected val p0 = new Params[Any,Any,Tree[Any,Any]](PrefixTreeLikeBuilder.noElt,true,LinkedHashMap.empty[Any,Tree[Any,Any]])
+    implicit def default[K,V,T<:Tree[K,V] with PrefixTreeLike[K,V,T]] = p0.asInstanceOf[Params[K,V,T]]
   }
-  
   
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
@@ -57,15 +61,17 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
       def params:P = p
       def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = {
         val i = (if (v==None) 0x100 else 0)+(if (t.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0)
+        val t0 = params.emptyMap ++ t
+        val t1 = if (p.stripEmpty) t0.filterNot(_._2.isNonSignificant) else t0
         (i: @switch) match {
           case 0x111 => new Abstract[K,V] { override def isNonSignificant = true }
           case 0x110 => new Abstract[K,V] { override val default = d }
-          case 0x101 => new Abstract[K,V] { override val tree = params.emptyMap ++ t }
-          case 0x100 => new Abstract[K,V] { override val tree = params.emptyMap ++ t; override val default = d }
+          case 0x101 => new Abstract[K,V] { override val tree = t1 }
+          case 0x100 => new Abstract[K,V] { override val tree = t1; override val default = d }
           case 0x011 => new Abstract[K,V] { override val value = v }
           case 0x010 => new Abstract[K,V] { override val value = v; override val default = d }
-          case 0x001 => new Abstract[K,V] { override val value = v; override val tree = params.emptyMap ++ t }
-          case 0x000 => new Abstract[K,V] { override val value = v; override val tree = params.emptyMap ++ t; override val default = d }
+          case 0x001 => new Abstract[K,V] { override val value = v; override val tree = t1 }
+          case 0x000 => new Abstract[K,V] { override val value = v; override val tree = t1; override val default = d }
         }
       }
     }

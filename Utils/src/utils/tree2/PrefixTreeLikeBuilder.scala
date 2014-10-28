@@ -102,7 +102,8 @@ object PrefixTreeLikeBuilder {
     type Tree[k,+v] <: PrefixTreeLike[k,v,Tree[k,v]]
     type P0[k,+v] <: Params[k,v,Tree[k,v]]
     
-    trait Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] extends PrefixTreeLike.Params[K,V,T]  {
+    class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty)  {
       private[Gen2] def b2:Gen2.this.type = Gen2.this
     }
 
@@ -132,11 +133,13 @@ object PrefixTreeLikeBuilder {
   }
   
   //a class for easily defining a builder for a tree where K is fixed and V is free
-  abstract class Gen1[K] {
+  abstract class Gen1[K0] {
+    type K = K0
     type Tree[+v] <: PrefixTreeLike[K,v,Tree[v]]
     type P0[+v] <: Params[v,_<:Tree[v]]
 
-    trait Params[+V,+T<:Tree[V] with PrefixTreeLike[K,V,T]] extends PrefixTreeLike.Params[K,V,Tree[V]]  {
+    class Params[+V,+T<:Tree[V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty)  {
       private[Gen1] def b1:Gen1.this.type = Gen1.this
     }
 
@@ -166,11 +169,14 @@ object PrefixTreeLikeBuilder {
   }
   
   //a class for easily defining a builder for a tree where both K and V are fixed
-  abstract class Gen0[K,V] {
+  abstract class Gen0[K0,V0] {
+    type K = K0
+    type V = V0
     type Tree <: PrefixTreeLike[K,V,Tree]
     type P0 <: Params[Tree]
     
-    trait Params[+T<:Tree with PrefixTreeLike[K,V,T]] extends PrefixTreeLike.Params[K,V,Tree]  {
+    class Params[+T<:Tree with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty)  {
       private[Gen0] def b0:Gen0.this.type = Gen0.this
     }
 

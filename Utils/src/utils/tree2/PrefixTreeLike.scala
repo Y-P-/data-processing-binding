@@ -58,7 +58,30 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def empty: Repr = newBuilder(None,Nil,null)
 
-    
+  /** The depth of this element in the tree.
+   *  This is unrequired and some implementations may decide not to implement this method.
+   *  If this method is implemented, the top tree element has a depth of 0, and each children
+   *  increases its parent depth by one.
+   */
+  def depth:Int = ???
+  
+  /** The current depth of this element in the tree.
+   *  This is unrequired and some implementations may decide not to implement this method.
+   *  If this method is implemented, the top tree element has a parent which is 'null'.
+   */
+  def parent:Repr = ???
+  
+  /** Detaches 'this' from its parent.
+   *  This is unrequired and some implementations may decide not to implement this method.
+   *  If this method is implemented, a detached element has a parent which is 'null'.
+   */
+  def detach:Repr = ???
+  
+  /** Attaches 'this' to a parent.
+   *  This is unrequired and some implementations may decide not to implement this method.
+   */
+  def attach[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](parent:T):T = ???
+  
   /** A new instance of builder similar to the one used to build this tree element.
    *  It can be used to build elements of the same tree kind.
    */
@@ -546,14 +569,28 @@ object PrefixTreeLike {
   
   /** The minimum for building the Params used by the Tree implementation.
    */
-  trait Params[K,+V,+T<:PrefixTreeLike[K,V,T]] {
-    def noDefault:K=>T
-  }
+  class Params[K,+V,+T<:PrefixTreeLike[K,V,T]] (
+    /** The default method that will be used if no default is provided */
+    val noDefault:K=>T,
+    /** The tree will not contain non significant nodes.
+     *  As a consequence, some defined sequences of keys that led to such values will disappear,
+     *  and if invoked, they will fall back on the default.
+     */
+    val stripEmpty:Boolean
+  )
   
   /** An abstract class for the trait. Used to share code.
    */
   abstract class Abstract[K, +V, +This <: PrefixTreeLike[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] { this:This=>
     override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
+  }
+  
+  trait Navigable[K, +V, +This <: PrefixTreeLike[K, V, This] with Navigable[K,V,This]] { this:This=>
+    protected[this] var parent0:Repr = _
+    override def parent:Repr = parent0
+    override def depth:Int = if (parent==null) 0 else parent.depth+1
+    override def detach:Repr = { parent0=null.asInstanceOf[Repr]; this }
+    override def attach[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](parent:T):T = ???    
   }
 }
 
