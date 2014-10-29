@@ -14,6 +14,7 @@ import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 import scala.collection.mutable.Buffer
 import scala.collection.TraversableOnce
+import scala.collection.mutable.ArrayStack
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -57,30 +58,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return   an empty tree of type `This`.
    */
   def empty: Repr = newBuilder(None,Nil,null)
-
-  /** The depth of this element in the tree.
-   *  This is unrequired and some implementations may decide not to implement this method.
-   *  If this method is implemented, the top tree element has a depth of 0, and each children
-   *  increases its parent depth by one.
-   */
-  def depth:Int = ???
-  
-  /** The current depth of this element in the tree.
-   *  This is unrequired and some implementations may decide not to implement this method.
-   *  If this method is implemented, the top tree element has a parent which is 'null'.
-   */
-  def parent:Repr = ???
-  
-  /** Detaches 'this' from its parent.
-   *  This is unrequired and some implementations may decide not to implement this method.
-   *  If this method is implemented, a detached element has a parent which is 'null'.
-   */
-  def detach:Repr = ???
-  
-  /** Attaches 'this' to a parent.
-   *  This is unrequired and some implementations may decide not to implement this method.
-   */
-  def attach[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](parent:T):T = ???
   
   /** A new instance of builder similar to the one used to build this tree element.
    *  It can be used to build elements of the same tree kind.
@@ -405,7 +382,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   /** Identical to the previous method, but more than one element is updated.
    */
-  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T)*)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv:_*)
+  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv1:(K,T),kv2:(K,T),kv:(K,T)*)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = { val t=kv; update[W,T](kv1 +: kv2 +: t) }
   
   /** Identical to the previous method, but elements are passed through an iterable like rather than a built Seq.
    */
@@ -585,12 +562,38 @@ object PrefixTreeLike {
     override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
   }
   
-  trait Navigable[K, +V, +This <: PrefixTreeLike[K, V, This] with Navigable[K,V,This]] { this:This=>
-    protected[this] var parent0:Repr = _
-    override def parent:Repr = parent0
-    override def depth:Int = if (parent==null) 0 else parent.depth+1
-    override def detach:Repr = { parent0=null.asInstanceOf[Repr]; this }
-    override def attach[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](parent:T):T = ???    
+  /** This trait adds the possibility to navigate upwards in a tree.
+   *  It has two limitations:
+   *  - 
+   */
+  trait Navigable[K, V, This <: PrefixTreeLike[K, V, This] with Navigable[K, V, This]] extends PrefixTreeLike[K, V, This] { this:This=>
+    private[this] var parent0:Repr = _
+    @inline final private def count(i:Int):Int = if (parent0==null) i else parent0.count(i+1)
+    def parent:Repr = parent0
+    def depth:Int = count(0)
+    def detach():Repr = { parent0=null.asInstanceOf[Repr]; this }
+    def attach(parent:Repr):Unit = parent0=parent
+    def updateNavigable(kv:(K,Repr)): Repr = { kv._2.attach(this); update(kv)(newBuilder) }
+    abstract override def -(key:K):Repr = { get(key).map(_.detach()); super.-(key) }
+  }
+  
+  //XXX keep for later
+  //parsers => use independant handler and transform to Traversable[(Traversable[K], V)] ?
+  //           anyway: this handler automatically builds a PrefixTree...
+  trait Processor[K,V] extends Traversable[(Traversable[K], V)] {
+    def apply(h:H[K,V]):Unit
+    def foreach[U](f: ((Traversable[K], V))=>U) = apply(new Foreach[K,V,U](f))
+  }
+  trait H[K,V] {
+    def enter(k:K):Unit
+    def exit:Unit
+    def value(v:V):Unit
+  }
+  class Foreach[K,V,U](f: ((Traversable[K], V))=>U) extends H[K,V] {
+    val b = new ArrayStack[K]
+    def enter(k:K):Unit = b += k
+    def exit:Unit       = b.pop
+    def value(v:V)      = f((b,v))
   }
 }
 
