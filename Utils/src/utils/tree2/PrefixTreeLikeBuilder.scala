@@ -66,8 +66,8 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    */
   protected var elems: ArrayBuffer[(K, Tree)] = ArrayBuffer.empty
   def +=(x: (K, Tree)): this.type = { elems += x; this }
-  def clear():Unit = elems = ArrayBuffer.empty
-  def result: Tree = { val r=elems; clear(); empty.update(r)(this) }
+  def clear():Unit = elems.clear
+  def result: Tree = { val r=empty.update(elems)(this); clear; r }
   
   /** inner utility : develops one level of data by tearing out the first elt of all inner iterables.
    *  @return (value for empty GenTraversable[K] if any, subtree in which children lists are in reverse order)
