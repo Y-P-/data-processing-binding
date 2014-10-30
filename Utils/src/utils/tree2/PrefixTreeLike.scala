@@ -15,6 +15,7 @@ import scala.runtime.AbstractPartialFunction
 import scala.collection.mutable.Buffer
 import scala.collection.TraversableOnce
 import scala.collection.mutable.ArrayStack
+import sun.reflect.generics.reflectiveObjects.NotImplementedException
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -71,6 +72,13 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** rebuilds this tree as defaulting to itself */
   final def selfDefault:Repr = newBuilder.selfDefault(this)
   
+  /** tells if the two following method should work with no exception */
+  def isNavigable:Boolean = false
+  /** the parent of that PrefixTree ; this is not required and usually makes the implementation heavier */
+  def parent:Repr = throw new NotImplementedError(s"parent is not accessible in that implementation: $getClass")
+  /** the depth within the tree ; this is not required and usually makes the implementation heavier */
+  def depth:Int   = throw new NotImplementedError(s"depth is not accessible in that implementation: $getClass")
+  
   /** Removes a key from this tree, returning a new tree.
    *  @param    key the key to be removed
    *  @return   a new tree without a binding for `key`
@@ -123,7 +131,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
-  def isNonSignificant = false 
+  def isNonSignificant = value.isEmpty && isEmpty && default==null 
 
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
@@ -553,32 +561,16 @@ object PrefixTreeLike {
      *  As a consequence, some defined sequences of keys that led to such values will disappear,
      *  and if invoked, they will fall back on the default.
      */
-    val stripEmpty:Boolean
+    val stripEmpty:Boolean,
+    /** The tree is built with navigable elements.
+     */
+    val navigable:Boolean
   )
   
   /** An abstract class for the trait. Used to share code.
    */
   abstract class Abstract[K, +V, +This <: PrefixTreeLike[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] { this:This=>
     override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
-  }
-  
-  /** This trait adds the possibility to navigate upwards in a tree.
-   *  It has two limitations:
-   *  - 
-   */
-  trait Navigable[K, +V, This <: PrefixTreeLike[K, V, This] with Navigable[K, V, This]] extends PrefixTreeLike[K, V, This] { this:This=>
-    private[this] var parent0:Navigable[K,_>:V,Repr] = _
-    @inline final private def count(i:Int):Int = if (parent0==null) i else parent0.count(i+1)
-    def parent:Navigable[K,_>:V,Repr] = parent0
-    def depth:Int = count(0)
-    def detach():Repr = { parent0=null.asInstanceOf[Repr]; this }
-    def attach(parent:Navigable[K,_>:V,Repr]):Unit = parent0=parent
-    abstract override def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = {
-      if (kv._2.isInstanceOf[Navigable[K,W,Repr]]) kv._2.asInstanceOf[Navigable[K,_>:V,Repr]].attach(this)
-      super.update[W,T](kv)
-    }
-    def updateNavigable(kv:(K,Repr)): Repr = { kv._2.attach(this); update(kv)(newBuilder) }
-    abstract override def -(key:K):Repr = { get(key).map(_.detach()); super.-(key) }
   }
   
   //XXX keep for later

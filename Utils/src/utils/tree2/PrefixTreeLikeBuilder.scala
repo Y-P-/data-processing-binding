@@ -97,13 +97,34 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
 object PrefixTreeLikeBuilder {
   val noElt = (x:Any) => throw new NoSuchElementException(s"key not found $x")
 
+  //a Navigable has almost always a minimum of three fields filled up : there is no point in trying to save one or two more fields...
+  trait Navigable[K,V,This<:PrefixTreeLike[K,V,This]] extends PrefixTreeLike[K, V, This] { this:This=>
+    var parent0:Repr with Navigable[K, V, This] = _
+    override def parent:Repr = parent0
+    override def isNavigable = true
+    override def depth:Int = if (parent0==null) 0 else 1+parent0.depth
+    override def isNonSignificant = value.isEmpty && isEmpty && default==null
+    def detach():Unit = parent0=null.asInstanceOf[Repr with Navigable[K, V, This]]
+    def attach(parent:Repr with Navigable[K, V, This]):Unit = parent0=parent
+    abstract override def -(key:K):Repr = {
+      //on removal, clear the parent
+      get(key) match {
+        case Some(n) if n.isInstanceOf[Navigable[K,V,This]]=> n.asInstanceOf[Navigable[K,V,This]].detach()
+        case _ =>
+      }
+      super.-(key)
+    }
+    //on init, attach all Navigable to this node
+    for (x<-this if x._2.isInstanceOf[Navigable[K,V,This]]) x._2.asInstanceOf[Navigable[K,V,This]].attach(this)
+  }  
+  
   //a class for easily defining a builder for a tree where both K and V are free
   abstract class Gen2 {
     type Tree[k,+v] <: PrefixTreeLike[k,v,Tree[k,v]]
     type P0[k,+v] <: Params[k,v,Tree[k,v]]
     
-    class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean)
-             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty)  {
+    class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:Boolean)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
       private[Gen2] def b2:Gen2.this.type = Gen2.this
     }
 
@@ -138,8 +159,8 @@ object PrefixTreeLikeBuilder {
     type Tree[+v] <: PrefixTreeLike[K,v,Tree[v]]
     type P0[+v] <: Params[v,_<:Tree[v]]
 
-    class Params[+V,+T<:Tree[V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean)
-             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty)  {
+    class Params[+V,+T<:Tree[V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:Boolean)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
       private[Gen1] def b1:Gen1.this.type = Gen1.this
     }
 
@@ -175,8 +196,8 @@ object PrefixTreeLikeBuilder {
     type Tree <: PrefixTreeLike[K,V,Tree]
     type P0 <: Params[Tree]
     
-    class Params[+T<:Tree with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean)
-             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty)  {
+    class Params[+T<:Tree with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:Boolean)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
       private[Gen0] def b0:Gen0.this.type = Gen0.this
     }
 
