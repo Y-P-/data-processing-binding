@@ -566,13 +566,17 @@ object PrefixTreeLike {
    *  It has two limitations:
    *  - 
    */
-  trait Navigable[K, V, This <: PrefixTreeLike[K, V, This] with Navigable[K, V, This]] extends PrefixTreeLike[K, V, This] { this:This=>
-    private[this] var parent0:Repr = _
+  trait Navigable[K, +V, This <: PrefixTreeLike[K, V, This] with Navigable[K, V, This]] extends PrefixTreeLike[K, V, This] { this:This=>
+    private[this] var parent0:Navigable[K,_>:V,Repr] = _
     @inline final private def count(i:Int):Int = if (parent0==null) i else parent0.count(i+1)
-    def parent:Repr = parent0
+    def parent:Navigable[K,_>:V,Repr] = parent0
     def depth:Int = count(0)
     def detach():Repr = { parent0=null.asInstanceOf[Repr]; this }
-    def attach(parent:Repr):Unit = parent0=parent
+    def attach(parent:Navigable[K,_>:V,Repr]):Unit = parent0=parent
+    abstract override def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = {
+      if (kv._2.isInstanceOf[Navigable[K,W,Repr]]) kv._2.asInstanceOf[Navigable[K,_>:V,Repr]].attach(this)
+      super.update[W,T](kv)
+    }
     def updateNavigable(kv:(K,Repr)): Repr = { kv._2.attach(this); update(kv)(newBuilder) }
     abstract override def -(key:K):Repr = { get(key).map(_.detach()); super.-(key) }
   }
