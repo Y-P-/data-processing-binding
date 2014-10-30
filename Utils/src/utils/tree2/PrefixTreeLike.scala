@@ -27,8 +27,16 @@ import sun.reflect.generics.reflectiveObjects.NotImplementedException
  *  stage, there is yet no `view` for trees.
  *  
  *  The `default` operation usually suggests that it can handle any other value not listed in the
- *  iterable part of the tree
- *  It must be differentiated from the `orElse` operation which links on a fallback tree.
+ *  iterable part of the tree. It itself defaults on a generic (but user provided) method.
+ *  
+ *  There are usually three kinds of trees, in ascending order of complexity, memory footprint, building speed:
+ *  - Standard trees provide no way to ascend into the tree.
+ *  - Weak Navigable trees allow access to the parent, BUT it relies on mutation and may sometimes be
+ *    unsafe to use ; in particular, a tree that is built using shared branches may have incorrect parents.
+ *    These trees can contain sub-parts that are not navigable.
+ *  - Strong Navigable trees are just like weak navigable trees, but nodes are always rebuilt on assignment.
+ *    In particular, these tree nodes always correctly point to the right parent. However, the building
+ *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
  */
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]

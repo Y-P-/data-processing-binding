@@ -30,10 +30,21 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
   type Tree[k,+v] = PrefixTree[k, v]
   type P0[k,+v]   = Params[k,v,PrefixTree[k, v]]
   
+  /** The second implementation for navigable trees. Unsafe.
+   */
   protected class Navigable[K,V](override val value:Option[V], override val tree:Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V])(implicit val params:P0[K,V])
                       extends PrefixTree[K, V] with super.Abstract[K,V] with PrefixTreeLikeBuilder.Navigable[K, V, PrefixTree[K, V]]
   
-  /** The full actual PrefixTree class used. It is designed to be sub-classed to minimize memory footprint.
+  /** The second implementation for navigable trees. Safe.
+   */
+  protected class Navigable1[K,V](value:Option[V], data:Iterable[(K,PrefixTree[K,V])], default:K=>PrefixTree[K,V])(implicit params:P0[K,V])
+                     extends Navigable[K,V](value,null,default) {
+    override val tree = params.emptyMap ++ (data.map(x=>(x._1,rebuild(x._2))))
+    def rebuild(t:PrefixTree[K,V]):PrefixTree[K,V] = if (t.isNavigable) { val r=new Navigable(t.value,t.tree,t.default); r.parent0=this; r } else t
+    override def initNav() = ()
+  }
+  
+  /** The non navigable PrefixTree class used. It is designed to be sub-classed to minimize memory footprint.
    */
   protected class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V] {
     def tree: Map[K,Repr] = params.emptyMap

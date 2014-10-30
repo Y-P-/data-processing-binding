@@ -97,7 +97,12 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
 object PrefixTreeLikeBuilder {
   val noElt = (x:Any) => throw new NoSuchElementException(s"key not found $x")
 
-  //a Navigable has almost always a minimum of three fields filled up : there is no point in trying to save one or two more fields...
+  /** This trait provides an easy way to build navigable trees, but there are other ways
+   *  to achieve the same results.
+   *  Note that this trait is unsafe (shared subtrees will have only the last parent assigned)
+   *  but is can be used in a safe way.
+   *  @see PrefixTree to understand how it is used in both ways (safe and unsafe.)
+   */
   trait Navigable[K,V,This<:PrefixTreeLike[K,V,This]] extends PrefixTreeLike[K, V, This] { this:This=>
     var parent0:Repr with Navigable[K, V, This] = _
     override def parent:Repr = parent0
@@ -114,9 +119,16 @@ object PrefixTreeLikeBuilder {
       }
       super.-(key)
     }
-    //on init, attach all Navigable to this node
-    for (x<-this if x._2.isInstanceOf[Navigable[K,V,This]]) x._2.asInstanceOf[Navigable[K,V,This]].attach(this)
-  }  
+    def initNav():Unit = {
+      //on init, attach all Navigable to this node
+      for (x<-this if x._2.isInstanceOf[Navigable[K,V,This]]) x._2.asInstanceOf[Navigable[K,V,This]].attach(this)
+    }
+    initNav()
+  }
+
+  trait Secure[K,V,This<:PrefixTreeLike[K,V,This]] extends Navigable[K, V, This] { this:This=>
+    abstract override def initNav():Unit = ()
+  }
   
   //a class for easily defining a builder for a tree where both K and V are free
   abstract class Gen2 {
