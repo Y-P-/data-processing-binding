@@ -10,7 +10,7 @@ import scala.runtime.AbstractPartialFunction
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  */
-abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
+abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] with Cloneable {
   type P
   implicit def params:P
   
@@ -19,6 +19,10 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    *  apply(None,tree,null) must return the shared value empty if tree is empty
    */
   def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
+  
+  /** A similar builder, ready to use
+   */
+  def newEmpty:PrefixTreeLikeBuilder[K,V,Tree]
   
   /** The empty value is often used */
   def empty: Tree = apply(None,Nil,null)
@@ -67,8 +71,9 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   protected var elems: ArrayBuffer[(K, Tree)] = ArrayBuffer.empty
   def +=(x: (K, Tree)): this.type = { elems += x; this }
   def clear():Unit = elems.clear
-  def result: Tree = { val r=empty.update(elems)(this); clear; r }
-  
+  def result: Tree = result(None,null)
+  def result(v:Option[V],default:K=>Tree):Tree = { val r=apply(v,elems,default); clear; r }
+    
   /** inner utility : develops one level of data by tearing out the first elt of all inner iterables.
    *  @return (value for empty GenTraversable[K] if any, subtree in which children lists are in reverse order)
    */
@@ -135,7 +140,7 @@ object PrefixTreeLikeBuilder {
     type Tree[k,+v] <: PrefixTreeLike[k,v,Tree[k,v]]
     type P0[k,+v] <: Params[k,v,Tree[k,v]]
     
-    class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:Boolean)
+    class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
              extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
       private[Gen2] def b2:Gen2.this.type = Gen2.this
     }
@@ -171,7 +176,7 @@ object PrefixTreeLikeBuilder {
     type Tree[+v] <: PrefixTreeLike[K,v,Tree[v]]
     type P0[+v] <: Params[v,_<:Tree[v]]
 
-    class Params[+V,+T<:Tree[V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:Boolean)
+    class Params[+V,+T<:Tree[V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
              extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
       private[Gen1] def b1:Gen1.this.type = Gen1.this
     }
@@ -208,7 +213,7 @@ object PrefixTreeLikeBuilder {
     type Tree <: PrefixTreeLike[K,V,Tree]
     type P0 <: Params[Tree]
     
-    class Params[+T<:Tree with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:Boolean)
+    class Params[+T<:Tree with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
              extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
       private[Gen0] def b0:Gen0.this.type = Gen0.this
     }

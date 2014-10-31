@@ -30,16 +30,19 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
   type Tree[k,+v] = PrefixTree[k, v]
   type P0[k,+v]   = Params[k,v,PrefixTree[k, v]]
   
-  /** The second implementation for navigable trees. Unsafe.
+  /** The first implementation for navigable trees. Unsafe.
+   *  Default values usually are unsafe to navigate upwards.
    */
   protected class Navigable[K,V](override val value:Option[V], override val tree:Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V])(implicit val params:P0[K,V])
                       extends PrefixTree[K, V] with super.Abstract[K,V] with PrefixTreeLikeBuilder.Navigable[K, V, PrefixTree[K, V]]
   
   /** The second implementation for navigable trees. Safe.
+   *  Even default values will have a correct parent if they return an element isNavigable.
    */
-  protected class Navigable1[K,V](value:Option[V], data:Iterable[(K,PrefixTree[K,V])], default:K=>PrefixTree[K,V])(implicit params:P0[K,V])
-                     extends Navigable[K,V](value,null,default) {
+  protected class Navigable1[K,V](value:Option[V], data:Iterable[(K,PrefixTree[K,V])], default0:K=>PrefixTree[K,V])(implicit params:P0[K,V])
+                     extends Navigable[K,V](value,null,default0) {
     override val tree = params.emptyMap ++ (data.map(x=>(x._1,rebuild(x._2))))
+    override val default = (k:K) => rebuild(default0(k))
     def rebuild(t:PrefixTree[K,V]):PrefixTree[K,V] = if (t.isNavigable) { val r=new Navigable(t.value,t.tree,t.default); r.parent0=this; r } else t
     override def initNav() = ()
   }
@@ -53,7 +56,7 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
   
   /** The actual Parameters required to build a PrefixTree.
    */
-  class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]](noDefault:K=>T,stripEmpty:Boolean,navigable:Boolean,mapKind:Map[K,T])
+  class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]](noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode,mapKind:Map[K,T])
         extends super.Params[K,V,T](noDefault,stripEmpty,navigable) {
     def emptyMap: Map[K,T] = mapKind.empty
   }
@@ -61,7 +64,7 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
     //the default value implies the LinkedHashMap Map implementation ; we share it.
     //The cast is OK because in this case, neither V nor K are actually used.
     //we also choose the simplest implementation: no empty node, not navigable
-    protected val p0 = new Params[Any,Any,Tree[Any,Any]](PrefixTreeLikeBuilder.noElt,true,false,LinkedHashMap.empty[Any,Tree[Any,Any]])
+    protected val p0 = new Params[Any,Any,Tree[Any,Any]](PrefixTreeLikeBuilder.noElt,true,PrefixTreeLike.nonNavigable,LinkedHashMap.empty[Any,Tree[Any,Any]])
     implicit def default[K,V,T<:Tree[K,V] with PrefixTreeLike[K,V,T]] = p0.asInstanceOf[Params[K,V,T]]
   }
   
@@ -72,11 +75,11 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
     new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
       type P = P0[K,V]
       def params:P = p
+      def newEmpty:PrefixTreeLikeBuilder[K,V,PrefixTree[K, V]] = builder[K,V]
       def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = {
-        val i = if (params.navigable) -1 else (if (v==None) 0x100 else 0)+(if (t.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0)
         val t0 = params.emptyMap ++ t
         val t1 = if (p.stripEmpty) t0.filterNot(_._2.isNonSignificant) else t0
-        (i: @switch) match {
+        (if (params.navigable.id>0) -params.navigable.id else (if (v==None) 0x100 else 0)+(if (t.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0): @switch) match {
           case 0x111 => new Abstract[K,V] { override def isNonSignificant = true }
           case 0x110 => new Abstract[K,V] { override val default = d }
           case 0x101 => new Abstract[K,V] { override val tree = t1 }
@@ -85,7 +88,8 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
           case 0x010 => new Abstract[K,V] { override val value = v; override val default = d }
           case 0x001 => new Abstract[K,V] { override val value = v; override val tree = t1 }
           case 0x000 => new Abstract[K,V] { override val value = v; override val tree = t1; override val default = d }
-          case _     => new Navigable[K,V](v,t1.asInstanceOf[Map[K,Navigable[K,V]]],d)
+          case -1 => new Navigable[K,V](v,t1,d)
+          case -2 => new Navigable1[K,V](v,t1,d)
         }
       }
     }

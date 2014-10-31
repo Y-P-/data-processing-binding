@@ -184,7 +184,7 @@ object TreeTests2 {
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )
     out.println(r)
-    out.println(r("e"))
+ //   out.println(r("e"))
   }
   
   @Test class TreeTest2 extends StandardTester {
