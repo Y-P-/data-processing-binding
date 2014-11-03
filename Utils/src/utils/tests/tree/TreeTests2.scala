@@ -86,6 +86,9 @@ object TreeTests2 {
   //tests filterAll
   def testFilter1(implicit out:PrintWriter) = out.println(m.filterAll(_._1!="b"))
   
+  //tests filterView
+  def testFilter2(implicit out:PrintWriter) = out.println(m.filterView(_._1!="b"))
+  
   //tests get/apply
   def testGet(implicit out:PrintWriter) = {
     out.println(m.get("d"))
@@ -191,38 +194,25 @@ object TreeTests2 {
     def apply(file:Solver,out:PrintWriter) = {
       implicit val o = out
       import out._
-      println("----01--------")
-      testPrint
-      println("----02--------")
-      testMap1
-      println("----03--------")
-      testMap2
-      println("----04--------")
-      testMap3
-      println("----05--------")
-      testFilter1
-      println("----06--------")
-      testSeqView
-      println("----07--------")
-      testGet
-      println("----08--------")
-      testGetSeq
-      println("----09--------")
-      testBuildFromCanonical
-      println("----10--------")
-      testSeqFlatMap
-      println("----11--------")
-      testFlatMap
-      println("----12--------")
-      testConstant
-      println("----13--------")
-      testConstantMap
-      println("----14--------")
-      testBasicDefault
-      println("----15--------")
-      testDefFlatMap
-      println("----16--------")
-      testBasicZip
+      var i=0
+      def t(f: =>Unit) = { println(s"----$i--------"); i+=1; f }
+      t(testPrint)
+      t(testMap1)
+      t(testMap2)
+      t(testMap3)
+      t(testFilter1)
+      t(testFilter2)
+      t(testSeqView)
+      t(testGet)
+      t(testGetSeq)
+      t(testBuildFromCanonical)
+      t(testSeqFlatMap)
+      t(testFlatMap)
+      t(testConstant)
+      t(testConstantMap)
+      t(testBasicDefault)
+      t(testDefFlatMap)
+      t(testBasicZip)
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
       //println(r1.seqView().mkString("\n"))
     }

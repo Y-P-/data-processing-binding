@@ -58,6 +58,9 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param key the given key value for which a binding is missing.
    */
   def default: K=>Repr = null
+  
+  //an internal utility to correctly rebuild default when necessary
+  @inline final def asDefault[L,T](f:L=>T):L=>T = if (default==null) null else f
       
   /** The empty tree of the same type as this tree
    *  @return   an empty tree of type `This`.
@@ -140,18 +143,52 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
    *  @return an immutable tree consisting only of those key where the key satisfies
-   *          the predicate `p`. This results in a new tree.
+   *          the predicate `p`. This results in a new tree in which keys that where
+   *          removed now fall back on the default method.
    */
-  def filterKeys(p: K => Boolean): Repr  = newBuilder(value,iterator.filter(x=>p(x._1)),default)
+  def filterKeys(p: K => Boolean): Repr = filterAll(x => p(x._1))
   
   /** Filters this map by retaining only key/value satisfying a predicate.
    *  @param  p   the predicate used to test key/value
-   *  @return an immutable map consisting only of those key value pairs of this map where the key/value satisfies
-   *          the predicate `p`. This results in a new tree.
+   *  @return an immutable tree consisting only of those items which satisfy
+   *          the predicate `p`. This results in a new tree in which keys that
+   *          were removed now fall back on the default method.
    */
-  def filterAll(p: ((K,Repr)) => Boolean): Repr  = {
-    def h(r:Repr):Repr = newBuilder(r.value,r.filter(p).map((x:(K,Repr))=>(x._1,h(x._2))),r.default)
-    h(this)
+  def filterAll(p: ((K,Repr)) => Boolean): Repr = {
+    val bf = newBuilder
+    if (!isEmpty) for (x:(K,Repr) <- this if p(x)) bf += ((x._1,x._2.filterAll(p)))
+    bf.result(value,default)
+  }
+  
+  /** Similar to the previous method, but the result is a view and doesn't rebuild
+   *  a new tree. Such views are only useful when relatively few elements are used ;
+   *  in other cases, it may be more performant to use filterAll. 
+   */
+  def filterView(p: ((K,Repr)) => Boolean): PrefixTreeLike[K,V,_] = new WithFilter(p)
+  
+  /** This class yields a filtered view of the current tree.
+   *  Default apply and may be filtered : in that case they fall back on the noDefault method.
+   *  Some operations will not work on views, in particular all methods that return Repr.
+   *  A call to 'force' will create a full blown new Tree.
+   */
+  protected class WithFilter(p: ((K,Repr)) => Boolean) extends PrefixTreeLike[K,V,This#WithFilter] {
+    type P = Nothing
+    def -(key: K): This#WithFilter = ???
+    override def default:K=>Repr = self.asDefault(k => { val r=self(k); if (p(k,r)) new r.WithFilter(p) else { val r=self.params.noDefault(k); new r.WithFilter(p) } })
+    def get(key: K): Option[This#WithFilter] = self.get(key).filter(t=>p(key,t)).map(x => new x.WithFilter(p))
+    def iterator: Iterator[(K, This#WithFilter)] = self.iterator.filter(p).map(x => (x._1,new x._2.WithFilter(p)))
+    protected[this] def newBuilder: PrefixTreeLikeBuilder[K,V,This#WithFilter] = ???
+    def params: Nothing = ???
+    def update[W >: V, T >: This#WithFilter <: PrefixTreeLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTreeLikeBuilder[K,W,T]): T = ???
+    def value: Option[V] = self.value
+    def assoc:self.type = self
+    /** Rebuilds the view as a true PrefixTreeLike. Defaults are again available, and removed keys will fall on default.
+     */
+    def force:PrefixTreeLike.this.Repr = {
+      val bf = self.newBuilder
+      if (!isEmpty) for (x <- this) bf += ((x._1,x._2.force))
+      bf.result(self.value,self.default)
+    }
   }
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the tree.
@@ -250,7 +287,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val bf1 = bf.newEmpty
       def value(t:T,cur:Repr):Option[U]
       def next(k:K):RR
-      def default(t:T,cur:Repr):K=>R  = if (cur.default==null) null else k=>recur(t(k),cur.default(k),next(k))
+      def default(t:T,cur:Repr):K=>R  = cur.asDefault(k=>recur(t(k),cur.default(k),next(k)))
       def loop(cur:Repr,t:T,r:RR)     = for (x:(K,This) <- cur) bf1 += ((x._1, recur(t(x._1),x._2,next(x._1))))
       def recur(t:T,cur:Repr,r:RR):R  = { loop(cur,t,r); bf1.result(value(t,cur),default(t,cur)) }
       def apply(t:T,cur:Repr):R       = recur(t,cur,this)
@@ -258,7 +295,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     //zip tolerating non matching trees (the intersection only will match)
     trait RecurPartial[+RR<:RecurPartial[RR]] extends Recur[RR] { this:RR=>
       override def loop(cur:Repr,t:T,r:RR)    = for (x:(K,This) <- cur.toSeq; v <- try { List((t(x._1),next(x._1))) } catch { case _:NoSuchElementException => Nil }) bf1 += ((x._1, recur(v._1,x._2,v._2)))      
-      override def default(t:T,cur:Repr):K=>R = if (cur.default==null) null else k=> { val d=cur.default(k); try { recur(t(k),d,next(k)) } catch { case _:NoSuchElementException => bf.empty } }
+      override def default(t:T,cur:Repr):K=>R = cur.asDefault(k=> { val d=cur.default(k); try { recur(t(k),d,next(k)) } catch { case _:NoSuchElementException => bf.empty } })
     }
     //zip for tree operations (the operation between T and This depends on the current node)
     class RecurOpTree[O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O]](protected[this] val op:O) extends Recur[RecurOpTree[O]] {
@@ -352,12 +389,13 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val bf1 = bf.newEmpty
       for (x <- this) bf += ((x._1,x._2.map(f)(bf1)))
     }
-    bf.result(value.map(f),if (default==null) null else default(_:K).map(f))
+    bf.result(value.map(f),asDefault(default(_:K).map(f)))
   }
   
   /** The clone of this tree is the same tree using the same builder, cloning each sub-tree
    */
-  override def clone:This = {
+  override def clone:Repr = {
+    println("clone called")
     val bf = newBuilder
     for (x <- this) bf += ((x._1,x._2.clone))    
     bf.result(value,default)
@@ -378,7 +416,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val bf1 = bf.newEmpty
       bf ++= (for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapFull(f)(bf1))))
     }
-    bf.result(value.map(f._3), if (default==null) null else (l:L)=>default(f._2(l)).mapFull(f))
+    bf.result(value.map(f._3), asDefault((l:L)=>default(f._2(l)).mapFull(f)))
   }
   
   /** Transforms this tree by applying a function to every key.
@@ -393,7 +431,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val bf1 = bf.newEmpty
       bf ++= (for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapKeys[L,W,T](f)(bf1))))
     }
-    bf.result(value, if (default==null) null else (l:L)=>default(f._2(l)).mapKeys[L,W,T](f))
+    bf.result(value, asDefault((l:L)=>default(f._2(l)).mapKeys[L,W,T](f)))
   }
   
   /** Transforms this tree by applying a function to every retrieved value.
@@ -416,7 +454,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val bf1 = bf.newEmpty
       bf ++= (for (x:(K,This) <- this) yield ((x._1,x._2.flatMap[W,T](f)(bf1))))
     }
-    bf.result(e.value, if (default==null) null else default(_:K).flatMap[W,T](f))
+    bf.result(e.value, asDefault(default(_:K).flatMap[W,T](f)))
   }
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
@@ -599,7 +637,13 @@ object PrefixTreeLike {
   /** The minimum for building the Params used by the Tree implementation.
    */
   class Params[K,+V,+T<:PrefixTreeLike[K,V,T]] (
-    /** The default method that will be used if no default is provided */
+    /** The default method that will be used if no default is provided.
+     *  It is strongly recommended that it either throws an exception or returns a
+     *  non significant value.
+     *  This method must not be understood as a fallback default, but as a handler
+     *  for errors, that is any key not handled by the underlying iterable when
+     *  there is not provided default.
+     */
     val noDefault:K=>T,
     /** The tree will not contain non significant nodes.
      *  As a consequence, some defined sequences of keys that led to such values will disappear,
