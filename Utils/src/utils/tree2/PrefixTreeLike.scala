@@ -326,13 +326,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     recur(t,this,op)
   }
   
-  /** Similar to the previous method, but the operation is provided through a third tree which is explored
-   *  'in parallel' too.
-   *  Default values for both trees are used but exceptions will end the transformation ungracefully.
-   *  Note that this operation is one of the most complex for trees, and it could be used to define most other
-   *  tree transformations that are defined here, albeit in a more costly way (performance wise.) ; for example
-   *  zip above can be expressed here by using a constant op tree ; various map operations can be expressed by
-   *  zipping a tree with itself etc...
+  /** Similar to the previous method, but now we can build a tree of a different nature.
+   *  Note that this operation is the most complex for trees and it allows extensive tree transformations.
+   *  However, it procuces trees with no default : handling defaults for the produced tree would be rather
+   *  convoluted, and in any case, defaults can be added afterwards if necessary by a simple map operation.
    *  @param t   the transformer tree
    *  @param strict is true if we don't accept the use of default values for the second tree or op tree for 
    *                defined values in the first tree : in that case we fall back on the zipped default : this
@@ -340,23 +337,27 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  def zip2Full[U,L,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](t:T,strict:Boolean,op:O)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+  def zipFull[U,L,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,t:T,strict:Boolean,op:O)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
     def recur(tt:T,cur:Repr,oo:O,u:Option[U]):R = {
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
         if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) {
-          oo.get(x._1) match {
+          oo.value match {
             case None    =>
-            case Some(f) => val r = f(x._1,tt(x._1),x._2)
+            case Some(f) => val t1 = tt(x._1); val r = f(x._1,t1,x._2)
               r._1 match {
                 case None    =>
-                case Some(l) => b += ((l, recur(tt(x._1),x._2,oo(x._1),r._2)))
+                case Some(l) => b += ((l, recur(t1,x._2,oo(x._1),r._2)))
               }
           }
         }
       b.result(u,null)
     }
-    recur(t,this,op)
+    val u0 = op.value match {
+      case None    => None
+      case Some(f) => f(k0,t,this)._2
+    }
+    recur(t,this,op,u0)
   }
 
   /** Transforms this tree by applying a function to every retrieved value.
