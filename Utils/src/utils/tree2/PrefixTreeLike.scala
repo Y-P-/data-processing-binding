@@ -342,12 +342,14 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
         if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) {
-          oo.value match {
+          val t1 = tt(x._1)
+          val o1 = oo(x._1)
+          o1.value match {
             case None    =>
-            case Some(f) => val t1 = tt(x._1); val r = f(x._1,t1,x._2)
+            case Some(f) => val r = f(x._1,t1,x._2)
               r._1 match {
                 case None    =>
-                case Some(l) => b += ((l, recur(t1,x._2,oo(x._1),r._2)))
+                case Some(l) => b += ((l, recur(t1,x._2,o1,r._2)))
               }
           }
         }
