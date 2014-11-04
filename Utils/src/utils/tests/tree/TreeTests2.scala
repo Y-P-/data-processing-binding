@@ -182,12 +182,14 @@ object TreeTests2 {
   }
   
   def testBasicZip(implicit out:PrintWriter) = {
-    //running zip against itself shows that zip basically works
-    val r = m1.zip[String,StringTree[Int],StringTree[String]](m, (t1,t2) =>
+    //running zip for a tree against itself shows that zip basically works
+    val r = m1.zip[String,StringTree[Int],StringTree[String]](m1, false, (t1,t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )
     out.println(r)
- //   out.println(r("e"))
+    out.println(r("e"))
+    out.println(r("x"))
+    out.println(r("u"))
   }
   
   @Test class TreeTest2 extends StandardTester {
