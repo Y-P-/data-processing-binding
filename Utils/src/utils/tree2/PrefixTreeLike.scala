@@ -283,7 +283,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** An internal class designed to make efficient zip operations without code duplication between various zip cases. 
    */
   protected[this] class Zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) {
-    trait Recur[+RR<:Recur[RR]] { this:RR=>
+    abstract class Recur[+RR<:Recur[RR]] { this:RR=>
       val bf1 = bf.newEmpty
       def value(t:T,cur:Repr):Option[U]
       def next(k:K):RR
@@ -325,10 +325,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return the resulting transformed tree
    */
   def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    val z = new Zip[U,T,R]
-    new z.RecurOp(op)(t,this)
-    //def recur(tt:T,cur:Repr):R = bf(op(tt,cur),for (x:(K,This) <- cur) yield (x._1, recur(tt(x._1),x._2)))
-    //recur(t,this)
+    def recur(tt:T,cur:Repr):R = { val b=bf.newEmpty; for (x:(K,This) <- cur) b += ((x._1, recur(tt(x._1),x._2))); b.result(op(tt,cur),null) }
+    recur(t,this)
   }
   
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
