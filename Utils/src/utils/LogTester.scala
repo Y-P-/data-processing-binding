@@ -68,6 +68,11 @@ class LogTester(name:String,handlers:LogTester.Comparator*) extends LogTester.So
 object LogTester {
   private[this] val p1 = Pattern.compile("\\s*")
   
+  implicit class PExc(out:PrintWriter) {
+    /** utility to write an expected exception result */
+    def printExc(f: =>Any,msg:String=null):Unit = try { f } catch { case e:Throwable => if (msg==null) out.println(e) else out.println(msg) }
+  }
+  
   /** used by client code to resolve files in the test directory. name is relative to that directory. */
   trait Solver {
     def apply(name:String):URI

@@ -23,6 +23,8 @@ object TreeTests2 {
   val c12 = StringTree(5,"c"->c3)
   val c13 = StringTree(6,"d"->c11,"x"->c12)
   val m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13))
+  //an extract: (7) => { d/4 => { a/1 }, f/6 => { d/4 => { b/2 } } }
+  val m0  = StringTree(7,Seq("d"->StringTree(4,Seq("a"->c1),(x:String)=>m),"f"->StringTree(6,"d"->StringTree(4,Seq("b"->c2)))))
 
   /*
    * The same basic tree with complex default everywhere.
@@ -97,13 +99,12 @@ object TreeTests2 {
   
   //tests get/apply on SeqView
   def testGetSeq(implicit out:PrintWriter) = {
-    import out._
     val v = m.seqView()
-    println(v.get("d","a"))
-    println(v("d","a"))
-    println(v(Seq("d","a")))
-    println(v.get("d","a","c"))
-    try { println(v("d","a","c")) } catch { case e:java.util.NoSuchElementException => println("d.a.c not found")}
+    out.println(v.get("d","a"))
+    out.println(v("d","a"))
+    out.println(v(Seq("d","a")))
+    out.println(v.get("d","a","c"))
+    out.printExc(v("d","a","c"))
   }
   
   //tests seqView
@@ -182,14 +183,61 @@ object TreeTests2 {
   }
   
   def testBasicZip(implicit out:PrintWriter) = {
-    //running zip for a tree against itself shows that zip basically works
     val r = m1.zip[String,StringTree[Int],StringTree[String]](m1, false, (t1,t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )
     out.println(r)
     out.println(r("e"))
-    out.println(r("x"))
     out.println(r("u"))
+    out.println(r("u","v"))
+    out.println(r("x"))
+    out.println(r("x","c"))
+    out.println(r("f","d","a"))
+    out.println(r("f","d","a","x"))
+  }
+  
+  def testBasicZipStrict(implicit out:PrintWriter) = {
+    val r = m1.zip[String,StringTree[Int],StringTree[String]](m1, true, (t1,t2) =>
+      for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
+    )
+    out.println(r)
+    out.println(r("e"))
+    out.printExc(r("u"))
+    out.printExc(r("u","v"))
+    out.printExc(r("x"))
+    out.printExc(r("x","c"))
+    out.println(r("f","d","a"))
+    out.printExc(r("f","d","a","x"))
+    //to compare with the next test result where some matches will disappear
+    out.println(r("e"))
+    out.println(r("d"))
+    out.println(r("d","a"))
+    out.println(r("d","b"))
+  }
+  
+  def testBasicRestrictZipStrict(implicit out:PrintWriter) = {
+    //restrict result using m0 instead of full tree
+    val r = m1.zip[String,StringTree[Int],StringTree[String]](m0, true, (t1,t2) =>
+      for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
+    )
+    out.println(r)
+    out.printExc(r("e"))     // e not in m0
+    out.println(r("d"))      // d in m0
+    out.println(r("d","a"))  // a in m0(d)
+    out.printExc(r("d","b")) // b not in m0(d)
+  }
+  
+  def testBasicRestrictZip(implicit out:PrintWriter) = {
+    //restrict result using m0 instead of full tree
+    val r = m1.zip[String,StringTree[Int],StringTree[String]](m0, false, (t1,t2) =>
+      for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
+    )
+    out.println(r)
+    out.printExc(r("e"))     // e not in m0
+    out.println(r("d"))      // d in m0
+    out.println(r("d","a"))  // a in m0(d)
+    out.println(r("d","b"))  // b not in m0(d) but defaults to m
+    out.println(r("d","b","d"))  // that's hotter: in m1, d->b->b=m (following defaults), in m0 this gives c11 (again following defaults)
   }
   
   @Test class TreeTest2 extends StandardTester {
@@ -215,6 +263,9 @@ object TreeTests2 {
       t(testBasicDefault)
       t(testDefFlatMap)
       t(testBasicZip)
+      t(testBasicZipStrict)
+      t(testBasicRestrictZipStrict)
+      t(testBasicRestrictZip)
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
       //println(r1.seqView().mkString("\n"))
     }

@@ -12,6 +12,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.ArrayStack
 import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
+import java.util.NoSuchElementException
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -135,6 +136,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     case None => if (default!=null) default(key) else params.noDefault(key)
     case Some(value) => value
   }
+  
+  /** As apply above, but for a succession of keys.
+   */
+  def apply(k1:K, k2:K, k: K*): Repr = { var r=apply(k1)(k2); k.foreach(x=>r=r(x)); r}
   
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
@@ -296,7 +301,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     def recur(tt:T,cur:Repr):R = {
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
-        if (!strict || tt.isDefinedAt(x._1)) b += ((x._1, recur(tt(x._1),x._2)))
+        if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
       b.result(op(tt,cur),cur.asDefault(k=>recur(if (!strict || tt.isDefinedAt(k)) tt(k) else tt.params.noDefault(k),cur.default(k))))
     }
     recur(t,this)
@@ -320,7 +325,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     def recur(tt:T,cur:Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
-        if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) b += ((x._1, recur(tt(x._1),x._2,oo(x._1))))
+        if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
       b.result(oo.value.flatMap(_(tt,cur)),cur.asDefault(k=>recur(if (!strict || tt.isDefinedAt(k)) tt(k) else tt.params.noDefault(k),cur.default(k),if (!strict || oo.isDefinedAt(k)) oo(k) else oo.params.noDefault(k))))
     }
     recur(t,this,op)
@@ -342,8 +347,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
         if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) {
-          val t1 = tt(x._1)
-          val o1 = oo(x._1)
+          val (t1,o1) = try { (tt(x._1),oo(x._1)) } catch { case _:NoSuchElementException => (tt.empty,oo.empty) }
           o1.value match {
             case None    =>
             case Some(f) => val r = f(x._1,t1,x._2)
@@ -388,7 +392,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** The clone of this tree is the same tree using the same builder, cloning each sub-tree
    */
   override def clone:Repr = {
-    println("clone called")
     val bf = newBuilder
     for (x <- this) bf += ((x._1,x._2.clone))    
     bf.result(value,default)
