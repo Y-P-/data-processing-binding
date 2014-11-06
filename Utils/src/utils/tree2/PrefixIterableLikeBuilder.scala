@@ -200,22 +200,6 @@ object PrefixIterableLikeBuilder {
     def empty(implicit p:P0): Tree = apply(None,Nil)
   }
   
-  abstract class U(val value: Option[String])(implicit val params:U.P) extends PrefixIterableLike[String,String,U] {
-    type P = U.P
-    protected[this] def newBuilder:PrefixIterableLikeBuilder[String,String,U] = U //should be created but OK for now
-    def update[W >: String, T >: U <: PrefixIterableLike[String,W,T]](kv: (String, T))(implicit bf: PrefixIterableLikeBuilder[String,W,T]): T =
-      bf(value,iterator ++ Iterator(kv))
-    def update[W >: String, T >: U <: PrefixIterableLike[String,W,T]](kv1: (String, T), kv2: (String, T), kv: (String, T))(implicit bf: PrefixIterableLikeBuilder[String,W,T]): T =
-      bf(value,iterator ++ Iterator(kv1,kv2,kv))
-  }
-  object U extends PrefixIterableLikeBuilder[String,String,U] {
-    type P = PrefixIterableLike.Params[String,String,U]
-    def apply(v: Option[String],tree: GenTraversableOnce[(String, U)]):U = new U(v) {
-      def iterator = ???
-    }
-    def newEmpty: PrefixIterableLikeBuilder[String,String,U] = U //should be created but OK for now
-    implicit def params:P = ???    
-  }
 }
 
 

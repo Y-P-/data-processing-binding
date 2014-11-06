@@ -41,11 +41,6 @@ trait PrefixIterableLike[K, +V, +This <: PrefixIterableLike[K, V, This]]
   protected[this] type Repr = This
   override def repr:Repr = self
   
-  /** The general parameters used for building the tree.
-   */
-  type P <: PrefixIterableLike.Params[K,V,Repr]
-  def params:P
-  
   /** The value for the current node */
   def value: Option[V]
       
@@ -116,7 +111,7 @@ trait PrefixIterableLike[K, +V, +This <: PrefixIterableLike[K, V, This]]
     def iterator: Iterator[(K, This#WithFilter)] = self.iterator.filter(p).map(x => (x._1,new x._2.WithFilter(p)))
     protected[this] def newBuilder: PrefixIterableLikeBuilder[K,V,This#WithFilter] = ???
     def params: Nothing = ???
-    def update[W >: V, T >: This#WithFilter <: PrefixIterableLike[K,W,T]](kv: (K, T))(implicit bf: PrefixIterableLikeBuilder[K,W,T]): T = ???
+    def update1[W >: V, T >: This#WithFilter <: PrefixIterableLike[K,W,T]](kv: (K, T))(implicit bf: PrefixIterableLikeBuilder[K,W,T]): T = ???
     def value: Option[V] = self.value
     def assoc:self.type = self
     /** Rebuilds the view as a true PrefixIterableLike. Defaults are again available, and removed keys will fall on default.
@@ -296,16 +291,16 @@ trait PrefixIterableLike[K, +V, +This <: PrefixIterableLike[K, V, This]]
    *  @tparam   T the type of the added value
    *  @return   A new tree with the new key/value mapping added to this map.
    */
-  def update[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv:(K,T))(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T
+  def update1[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv:(K,T))(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T
   
   /** Identical to the previous method, but more than one element is updated.
    */
-  def update[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv1:(K,T),kv2:(K,T),kv:(K,T)*)(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T = { val t=kv; update[W,T](kv1 +: kv2 +: t) }
+  def update[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv:(K,T)*)(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T = { val t=kv; update[W,T](t) }
   
   /** Identical to the previous method, but elements are passed through an iterable like rather than a built Seq.
    */
   def update[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T =
-    kv.foldLeft[T](repr)(_.update[W,T](_))
+    kv.foldLeft[T](repr)(_.update1[W,T](_))
     
   /** Adds a key/(value,tree) pair to this tree, returning a new tree.
    *  Enlarge subtrees without losing information is usualy the expected operation on trees.
