@@ -8,40 +8,49 @@ abstract class PushPull[-K,+V] {
 
 object PushPull {
   
-  class Stack[K,V] extends PushPull[K,V] with PrefixTraversableLike[K,V,Stack[K,V]] {
-    protected[this] var cur:Import = new Import
-    protected[this] def newBuilder: PrefixTraversableLikeBuilder[K,V,Stack[K,V]] = ???
-    def update1[W >: V, T >: PushPull.Stack[K,V] <: PrefixTraversableLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTraversableLikeBuilder[K,W,T]): T = ???
-    def value: Option[V] = cur.value
-    def foreach[U](f: ((K, Stack[K,V])) => U): Unit = ???
-    protected[this] class Import extends PushPull[K,V] { self=>
-      //val b = bf.newEmpty
-      var value:Option[V] = None
-      final def push(k:K):Unit = cur   = new InnerImport(k)
-      final def pull(v:V):Unit = value = Some(v) 
-      def pull = ()
-      final protected[this] class InnerImport(k:K) extends Import {
-        override def pull = {
-          //self.b += ((k,b.result(value)))
-          cur=self
-        }
+  class Stack[K,V] extends PushPull[K,V] {
+      var cur:Loop = _
+      var f:((K,Loop))=>Any = _
+      class Loop extends PrefixTraversableLike[K,V,Loop] { self=>
+        protected[this] def newBuilder = ???
+        def f = Stack.this.f
+        def update1[W >: V, T >: Loop <: PrefixTraversableLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTraversableLikeBuilder[K,W,T]): T = ???
+        def foreach[U](f:((K,Loop))=>U) = { Stack.this.f=f; cur=this }
+        def value:Option[V] = None
+        def push(k:K):Unit = cur = new Inner(k,this)
+        def pull(v:V):Unit = () 
+        def pull           = cur = null
+      }
+      final protected[this] class Inner(k:K,parent:Loop) extends Loop {
+        println(k+" "+f)
+        private var value0:Option[V] = None
+        override def value          = value0
+        override def pull(v:V):Unit = value0 = Some(v) 
+        override def pull           = { println(k); parent.f((k,this)); cur=parent }
+      }
+    final def push(k:K) = cur.push(k)
+    final def pull(v:V) = cur.pull(v)
+    final def pull      = cur.pull
+    def run(x: =>Unit):PrefixTraversableLike[K,V,Loop] = new Loop {
+      override def foreach[U](f:((K,Loop))=>U) = {
+        super.foreach(f)
+        x
       }
     }
-    final def                 push(k:K) = cur.push(k)
-    final protected[this] def pull(v:V) = cur.pull(v)
-    final def                 pull      = cur.pull
-    //final def result                    = cur.b.result(cur.value)
   }
   
   def main(args:Array[String]):Unit = {
-    val f:Stack[String,String] = new Stack[String,String] {
-      push("a")
-      push("aa")
-      pull("1")
-      pull
-      pull
+    val f:Stack[String,String] = new Stack[String,String]
+    f.run {
+      f.push("a")
+      f.pull
+      f.push("aa")
+      f.pull("1")
+      f.pull
+      f.pull
+    }.foreach { x =>
+      println(s"$x")
     }
-    println(f)
   }
   
 }
