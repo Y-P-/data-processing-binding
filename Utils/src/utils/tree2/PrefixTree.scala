@@ -15,7 +15,7 @@ abstract class PrefixTree[K,+V] protected extends PrefixTreeLike.Abstract[K,V,Pr
   implicit def params:P  //make params implicit so that it is automatically used by these methods that rely on it
   def value:Option[V] = None
   def tree: Map[K,Repr]
-  def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = bf(value,tree+kv,default)
+  def update1[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = bf(value,tree+kv,default)
   def -(key: K): Repr              = newBuilder(value,tree-key,default)
   def get(key: K): Option[Repr]    = tree.get(key)
   def iterator:Iterator[(K, Repr)] = tree.iterator
