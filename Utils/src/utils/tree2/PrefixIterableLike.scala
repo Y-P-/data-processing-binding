@@ -35,15 +35,15 @@ import java.util.NoSuchElementException
  *    In particular, these tree nodes always correctly point to the right parent. However, the building
  *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
  */
-trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
+trait PrefixIterableLike[K, +V, +This <: PrefixIterableLike[K, V, This]]
   extends IterableLike[(K, This), This] { self:This =>
-  //an alias that concrete classes can use as shrotcut to refer to themselves ; necessary too to get the appropriate overload on apply
+  //an alias that concrete classes can use as shortcut to refer to themselves
   protected[this] type Repr = This
   override def repr:Repr = self
   
   /** The general parameters used for building the tree.
    */
-  type P <: PrefixIteratorLike.Params[K,V,Repr]
+  type P <: PrefixIterableLike.Params[K,V,Repr]
   def params:P
   
   /** The value for the current node */
@@ -57,10 +57,10 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
   /** A new instance of builder similar to the one used to build this tree element.
    *  It can be used to build elements of the same tree kind.
    */
-  protected[this] def newBuilder:PrefixIteratorLikeBuilder[K,V,Repr]
+  protected[this] def newBuilder:PrefixIterableLikeBuilder[K,V,Repr]
   
   /** rebuilds this tree with a specific value */
-  final def withValue[W>:V,T>:Repr<:PrefixIteratorLike[K,W,T]](value:Option[W])(implicit bf:PrefixIteratorLikeBuilder[K,W,T]):T = bf.withValue(this, value)
+  final def withValue[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](value:Option[W])(implicit bf:PrefixIterableLikeBuilder[K,W,T]):T = bf.withValue(this, value)
   
   /** tells if the two following method should work with no exception */
   def isNavigable:Boolean = false
@@ -104,25 +104,24 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *  a new tree. Such views are only useful when relatively few elements are used ;
    *  in other cases, it may be more performant to use filterAll. 
    */
-  def filterView(p: ((K,Repr)) => Boolean): PrefixIteratorLike[K,V,_] = new WithFilter(p)
+  def filterView(p: ((K,Repr)) => Boolean): PrefixIterableLike[K,V,_] = new WithFilter(p)
   
   /** This class yields a filtered view of the current tree.
    *  Default apply and may be filtered : in that case they fall back on the noDefault method.
    *  Some operations will not work on views, in particular all methods that return Repr.
    *  A call to 'force' will create a full blown new Tree.
    */
-  protected class WithFilter(p: ((K,Repr)) => Boolean) extends PrefixIteratorLike[K,V,This#WithFilter] {
+  protected class WithFilter(p: ((K,Repr)) => Boolean) extends PrefixIterableLike[K,V,This#WithFilter] {
     type P = Nothing
-    def -(key: K): This#WithFilter = ???
     def iterator: Iterator[(K, This#WithFilter)] = self.iterator.filter(p).map(x => (x._1,new x._2.WithFilter(p)))
-    protected[this] def newBuilder: PrefixIteratorLikeBuilder[K,V,This#WithFilter] = ???
+    protected[this] def newBuilder: PrefixIterableLikeBuilder[K,V,This#WithFilter] = ???
     def params: Nothing = ???
-    def update[W >: V, T >: This#WithFilter <: PrefixIteratorLike[K,W,T]](kv: (K, T))(implicit bf: PrefixIteratorLikeBuilder[K,W,T]): T = ???
+    def update[W >: V, T >: This#WithFilter <: PrefixIterableLike[K,W,T]](kv: (K, T))(implicit bf: PrefixIterableLikeBuilder[K,W,T]): T = ???
     def value: Option[V] = self.value
     def assoc:self.type = self
-    /** Rebuilds the view as a true PrefixIteratorLike. Defaults are again available, and removed keys will fall on default.
+    /** Rebuilds the view as a true PrefixIterableLike. Defaults are again available, and removed keys will fall on default.
      */
-    def force:PrefixIteratorLike.this.Repr = {
+    def force:PrefixIterableLike.this.Repr = {
       val bf = self.newBuilder
       if (!isEmpty) for (x <- this) bf += ((x._1,x._2.force))
       bf.result(self.value)
@@ -219,7 +218,7 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *            The resulting tree is a new tree.
    */
-  def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
+  def map[W,T<:PrefixIterableLike[K,W,T]](f:V=>W)(implicit bf:PrefixIterableLikeBuilder[K,W,T]):T = {
     if (!isEmpty) {
       //OK: one explanation here, but it is the same everywhere:
       //We must duplicate bf to have an empty copy to work on with children : the bf used at
@@ -232,7 +231,7 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
       val bf1 = bf.newEmpty
       for (x <- this) bf += ((x._1,x._2.map(f)(bf1)))
     }
-    bf.result(value.map(f),null)
+    bf.result(value.map(f))
   }
   
   /** Transforms this tree by applying a function to every retrieved value and key.
@@ -245,12 +244,12 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree. 
    */
-  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
+  def mapFull[L,W,T<:PrefixIterableLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixIterableLikeBuilder[L,W,T]):T = {
     if (!isEmpty) {
       val bf1 = bf.newEmpty
       bf ++= (for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapFull(f)(bf1))))
     }
-    bf.result(value.map(f._3),null)
+    bf.result(value.map(f._3))
   }
   
   /** Transforms this tree by applying a function to every key.
@@ -260,12 +259,12 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */
-  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
+  def mapKeys[L,W>:V,T<:PrefixIterableLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixIterableLikeBuilder[L,W,T]):T = {
     if (!isEmpty) {
       val bf1 = bf.newEmpty
       bf ++= (for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapKeys[L,W,T](f)(bf1))))
     }
-    bf.result(value,null)
+    bf.result(value)
   }
   
   /** Transforms this tree by applying a function to every retrieved value.
@@ -281,14 +280,14 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *            The resulting tree is a new tree with the same key type, the new value type,
    *            which expands this tree values to new subtrees.
    */
-  def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
+  def flatMap[W,T<:PrefixIterableLike[K,W,T]](f:V=>T)(implicit bf:PrefixIterableLikeBuilder[K,W,T]):T = {
     val e = (if (value.isDefined) f(value.get) else bf.empty)
     bf ++= e
     if (!isEmpty) {
       val bf1 = bf.newEmpty
       bf ++= (for (x:(K,This) <- this) yield ((x._1,x._2.flatMap[W,T](f)(bf1))))
     }
-    bf.result(e.value,null)
+    bf.result(e.value)
   }
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
@@ -297,15 +296,15 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *  @tparam   T the type of the added value
    *  @return   A new tree with the new key/value mapping added to this map.
    */
-  def update[W>:V,T>:Repr<:PrefixIteratorLike[K,W,T]](kv:(K,T))(implicit bf:PrefixIteratorLikeBuilder[K,W,T]): T
+  def update[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv:(K,T))(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T
   
   /** Identical to the previous method, but more than one element is updated.
    */
-  def update[W>:V,T>:Repr<:PrefixIteratorLike[K,W,T]](kv1:(K,T),kv2:(K,T),kv:(K,T)*)(implicit bf:PrefixIteratorLikeBuilder[K,W,T]): T = { val t=kv; update[W,T](kv1 +: kv2 +: t) }
+  def update[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv1:(K,T),kv2:(K,T),kv:(K,T)*)(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T = { val t=kv; update[W,T](kv1 +: kv2 +: t) }
   
   /** Identical to the previous method, but elements are passed through an iterable like rather than a built Seq.
    */
-  def update[W>:V,T>:Repr<:PrefixIteratorLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixIteratorLikeBuilder[K,W,T]): T =
+  def update[W>:V,T>:Repr<:PrefixIterableLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T =
     kv.foldLeft[T](repr)(_.update[W,T](_))
     
   /** Adds a key/(value,tree) pair to this tree, returning a new tree.
@@ -317,7 +316,7 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *
    *  @usecase  def + (kv: (K, (V,T)): T
    */
-  def + [W>:V,T>:Repr<:PrefixIteratorLike[K,W,T]] (kv:(K,T))(implicit bf:PrefixIteratorLikeBuilder[K,W,T]): T = update[W,T](kv)
+  def + [W>:V,T>:Repr<:PrefixIterableLike[K,W,T]] (kv:(K,T))(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T = update[W,T](kv)
 
   /** Adds key/value pairs to this tree, returning a new tree.
    *
@@ -335,7 +334,7 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *    @inheritdoc
    *    @param    kvs the key/value pairs
    */
-  def + [W>:V,T>:Repr<:PrefixIteratorLike[K,W,T]] (kv1:(K,T), kv2:(K,T), kvs:(K,T) *)(implicit bf:PrefixIteratorLikeBuilder[K,W,T]): T =
+  def + [W>:V,T>:Repr<:PrefixIterableLike[K,W,T]] (kv1:(K,T), kv2:(K,T), kvs:(K,T) *)(implicit bf:PrefixIterableLikeBuilder[K,W,T]): T =
     this +[W,T] kv1 + kv2 ++ kvs
 
   /** Adds all key/value pairs in a traversable collection to this tree, returning a new tree.
@@ -347,7 +346,7 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
    *  @usecase  def ++ (xs: Traversable[(A, B)]): Map[A, B]
    *    @inheritdoc
    */
-  def ++[W>:V, T1 >: Repr <: PrefixIteratorLike[K,W,T1]](xs: GenTraversableOnce[(K, T1)])(implicit bf:PrefixIteratorLikeBuilder[K,W,T1]): T1 =
+  def ++[W>:V, T1 >: Repr <: PrefixIterableLike[K,W,T1]](xs: GenTraversableOnce[(K, T1)])(implicit bf:PrefixIterableLikeBuilder[K,W,T1]): T1 =
     ((repr: T1) /: xs.seq) (_ + _)
 
   /* Overridden for efficiency. */
@@ -448,8 +447,8 @@ trait PrefixIteratorLike[K, +V, +This <: PrefixIteratorLike[K, V, This]]
   override def toString = super[IterableLike].toString
 }
 
-object PrefixIteratorLike {
-  implicit def toSeq[T<:PrefixIteratorLike[_,_,T]](t:T):t.SeqView = t.seqView()
+object PrefixIterableLike {
+  implicit def toSeq[T<:PrefixIterableLike[_,_,T]](t:T):t.SeqView = t.seqView()
   
   sealed class NavigableMode(val id:Int)
   val nonNavigable    = new NavigableMode(0)
@@ -458,7 +457,7 @@ object PrefixIteratorLike {
   
   /** The minimum for building the Params used by the Tree implementation.
    */
-  class Params[K,+V,+T<:PrefixIteratorLike[K,V,T]] (
+  class Params[K,+V,+T<:PrefixIterableLike[K,V,T]] (
     /** The tree will not contain non significant nodes.
      *  As a consequence, some defined sequences of keys that led to such values will disappear,
      *  and if invoked, they will fall back on the default.
@@ -471,7 +470,7 @@ object PrefixIteratorLike {
   
   /** An abstract class for the trait. Used to share code.
    */
-  abstract class Abstract[K, +V, +This <: PrefixIteratorLike[K, V, This]] extends PrefixIteratorLike[K, V, This] {
+  abstract class Abstract[K, +V, +This <: PrefixIterableLike[K, V, This]] extends PrefixIterableLike[K, V, This] {
     this:This =>
   }
 }

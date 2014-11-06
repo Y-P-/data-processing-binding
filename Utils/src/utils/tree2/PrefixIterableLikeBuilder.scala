@@ -10,7 +10,7 @@ import scala.runtime.AbstractPartialFunction
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  */
-abstract class PrefixIteratorLikeBuilder[K,V,Tree<:PrefixIteratorLike[K,V,Tree]] extends Builder[(K,Tree),Tree] with Cloneable {
+abstract class PrefixIterableLikeBuilder[K,V,Tree<:PrefixIterableLike[K,V,Tree]] extends Builder[(K,Tree),Tree] with Cloneable {
   type P
   implicit def params:P
   
@@ -22,7 +22,7 @@ abstract class PrefixIteratorLikeBuilder[K,V,Tree<:PrefixIteratorLike[K,V,Tree]]
   
   /** A similar builder, ready to use
    */
-  def newEmpty:PrefixIteratorLikeBuilder[K,V,Tree]
+  def newEmpty:PrefixIterableLikeBuilder[K,V,Tree]
   
   /** The empty value is often used */
   def empty: Tree = apply(None,Nil)
@@ -85,7 +85,7 @@ abstract class PrefixIteratorLikeBuilder[K,V,Tree<:PrefixIteratorLike[K,V,Tree]]
   }
 }
 
-object PrefixIteratorLikeBuilder {
+object PrefixIterableLikeBuilder {
   val noElt = (x:Any) => throw new NoSuchElementException(s"key not found $x")
 
   /** This trait provides an easy way to build navigable trees, but there are other ways
@@ -94,7 +94,7 @@ object PrefixIteratorLikeBuilder {
    *  but is can be used in a safe way.
    *  @see PrefixTree to understand how it is used in both ways (safe and unsafe.)
    */
-  trait Navigable[K,V,This<:PrefixIteratorLike[K,V,This]] extends PrefixIteratorLike[K, V, This] { this:This=>
+  trait Navigable[K,V,This<:PrefixIterableLike[K,V,This]] extends PrefixIterableLike[K, V, This] { this:This=>
     var parent0:Repr with Navigable[K, V, This] = _
     override def parent:Repr = parent0
     override def isNavigable = true
@@ -109,17 +109,17 @@ object PrefixIteratorLikeBuilder {
     initNav()
   }
 
-  trait Secure[K,V,This<:PrefixIteratorLike[K,V,This]] extends Navigable[K, V, This] { this:This=>
+  trait Secure[K,V,This<:PrefixIterableLike[K,V,This]] extends Navigable[K, V, This] { this:This=>
     abstract override def initNav():Unit = ()
   }
   
   //a class for easily defining a builder for a tree where both K and V are free
   abstract class Gen2 {
-    type Tree[k,+v] <: PrefixIteratorLike[k,v,Tree[k,v]]
+    type Tree[k,+v] <: PrefixIterableLike[k,v,Tree[k,v]]
     type P0[k,+v] <: Params[k,v,Tree[k,v]]
     
-    class Params[K,+V,+T<:Tree[K,V] with PrefixIteratorLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixIteratorLike.NavigableMode)
-             extends PrefixIteratorLike.Params[K,V,T](stripEmpty,navigable)  {
+    class Params[K,+V,+T<:Tree[K,V] with PrefixIterableLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixIterableLike.NavigableMode)
+             extends PrefixIterableLike.Params[K,V,T](stripEmpty,navigable)  {
       private[Gen2] def b2:Gen2.this.type = Gen2.this
     }
 
@@ -129,7 +129,7 @@ object PrefixIteratorLikeBuilder {
       def newBuilder = params.b2.builder(params)
     }
     
-    implicit def builder[K,V](implicit p:P0[K,V]):PrefixIteratorLikeBuilder[K, V, Tree[K,V]] { type P=P0[K,V] }
+    implicit def builder[K,V](implicit p:P0[K,V]):PrefixIterableLikeBuilder[K, V, Tree[K,V]] { type P=P0[K,V] }
     def apply[K,V](v:Option[V],tree:GenTraversableOnce[(K,Tree[K,V])])(implicit p:P0[K,V]):Tree[K,V]  = builder[K,V](p)(v,tree)
     def apply[K,V](v:V,tree:GenTraversableOnce[(K,Tree[K,V])])(implicit p:P0[K,V]):Tree[K,V]          = apply(Some(v),tree)
     def apply[K,V](v:V)(implicit p:P0[K,V]):Tree[K,V]                                                 = apply(Some(v))
@@ -144,11 +144,11 @@ object PrefixIteratorLikeBuilder {
   //a class for easily defining a builder for a tree where K is fixed and V is free
   abstract class Gen1[K0] {
     type K = K0
-    type Tree[+v] <: PrefixIteratorLike[K,v,Tree[v]]
+    type Tree[+v] <: PrefixIterableLike[K,v,Tree[v]]
     type P0[+v] <: Params[v,_<:Tree[v]]
 
-    class Params[+V,+T<:Tree[V] with PrefixIteratorLike[K,V,T]] (stripEmpty:Boolean,navigable:PrefixIteratorLike.NavigableMode)
-             extends PrefixIteratorLike.Params[K,V,T](stripEmpty,navigable)  {
+    class Params[+V,+T<:Tree[V] with PrefixIterableLike[K,V,T]] (stripEmpty:Boolean,navigable:PrefixIterableLike.NavigableMode)
+             extends PrefixIterableLike.Params[K,V,T](stripEmpty,navigable)  {
       private[Gen1] def b1:Gen1.this.type = Gen1.this
     }
 
@@ -158,7 +158,7 @@ object PrefixIteratorLikeBuilder {
       def newBuilder = params.b1.builder[V](params)
     }
 
-    implicit def builder[V](implicit p:P0[V]):PrefixIteratorLikeBuilder[K, V, Tree[V]] { type P=P0[V] }
+    implicit def builder[V](implicit p:P0[V]):PrefixIterableLikeBuilder[K, V, Tree[V]] { type P=P0[V] }
     def apply[V](v:Option[V],tree:GenTraversableOnce[(K,Tree[V])])(implicit p:P0[V]):Tree[V]    = builder[V](p)(v,tree)
     def apply[V](v:V,tree:GenTraversableOnce[(K,Tree[V])])(implicit p:P0[V]):Tree[V]            = apply(Some(v),tree)
     def apply[V](v:V)(implicit p:P0[V]):Tree[V]                                                 = apply(Some(v))
@@ -174,11 +174,11 @@ object PrefixIteratorLikeBuilder {
   abstract class Gen0[K0,V0] {
     type K = K0
     type V = V0
-    type Tree <: PrefixIteratorLike[K,V,Tree]
+    type Tree <: PrefixIterableLike[K,V,Tree]
     type P0 <: Params[Tree]
     
-    class Params[+T<:Tree with PrefixIteratorLike[K,V,T]] (stripEmpty:Boolean,navigable:PrefixIteratorLike.NavigableMode)
-             extends PrefixIteratorLike.Params[K,V,T](stripEmpty,navigable)  {
+    class Params[+T<:Tree with PrefixIterableLike[K,V,T]] (stripEmpty:Boolean,navigable:PrefixIterableLike.NavigableMode)
+             extends PrefixIterableLike.Params[K,V,T](stripEmpty,navigable)  {
       private[Gen0] def b0:Gen0.this.type = Gen0.this
     }
 
@@ -188,7 +188,7 @@ object PrefixIteratorLikeBuilder {
       def newBuilder = params.b0.builder(params)
     }
 
-    implicit def builder(implicit p:P0):PrefixIteratorLikeBuilder[K, V, Tree] { type P=P0 }
+    implicit def builder(implicit p:P0):PrefixIterableLikeBuilder[K, V, Tree] { type P=P0 }
     def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)])(implicit p:P0):Tree = builder(p)(v,tree)
     def apply(v:V,tree:GenTraversableOnce[(K,Tree)])(implicit p:P0):Tree                         = apply(Some(v),tree)
     def apply(v:V)(implicit p:P0):Tree                                                           = apply(Some(v))
@@ -198,6 +198,23 @@ object PrefixIteratorLikeBuilder {
     
     def apply(flat:GenTraversableOnce[(GenTraversable[K],V)])(implicit p:P0):Tree = builder(p)(flat)
     def empty(implicit p:P0): Tree = apply(None,Nil)
+  }
+  
+  abstract class U(val value: Option[String])(implicit val params:U.P) extends PrefixIterableLike[String,String,U] {
+    type P = U.P
+    protected[this] def newBuilder:PrefixIterableLikeBuilder[String,String,U] = U //should be created but OK for now
+    def update[W >: String, T >: U <: PrefixIterableLike[String,W,T]](kv: (String, T))(implicit bf: PrefixIterableLikeBuilder[String,W,T]): T =
+      bf(value,iterator ++ Iterator(kv))
+    def update[W >: String, T >: U <: PrefixIterableLike[String,W,T]](kv1: (String, T), kv2: (String, T), kv: (String, T))(implicit bf: PrefixIterableLikeBuilder[String,W,T]): T =
+      bf(value,iterator ++ Iterator(kv1,kv2,kv))
+  }
+  object U extends PrefixIterableLikeBuilder[String,String,U] {
+    type P = PrefixIterableLike.Params[String,String,U]
+    def apply(v: Option[String],tree: GenTraversableOnce[(String, U)]):U = new U(v) {
+      def iterator = ???
+    }
+    def newEmpty: PrefixIterableLikeBuilder[String,String,U] = U //should be created but OK for now
+    implicit def params:P = ???    
   }
 }
 
