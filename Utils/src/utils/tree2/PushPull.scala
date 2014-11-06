@@ -13,24 +13,22 @@ object PushPull {
       var f:((K,Loop))=>Any = _
       class Loop extends PrefixTraversableLike[K,V,Loop] { self=>
         protected[this] def newBuilder = ???
-        def f = Stack.this.f
         def update1[W >: V, T >: Loop <: PrefixTraversableLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTraversableLikeBuilder[K,W,T]): T = ???
         def foreach[U](f:((K,Loop))=>U) = { Stack.this.f=f; cur=this }
         def value:Option[V] = None
         def push(k:K):Unit = cur = new Inner(k,this)
         def pull(v:V):Unit = () 
-        def pull           = cur = null
+        def pull:Loop      = null
       }
       final protected[this] class Inner(k:K,parent:Loop) extends Loop {
-        println(k+" "+f)
         private var value0:Option[V] = None
         override def value          = value0
         override def pull(v:V):Unit = value0 = Some(v) 
-        override def pull           = { println(k); parent.f((k,this)); cur=parent }
+        override def pull:Loop      = { println(k); f((k,this)); println("x"+(k,this)); parent }
       }
     final def push(k:K) = cur.push(k)
     final def pull(v:V) = cur.pull(v)
-    final def pull      = cur.pull
+    final def pull      = cur=cur.pull
     def run(x: =>Unit):PrefixTraversableLike[K,V,Loop] = new Loop {
       override def foreach[U](f:((K,Loop))=>U) = {
         super.foreach(f)
@@ -49,6 +47,7 @@ object PushPull {
       f.pull
       f.pull
     }.foreach { x =>
+      println("printing")
       println(s"$x")
     }
   }
