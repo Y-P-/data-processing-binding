@@ -656,53 +656,7 @@ object PrefixTreeLike {
   abstract class Abstract[K, +V, +This <: PrefixTreeLike[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] { this:This=>
     override def apply(key: K): Repr = super[PrefixTreeLike].apply(key)
   }
-  
-  //XXX keep for later
-  //parsers => use independant handler and transform to Traversable[(Traversable[K], V)] ?
-  //           anyway: this handler automatically builds a PrefixTree...
-  trait Processor[K,V] extends Traversable[(Traversable[K], V)] {
-    def foreach[U](f: ((Traversable[K], V))=>U) = new Foreach[K,V,U](f)
-    def apply(h:H[K,V]) = new Plug(h)
-  }
-  trait H[K,V] {
-    def enter(k:K):Unit
-    def exit:Unit
-    def value(v:V):Unit
-    //def run
-  }
-  class Foreach[K,V,U](f: ((Traversable[K], V))=>U) extends H[K,V] {
-    val b = new ArrayStack[K]
-    def enter(k:K):Unit = b += k
-    def exit:Unit       = b.pop
-    def value(v:V)      = f((b,v))
-  }
-  class Plug[K,V](h: H[K,V]) extends H[K,V] {
-    def enter(k:K):Unit = h.enter(k)
-    def exit:Unit       = h.exit
-    def value(v:V)      = h.value(v)
-  }
-  
-  class Stack[K,V,T<:PrefixTreeLike[K,V,T]] (implicit val bf:PrefixTreeLikeBuilder[K, V, T]) extends H[K,V] {
-    var cur:PrefixTreeImport = new PrefixTreeImport
-    protected class PrefixTreeImport extends H[K,V] { self=>
-      val b = bf.newEmpty
-      var value:Option[V] = None
-      final def enter(k:K):Unit = cur   = new InnerTreeImport(k)
-      final def value(v:V):Unit = value = Some(v) 
-      def exit = ()
-      final protected class InnerTreeImport(k:K) extends PrefixTreeImport {
-        override def exit = { self.b += ((k,b.result(value,null))); cur=self }
-      }
-    }
-    final def enter(k:K) = cur.enter(k)
-    final def value(v:V) = cur.value(v)
-    final def exit       = cur.exit
-    final def result     = cur.b.result(cur.value,null)
-  }
-  object Stack {
-    //implicit def toPrefixTree[K,V,T<:PrefixTreeLike[K,V,T]](h:H[K,V])(implicit bf:PrefixTreeLikeBuilder[K, V, T]):T = ()
-  }
-  
+
 }
 
 
