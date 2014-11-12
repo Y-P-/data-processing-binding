@@ -1,78 +1,74 @@
 package utils.tree2
-import com.typesafe.config.ConfigFactory
-import akka.actor.{Actor,Terminated,ActorSystem,Props,ReceiveTimeout}
-import akka.pattern.ask
-import akka.util.Timeout
-import scala.concurrent.Await
-import scala.concurrent.Future
 
+import scala.annotation.tailrec
+import scala.concurrent._
 
-class PullAdapter[K,V](f:(PullAdapter[K,V]#Layer, ()=>Unit)=>Unit) extends PushPull[K,V] {
-  
-  val waitTimeout = scala.concurrent.duration.Duration("1000ms")
-  implicit val timeout = Timeout(1000,java.util.concurrent.TimeUnit.MILLISECONDS)
-  
-  case class Value(v:V)
-  case class Key(k:K)
-  
-  //Config used for the Parser/Motor Actor pair. It ensures best performances (basic 1200msg/ms on i5-2400@3.1GHz).
-  val config = """
-    dispatcher {
-      type=Dispatcher
-      fork-join-executor {
-        parallelism-max = 1
+/**
+ * @param K, the key type ; it is not allowed to be an Option, nor to be null
+ * @param V, the value type
+ */
+class PullAdapter[K<:AnyRef,V] extends PushPull[K,V] {
+
+  class Layer(val key:K) extends Iterator[Layer] {
+    var next:Layer = _
+    var value:Option[V] = None
+    @tailrec final def hasNext:Boolean = queue.take() match {
+        case PullAdapter.End => false
+        case o:Option[V]     => if (value!=None) throw new IllegalStateException("the same object cannot receive two values")
+                                value = o
+                                hasNext
+        case k:K             => next = new Layer(k)
+                                true
       }
+    
+    def loop(f: (Layer,()=>Unit)=>Unit) = {
+      def recur(l:Layer):Unit = f(l,()=>for (x<-l) recur(x))
+      recur(this)
     }
-    """
-  val sys = ActorSystem("PushPull", ConfigFactory.parseString(config))
-  val p0 = Props(classOf[Top],this).withDispatcher("dispatcher")
-  val p1 = Props(classOf[Layer],this).withDispatcher("dispatcher")
-
-
-  class Layer extends Actor {
-    import context._
-    @volatile var key:K = _
-    @volatile var value:V = _    
-     
-    def receive() = {
-      case PullAdapter.Child => cur   = context.actorOf(p1); println("child")
-      case Key(k)            => key   = k; println(key)
-      case Value(v)          => value = v; println(value)
-      case PullAdapter.End   => println("return"); cur=context.parent; context.parent ! this
-      case l:Layer           => println("layer received")
-    }
-  }
+  }  
   
-  class Top extends Layer {
-    override def receive() = {
-      case PullAdapter.End  => println("finished"); sys.shutdown()
-    }
-  }
+  val queue = new java.util.concurrent.ArrayBlockingQueue[AnyRef](1)
   
-  private val top = sys.actorOf(p0)
-  @volatile protected var cur = top
+  final def push(k:K) = queue.put(k)
+  final def pull(v:V) = queue.put(Some(v))
+  final def pull      = queue.put(PullAdapter.End)
   
-  final def push(k:K) = { cur ! PullAdapter.Child; cur ! Key(k) }
-  final def pull(v:V) = cur ! Value(v)
-  final def pull      = cur ! PullAdapter.End
-  def run(x: =>Unit) = {
-      x
+  def run(x: =>Unit)(f:(Layer,()=>Unit)=>Unit) = {
+    import scala.concurrent._
+    import java.util.concurrent.Executors
+    implicit val executionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
+    val z = Future { new Layer(null.asInstanceOf[K]).loop(f) }
+    x
   }
 }
 
 object PullAdapter {
-  object Child
   object End
   
   def main(args:Array[String]):Unit = {
-    val s = new PullAdapter[String,String]((x,f) => println(x.key+"/"+x.value+"{"+f()+"}"))
-    s.run{
+    val s = new PullAdapter[String,String]
+    def doIt = {
       s.push("a")
       s.pull
       s.push("aa")
       s.pull("1")
       s.pull
+      s.push("ab")
+      s.pull("2")
+      s.push("aab")
+      s.pull("3")
+      s.push("d")
+      s.pull("5")
       s.pull
+      s.pull
+      s.push("aac")
+      s.pull("4")
+      s.pull
+      s.pull
+      s.pull
+    }
+    s.run(doIt){ (l,r)=>
+      print(l.key+"={");r();if (l.value==None) print("}") else print(s"}(${l.value.get})")
     }
   }
 }
