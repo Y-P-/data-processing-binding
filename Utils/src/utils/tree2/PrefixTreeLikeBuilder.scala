@@ -10,7 +10,7 @@ import scala.runtime.AbstractPartialFunction
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  */
-abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] with Cloneable {
+abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
   type P
   implicit def params:P
   
