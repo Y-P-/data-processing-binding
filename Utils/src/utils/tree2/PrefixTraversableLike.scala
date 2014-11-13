@@ -13,6 +13,7 @@ import scala.collection.mutable.ArrayStack
 import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 import java.util.NoSuchElementException
+import scala.collection.IterableLike
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -36,7 +37,7 @@ import java.util.NoSuchElementException
  *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
  */
 trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
-  extends TraversableLike[(K, ()=>This), This] { self:This =>
+  extends IterableLike[(K, This), This] { self:This =>
   //an alias that concrete classes can use as shortcut to refer to themselves
   protected[this] type Repr = This
   override def repr:Repr = self
@@ -71,7 +72,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
    */
   def filterKeys(p: (K) => Boolean): Repr = {
     val bf = newBuilder
-    if (!isEmpty) for (x:(K,()=>Repr) <- this if p(x._1)) bf += ((x._1,()=>x._2().filterKeys(p)))
+    if (!isEmpty) for (x:(K,Repr) <- this if p(x._1)) bf += ((x._1,x._2.filterKeys(p)))
     bf.result(value)
   }
   
@@ -92,8 +93,8 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
   def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(tt:T,cur: =>Repr):R = {
       val b=bf.newEmpty
-      for (x:(K,()=>This) <- cur)
-        if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2()))) } catch { case _:NoSuchElementException => }
+      for (x:(K,This) <- cur)
+        if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
       b.result(op(tt,cur),null)
     }
     recur(t,this)
@@ -116,8 +117,8 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(tt:T,cur: =>Repr,oo:O):R = {
       val b=bf.newEmpty
-      for (x:(K,()=>This) <- cur)
-        if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2(),oo(x._1)))) } catch { case _:NoSuchElementException => }
+      for (x:(K,This) <- cur)
+        if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
       b.result(oo.value.flatMap(_(tt,cur)),null)
     }
     recur(t,this,op)
@@ -137,15 +138,15 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
   def zipFull[U,L,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,t:T,strict:Boolean,op:O)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
     def recur(tt:T,cur:Repr,oo:O,u:Option[U]):R = {
       val b=bf.newEmpty
-      for (x:(K,()=>This) <- cur)
+      for (x:(K,This) <- cur)
         if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) {
           val (t1,o1) = try { (tt(x._1),oo(x._1)) } catch { case _:NoSuchElementException => (tt.empty,oo.empty) }
           o1.value match {
             case None    =>
-            case Some(f) => val r = f(x._1,t1,x._2())  //wrong: x._2() evaluated twice
+            case Some(f) => val r = f(x._1,t1,x._2)  //wrong: x._2() evaluated twice
               r._1 match {
                 case None    =>
-                case Some(l) => b += ((l, recur(t1,x._2(),o1,r._2)))
+                case Some(l) => b += ((l, recur(t1,x._2,o1,r._2)))
               }
           }
         }
@@ -176,7 +177,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
       //full blown maps (or whatever underlying structure is used in T) by using the
       //empty ++ ((k,t)) construct (which would work, but be awfully inefficient.)
       val bf1 = bf.newEmpty
-      for (x <- this) bf += ((x._1,()=>x._2().map(f)(bf1)))
+      for (x <- this) bf += ((x._1,x._2.map(f)(bf1)))
     }
     bf.result(value.map(f))
   }
@@ -194,7 +195,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
   def mapFull[L,W,T<:PrefixTraversableLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixTraversableLikeBuilder[L,W,T]):T = {
     if (!isEmpty) {
       val bf1 = bf.newEmpty
-      for (x:(K,()=>This) <- this) bf += ((f._1(x._1),()=>x._2().mapFull(f)(bf1)))
+      for (x:(K,This) <- this) bf += ((f._1(x._1),x._2.mapFull(f)(bf1)))
     }
     bf.result(value.map(f._3))
   }
@@ -209,7 +210,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
   def mapKeys[L,W>:V,T<:PrefixTraversableLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTraversableLikeBuilder[L,W,T]):T = {
     if (!isEmpty) {
       val bf1 = bf.newEmpty
-      for (x:(K,()=>This) <- this) bf += ((f._1(x._1),()=>x._2().mapKeys[L,W,T](f)(bf1)))
+      for (x:(K,This) <- this) bf += ((f._1(x._1),x._2.mapKeys[L,W,T](f)(bf1)))
     }
     bf.result(value)
   }
@@ -229,29 +230,80 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
    */
   def flatMap[W,T<:PrefixTraversableLike[K,W,T]](f:V=>T)(implicit bf:PrefixTraversableLikeBuilder[K,W,T]):T = {
     val e = (if (value.isDefined) f(value.get) else bf.empty)
-    for (x:(K,()=>T) <- e) bf += ((x._1,x._2))
+    for (x:(K,T) <- e) bf += ((x._1,x._2))
     if (!isEmpty) {
       val bf1 = bf.newEmpty
-      for (x:(K,()=>Repr) <- this) bf += ((x._1,()=>x._2().flatMap[W,T](f)(bf1)))
+      for (x:(K,Repr) <- this) bf += ((x._1,x._2.flatMap[W,T](f)(bf1)))
     }
     bf.result(e.value)
   }
+    
+  /** A fold left operation that descends through the subtrees.
+   *  Children are evaluated before their parent.
+   */
+  def deepFoldLeft[X](z:X,k:K)(f: (X, (K,Repr)) => X): X = {
+    def recur(x: X, t:(K,Repr)):X = f(t._2.foldLeft(x)(recur),t)
+    recur(z,(k,this))
+  }
+    
+  /** A recursive call that descends through the subtrees.
+   *  Children are all evaluated within the context of their parent, i.e.
+   *  within the 'op' call on their parent.
+   *  This produces no result.
+   *  @param k an initial key for the top node
+   *  @param op, the operation to execute on each node.
+   *             (K,Repr) : the current element and its key
+   *             =>Unit   : a byname param that has to be evaluated
+   *                        somewhere to evaluate the current element children
+   */
+  def deepForeach(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
+    def recur(elt:(K,Repr)):Unit = op(elt,elt._2.foreach(recur))
+    recur((k,this))
+  }
   
+  /** As above.
+   *  Evaluating children produces results that can be used by the parent.
+   *  Furthermore, children can be evaluated but don't have to be.
+   *  Evaluating children is done by iterating on the provided iterator.
+   *  @param k an initial key for the top node
+   *  @param op, the operation to execute on each node.
+   *             (K,Repr)    : the current element and its key
+   *             Iterator[U] : the iterator on the children
+   *             U           : some result
+   */
+  def deepForeach[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
+    def recur(elt:(K,Repr)):U = op(elt,elt._2.iterator.map(recur))
+    recur((k,this))
+  }
+  
+  /** As above.
+   *  Children can reach their parent (but not above.)
+   *  @param k an initial key for the top node
+   *  @param op, the operation to execute on each node.
+   *             Repr        : the parent
+   *             (K,Repr)    : the current element and its key
+   *             Iterator[U] : the iterator on the children
+   *             U           : some result
+   */
+  def deepForeach2[U](k:K)(op: (Repr,(K,Repr),Iterator[U]) => U): U = {
+    def recur(parent:Repr,elt:(K,Repr)):U = op(parent,elt,elt._2.iterator.map(recur(elt._2,_)))
+    recur(null.asInstanceOf[Repr],(k,this))
+  }  
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
    *  @param    kv the key/value pair
    *  @tparam   L the type of the new keys
    *  @tparam   T the type of the added value
    *  @return   A new tree with the new key/value mapping added to this map.
    */
-  def update1[W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]](kv:(K,()=>T))(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T
+  def update1[W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T
   
   /** Identical to the previous method, but more than one element is updated.
    */
-  def update[W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]](kv:(K,()=>T)*)(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T = { val t=kv; update[W,T](t) }
+  def update[W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]](kv:(K,T)*)(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T = { val t=kv; update[W,T](t) }
   
   /** Identical to the previous method, but elements are passed through an iterable like rather than a built Seq.
    */
-  def update[W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]](kv:GenTraversableOnce[(K,()=>T)])(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T =
+  def update[W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T =
     kv.foldLeft[T](repr)(_.update1[W,T](_))
     
   /** Adds a key/(value,tree) pair to this tree, returning a new tree.
@@ -263,7 +315,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
    *
    *  @usecase  def + (kv: (K, (V,T)): T
    */
-  def + [W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]] (kv:(K,()=>T))(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T = update[W,T](kv)
+  def + [W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]] (kv:(K,T))(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T = update[W,T](kv)
 
   /** Adds key/value pairs to this tree, returning a new tree.
    *
@@ -281,7 +333,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
    *    @inheritdoc
    *    @param    kvs the key/value pairs
    */
-  def + [W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]] (kv1:(K,()=>T), kv2:(K,()=>T), kvs:(K,()=>T) *)(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T =
+  def + [W>:V,T>:Repr<:PrefixTraversableLike[K,W,T]] (kv1:(K,T), kv2:(K,T), kvs:(K,T) *)(implicit bf:PrefixTraversableLikeBuilder[K,W,T]): T =
     this +[W,T] kv1 + kv2 ++ kvs
 
   /** Adds all key/value pairs in a traversable collection to this tree, returning a new tree.
@@ -293,7 +345,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
    *  @usecase  def ++ (xs: Traversable[(A, B)]): Map[A, B]
    *    @inheritdoc
    */
-  def ++[W>:V, T1 >: Repr <: PrefixTraversableLike[K,W,T1]](xs: GenTraversableOnce[(K, ()=>T1)])(implicit bf:PrefixTraversableLikeBuilder[K,W,T1]): T1 =
+  def ++[W>:V, T1 >: Repr <: PrefixTraversableLike[K,W,T1]](xs: GenTraversableOnce[(K, T1)])(implicit bf:PrefixTraversableLikeBuilder[K,W,T1]): T1 =
     ((repr: T1) /: xs.seq) (_ + _)
 /*
   /* Overridden for efficiency. */
@@ -392,7 +444,7 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
     case Some(v) => "Tree{"+v+"}"
   }
 
-  override def toString = super[TraversableLike].toString
+  override def toString = super[IterableLike].toString
 }
 
 object PrefixTraversableLike {
