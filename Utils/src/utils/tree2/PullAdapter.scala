@@ -9,22 +9,17 @@ import scala.concurrent._
  */
 class PullAdapter[K<:AnyRef,V] extends PushPull[K,V] {
 
-  class Layer(val key:K) extends Iterator[Layer] {
-    var next:Layer = _
+  class Layer extends Iterator[(K,Layer)] with PrefixTraversableOnce[K,V,Layer] {
+    var next:(K,Layer) = _
     var value:Option[V] = None
     @tailrec final def hasNext:Boolean = queue.take() match {
         case PullAdapter.End => false
         case o:Option[V]     => if (value!=None) throw new IllegalStateException("the same object cannot receive two values")
                                 value = o
                                 hasNext
-        case k:K             => next = new Layer(k)
+        case k:K             => next = (k,new Layer)
                                 true
-      }
-    
-    def loop(f: (Layer,()=>Unit)=>Unit) = {
-      def recur(l:Layer):Unit = f(l,()=>for (x<-l) recur(x))
-      recur(this)
-    }
+      }    
   }  
   
   val queue = new java.util.concurrent.ArrayBlockingQueue[AnyRef](1)
@@ -33,11 +28,11 @@ class PullAdapter[K<:AnyRef,V] extends PushPull[K,V] {
   final def pull(v:V) = queue.put(Some(v))
   final def pull      = queue.put(PullAdapter.End)
   
-  def run(x: =>Unit)(f:(Layer,()=>Unit)=>Unit) = {
+  def run[U](x: =>Unit)(op: ((K,Layer),Iterator[U]) => U) = {
     import scala.concurrent._
     import java.util.concurrent.Executors
     implicit val executionContext = ExecutionContext.fromExecutorService(Executors.newCachedThreadPool())
-    val z = Future { new Layer(null.asInstanceOf[K]).loop(f) }
+    val z = Future { (new Layer).deepForeach[U](null.asInstanceOf[K])(op) }
     x
   }
 }
@@ -67,8 +62,12 @@ object PullAdapter {
       s.pull
       s.pull
     }
-    s.run(doIt){ (l,r)=>
-      print(l.key+"={");r();if (l.value==None) print("}") else print(s"}(${l.value.get})")
+    s.run(doIt){ (t,r:Iterator[Unit])=>
+      print(s"${t._1}={")
+      var i=0
+      while (r.hasNext) { i+=1; r.next }
+      print(s"}(${if(t._2.value!=None) t._2.value.get else ""})[$i]")
+      //print(s"}[$i in ${if (p!=null) p.value.get else "top"}]")
     }
   }
 }
