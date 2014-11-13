@@ -452,6 +452,58 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     }
     bf.result(e.value, asDefault(default(_:K).flatMap[W,T](f)))
   }
+    
+  /** A fold left operation that descends through the subtrees.
+   *  Children are evaluated before their parent.
+   */
+  def deepFoldLeft[X](z:X,k:K)(f: (X, (K,Repr)) => X): X = {
+    def recur(x: X, t:(K,Repr)):X = f(t._2.foldLeft(x)(recur),t)
+    recur(z,(k,this))
+  }
+    
+  /** A recursive call that descends through the subtrees.
+   *  Children are all evaluated within the context of their parent, i.e.
+   *  within the 'op' call on their parent.
+   *  This produces no result.
+   *  @param k an initial key for the top node
+   *  @param op, the operation to execute on each node.
+   *             (K,Repr) : the current element and its key
+   *             =>Unit   : a byname param that has to be evaluated
+   *                        somewhere to evaluate the current element children
+   */
+  def recursiveLoop(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
+    def recur(elt:(K,Repr)):Unit = op(elt,elt._2.foreach(recur))
+    recur((k,this))
+  }
+  
+  /** As above.
+   *  Evaluating children produces results that can be used by the parent.
+   *  Furthermore, children can be evaluated but don't have to be.
+   *  Evaluating children is done by iterating on the provided iterator.
+   *  @param k an initial key for the top node
+   *  @param op, the operation to execute on each node.
+   *             (K,Repr)    : the current element and its key
+   *             Iterator[U] : the iterator on the children
+   *             U           : some result
+   */
+  def recursiveLoop[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
+    def recur(elt:(K,Repr)):U = op(elt,elt._2.iterator.map(recur))
+    recur((k,this))
+  }
+  
+  /** As above.
+   *  Children can reach their parent (but not above.)
+   *  @param k an initial key for the top node
+   *  @param op, the operation to execute on each node.
+   *             Repr        : the parent
+   *             (K,Repr)    : the current element and its key
+   *             Iterator[U] : the iterator on the children
+   *             U           : some result
+   */
+  def recursiveLoop2[U](k:K)(op: (Repr,(K,Repr),Iterator[U]) => U): U = {
+    def recur(parent:Repr,elt:(K,Repr)):U = op(parent,elt,elt._2.iterator.map(recur(elt._2,_)))
+    recur(null.asInstanceOf[Repr],(k,this))
+  }
   
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
    *  @param    kv the key/value pair

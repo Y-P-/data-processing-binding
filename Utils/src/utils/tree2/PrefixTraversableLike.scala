@@ -43,11 +43,6 @@ trait PrefixTraversableLike[K, +V, +This <: PrefixTraversableLike[K, V, This]]
   
   /** The value for the current node */
   def value: Option[V]
-      
-  /** The empty tree of the same type as this tree
-   *  @return   an empty tree of type `This`.
-   */
-  def empty: Repr = newBuilder(None,Nil)
   
   /** A new instance of builder similar to the one used to build this tree element.
    *  It can be used to build elements of the same tree kind.

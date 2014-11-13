@@ -240,6 +240,17 @@ object TreeTests2 {
     out.println(r("d","b","d"))  // that's hotter: in m1, d->b->b=m (following defaults), in m0 this gives c11 (again following defaults)
   }
   
+  def testFoldLeft(implicit out:PrintWriter) = {
+    import out.print
+    m.recursiveLoop2[Int](""){(p,t,c)=>
+      print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
+      var i=0
+      while (c.hasNext) { i+=1; c.next }
+      print(s"}[$i]")
+      i
+    }
+  }
+  
   @Test class TreeTest2 extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       implicit val o = out
@@ -266,6 +277,7 @@ object TreeTests2 {
       t(testBasicZipStrict)
       t(testBasicRestrictZipStrict)
       t(testBasicRestrictZip)
+      t(testFoldLeft)
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
       //println(r1.seqView().mkString("\n"))
     }

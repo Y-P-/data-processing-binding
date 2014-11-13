@@ -177,3 +177,10 @@ java.util.NoSuchElementException: key not found e
 Tree{4-4}(a -> Tree{1-1}())
 Tree{1-1}()
 java.util.NoSuchElementException: key not found b
+----19--------
+Tree{7-7}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{7-2}()), f -> Tree{6-6}(d -> Tree{4-4}(b -> Tree{2-2}())))
+java.util.NoSuchElementException: key not found e
+Tree{4-4}(a -> Tree{1-1}(), b -> Tree{7-2}())
+Tree{1-1}()
+Tree{7-2}()
+Tree{4-7}()
