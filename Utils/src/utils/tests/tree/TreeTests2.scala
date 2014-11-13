@@ -242,11 +242,11 @@ object TreeTests2 {
   
   def testFoldLeft(implicit out:PrintWriter) = {
     import out.print
-    m.recursiveLoop2[Int](""){(p,t,c)=>
+    m.deepForeach2[Int](""){(p,t,c)=>
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       var i=0
       while (c.hasNext) { i+=1; c.next }
-      print(s"}[$i]")
+      print(s"}[$i in ${if (p!=null) p.value.get else "top"}]")
       i
     }
   }

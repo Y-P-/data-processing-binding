@@ -471,7 +471,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *             =>Unit   : a byname param that has to be evaluated
    *                        somewhere to evaluate the current element children
    */
-  def recursiveLoop(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
+  def deepForeach(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
     def recur(elt:(K,Repr)):Unit = op(elt,elt._2.foreach(recur))
     recur((k,this))
   }
@@ -486,7 +486,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *             Iterator[U] : the iterator on the children
    *             U           : some result
    */
-  def recursiveLoop[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
+  def deepForeach[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
     def recur(elt:(K,Repr)):U = op(elt,elt._2.iterator.map(recur))
     recur((k,this))
   }
@@ -500,7 +500,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *             Iterator[U] : the iterator on the children
    *             U           : some result
    */
-  def recursiveLoop2[U](k:K)(op: (Repr,(K,Repr),Iterator[U]) => U): U = {
+  def deepForeach2[U](k:K)(op: (Repr,(K,Repr),Iterator[U]) => U): U = {
     def recur(parent:Repr,elt:(K,Repr)):U = op(parent,elt,elt._2.iterator.map(recur(elt._2,_)))
     recur(null.asInstanceOf[Repr],(k,this))
   }
