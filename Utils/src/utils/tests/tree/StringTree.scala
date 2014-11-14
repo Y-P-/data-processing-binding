@@ -4,7 +4,7 @@ import scala.collection.GenTraversableOnce
 import scala.collection.Map
 import scala.collection.mutable.LinkedHashMap
 import scala.annotation.switch
-import utils.tree2._
+import utils.tree._
 
 /** A common use case with String as key type.
  *  This highlights how one can derive PrefixTree for a specific case.

@@ -1,12 +1,12 @@
 package utils.tests.tree
 
 import scala.collection.GenTraversable
-import utils.tree2._
+import utils.tree._
 import java.io.PrintWriter
 import utils.LogTester._
 import org.junit.Test
 import scala.collection.GenTraversableOnce
-import utils.tree2.PrefixTraversableOnce.PullAdapter
+import utils.tree.PrefixTraversableOnce.PullAdapter
 import scala.concurrent.Await
 
 
@@ -283,7 +283,7 @@ object TreeTests2 {
     Await.result(r, 10 millis)
   }
     
-  @Test class TreeTest2 extends StandardTester {
+  @Test class TreeTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       implicit val o = out
       import out._
