@@ -6,6 +6,8 @@ import java.io.PrintWriter
 import utils.LogTester._
 import org.junit.Test
 import scala.collection.GenTraversableOnce
+import utils.tree2.PrefixTraversableOnce.PullAdapter
+import scala.concurrent.Await
 
 
 object TreeTests2 {
@@ -251,6 +253,37 @@ object TreeTests2 {
     }
   }
   
+  def testPushPull(implicit out:PrintWriter) = {
+    import scala.concurrent.duration._
+    import scala.concurrent.ExecutionContext
+    implicit val executionContext = ExecutionContext.global
+    val (s,r) = PrefixTraversableOnce[Unit,String,String] { (t,r)=>
+      out.print(s"${t._1}={")
+      val i=r.foldLeft(0)((i,u)=>i+1)
+      out.print(s"}(${if(t._2.value!=None) t._2.value.get else ""})[$i]")
+    }
+    s.push("a")
+    s.pull
+    s.push("aa")
+    s.pull("1")
+    s.pull
+    s.push("ab")
+    s.pull("2")
+    s.push("aab")
+    s.pull("3")
+    s.push("d")
+    s.pull("5")
+    s.pull
+    s.pull
+    s.push("aac")
+    s.pull("4")
+    s.pull
+    s.pull
+    s.pull
+    Await.result(r, 10 millis)
+  }
+  
+  
   @Test class TreeTest2 extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       implicit val o = out
@@ -278,6 +311,7 @@ object TreeTests2 {
       t(testBasicRestrictZipStrict)
       t(testBasicRestrictZip)
       t(testFoldLeft)
+      t(testPushPull)
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
       //println(r1.seqView().mkString("\n"))
     }

@@ -2,14 +2,19 @@ package utils
 
 import java.nio.charset.Charset
 
-
+/** The EOD (End Of Data) exception is thrown when there is no more data to read.
+ *  this is way more effective on most data flows than checking if the end has
+ *  been reached before reading a new character.
+ */
 final class EOD extends Exception {
   override def fillInStackTrace = this
 }
 
 /** A char reader with a buffer of one */
 trait CharReader {
+  /** puts one character back into the stream */
   def reject():Unit
+  /** takes the next character */
   @throws(classOf[EOD])
   def nextChar:Char
 }

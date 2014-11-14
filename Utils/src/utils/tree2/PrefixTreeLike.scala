@@ -587,6 +587,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 }
 
 object PrefixTreeLike {
+  type Gen[K,V] = PrefixTreeLike[K,V,_<:PrefixTreeLike[K,V,_]]
+  
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
   
   sealed class NavigableMode(val id:Int)

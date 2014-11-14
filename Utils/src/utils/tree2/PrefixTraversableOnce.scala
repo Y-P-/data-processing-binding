@@ -14,6 +14,10 @@ import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 import java.util.NoSuchElementException
 import scala.collection.IterableLike
+import scala.util.Success
+import scala.util.Failure
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -158,7 +162,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  Evaluating children produces results that can be used by the parent.
    *  Furthermore, children can be evaluated but don't have to be.
    *  Evaluating children is done by iterating on the provided iterator.
-   *  @param k an initial key for the top node
+   *  @param k an initial key for the top node ; it is hardly used
    *  @param op, the operation to execute on each node.
    *             (K,Repr)    : the current element and its key
    *             Iterator[U] : the iterator on the children
@@ -171,7 +175,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   
   /** As above.
    *  Children can reach their parent (but not above.)
-   *  @param k an initial key for the top node
+   *  @param k an initial key for the top node ; it is hardly used
    *  @param op, the operation to execute on each node.
    *             Repr        : the parent
    *             (K,Repr)    : the current element and its key
@@ -181,8 +185,98 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def deepForeach2[U](k:K)(op: (Repr,(K,Repr),Iterator[U]) => U): U = {
     def recur(parent:Repr,elt:(K,Repr)):U = op(parent,elt,elt._2.toIterator.map(recur(elt._2,_)))
     recur(null.asInstanceOf[Repr],(k,this))
+  }
+  
+  /** As above.
+   *  Children can reach their parent (but not above.)
+   *  @param k an initial key for the top node ; it is hardly used
+   *  @param op, the operation to execute on each node.
+   *             this is a tree and the actual operation can change on each key.
+   *             all required key entries must have a matching op.
+   *             Repr        : the parent
+   *             (K,Repr)    : the current element and its key
+   *             Iterator[U] : the iterator on the children
+   *             U           : some result
+   */
+  def deepForeach2[U,O<:PrefixTreeLike[K,(Repr,(K,Repr),Iterator[U]) => U,O]](k:K,op: O): U = {
+    def recur(parent:Repr,elt:(K,Repr),f:O):U = f.value.get(parent,elt,elt._2.toIterator.map(u=>recur(elt._2,u,f(u._1))))
+    recur(null.asInstanceOf[Repr],(k,this),op)
   }  
 
 }
 
+object PrefixTraversableOnce {
+  import utils.BlockingData
+  
+  /** This interface is sufficient to create a PrefixTraversableOnce
+   *  Whenever you have a new key, you push it.
+   *  Whenever you have a value for a key, you pull it.
+   *  Whenever you reach the end of a layer, you pull out.
+   *  e.g. for this xml: <a><b>1</b>2<c>3</c></a>
+   *     push(a)
+   *     push(b)
+   *     pull(1)
+   *     pull
+   *     pull(2)
+   *     push(c)
+   *     pull(3)
+   *     pull
+   *     pull
+   */
+  trait PushPull[-K,-V] {
+    def push(key:K):Unit
+    def pull(value:V):Unit
+    def pull():Unit
+  }
+  
+  /** marker for the PushPull */
+  val End = new AnyRef
+  
+  /** Used to turn the push/pull into a PrefixTraversableOnce.
+   *  The 'once' is not to trifle with: even 'hasNext' cannot be called more than once per element!
+   *  This implementation is naive as it doesn't care about handling any error.
+   *  In particular, the sending thread will lock if a second value is sent to the same item.
+   *  XXX improve the naive implementation
+   *  
+   * @param K, the key type ; it is not allowed to be an Option, nor to be null.
+   * @param V, the value type
+   * @param item, the blocking buffer
+   */
+  class Layer[K,V](item:BlockingData[AnyRef]) extends Iterator[(K,Layer[K,V])] with PrefixTraversableOnce[K,V,Layer[K,V]] {
+    var next:(K,Layer[K,V])  = _
+    var value:Option[V] = None
+    @tailrec final def hasNext:Boolean = item.take match {
+        case `End`       => false
+        case o:Option[V] => if (value.isDefined) throw new IllegalStateException("the same element cannot receive two values")
+                            value = o
+                            hasNext
+        case k:K         => next = (k,new Layer[K,V](item))
+                            true
+      }    
+  }
+  
+  /** Complement to the previous class to send the push/pull commands.
+   * @param K, the key type ; it is not allowed to be an Option, nor to be null
+   * @param V, the value type
+   */
+  class PullAdapter[K<:AnyRef,V] extends PushPull[K,V] {
+  
+    protected val item = new BlockingData[AnyRef]
+    
+    /** sends the appropriate command to the imbedded Layer */
+    final def push(k:K) = item.put(k)
+    final def pull(v:V) = item.put(Some(v))
+    final def pull      = item.put(End)
+  
+    /** converts the push/pull sequence through the given operator. */
+    def run[U](op: ((K,Layer[K,V]),Iterator[U]) => U)(implicit executionContext:ExecutionContext):Future[U] =
+      Future { (new Layer[K,V](item)).deepForeach[U](null.asInstanceOf[K])(op) }
+  }
+  
+  /** Creates a pair for creating a PrefixTraversableOnce using a Push/Pull interface */
+  def apply[U,K<:AnyRef,V](op: ((K,Layer[K,V]),Iterator[U]) => U)(implicit executionContext:ExecutionContext):(PushPull[K,V],Future[U]) = {
+    val p = new PullAdapter[K,V]
+    (p, p.run(op))
+  }
+}
 
