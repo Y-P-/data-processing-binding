@@ -282,8 +282,7 @@ object TreeTests2 {
     s.pull
     Await.result(r, 10 millis)
   }
-  
-  
+    
   @Test class TreeTest2 extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       implicit val o = out

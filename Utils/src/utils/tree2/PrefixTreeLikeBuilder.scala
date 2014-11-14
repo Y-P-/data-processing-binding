@@ -19,7 +19,8 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    *  apply(None,tree,null) must return the shared value empty if tree is empty
    */
   def apply(v:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
-  
+//  def apply(tree:Tree,reference:K*):Tree
+
   /** A similar builder, ready to use
    */
   def newEmpty:PrefixTreeLikeBuilder[K,V,Tree]
