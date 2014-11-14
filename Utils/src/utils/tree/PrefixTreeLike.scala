@@ -45,8 +45,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   /** The general parameters used for building the tree.
    */
-  type P <: PrefixTreeLike.Params[K,V,Repr]
-  def params:P
+  type Params <: PrefixTreeLike.Params[K,V,Repr]
+  def params:Params
   
   /** The value for the current node */
   def value: Option[V]

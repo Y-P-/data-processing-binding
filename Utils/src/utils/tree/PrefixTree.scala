@@ -12,7 +12,7 @@ import scala.annotation.switch
  *  See the StringTree subclass.
  */
 abstract class PrefixTree[K,+V] protected extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {  
-  implicit def params:P  //make params implicit so that it is automatically used by these methods that rely on it
+  implicit def params:Params  //make params implicit so that it is automatically used by these methods that rely on it
   def value:Option[V] = None
   def tree: Map[K,Repr]
   def update1[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = bf(value,tree+kv,default)
@@ -54,6 +54,11 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
     override def isNonSignificant = false
   }
   
+  trait Ref[K,+V,+This<:PrefixTree[K,V] with PrefixTreeLike[K,V,This]] extends PrefixTreeLikeBuilder.Ref[K,V,This] { this:This=>
+    abstract override def tree = target.tree
+  }
+
+  
   /** The actual Parameters required to build a PrefixTree.
    */
   class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]](noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode,mapKind:Map[K,T])
@@ -71,11 +76,22 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
    */
-  implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type P=P0[K,V] } = {
+  implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type Params=P0[K,V] } = {
     new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
-      type P = P0[K,V]
-      def params:P = p
+      type Params = P0[K,V]
+      def params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,PrefixTree[K, V]] = builder[K,V]
+      
+      def asRef(valuex:Option[V],defaultx:Option[K=>PrefixTree[K, V]],treex:PrefixTree[K, V],pathx:K*):PrefixTree[K, V] = params.navigable.id match {
+        case 0 => new Abstract[K,V] with Ref[K,V,PrefixTree[K,V]] {
+                    val origin=treex
+                    val path=pathx
+                    override def value   = if (valuex==null)   super.value   else valuex
+                    override def default = if (defaultx==None) super.default else defaultx.get
+                  }
+        case _ => throw new IllegalStateException("references cannot be navigable as a referenced node children would have more than one parent")
+      }
+        
       def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = {
         val t0 = params.emptyMap ++ t
         val t1 = if (p.stripEmpty) t0.filterNot(_._2.isNonSignificant) else t0
