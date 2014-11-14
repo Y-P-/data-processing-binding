@@ -1,4 +1,4 @@
-package utils.tree2
+package utils.tree
 
 import scala.collection.IterableLike
 import scala.collection.AbstractSet
