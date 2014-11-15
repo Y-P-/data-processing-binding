@@ -24,7 +24,12 @@ object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
     override def isNonSignificant = false
   }
   
-  protected class Ref[K,V](valuex:Option[V], defaultx:Option[K=>StringTree[V]], origin:StringTree[V], path:Seq[K])(implicit params:P0[V]) extends PrefixTree.Ref[K,V] with PrefixTreeLikeBuilder.Ref[K,V,StringTree[V]]
+  protected class Ref[V](valuex:Option[V], defaultx:Option[K=>StringTree[V]], val origin:StringTree[V], val path:Seq[K])(implicit params:P0[V]) extends Abstract[V] with PrefixTreeLikeBuilder.Ref[K,V,StringTree[V]] {
+    if (params.navigable.id!=0) throw new IllegalStateException("references cannot be navigable as a referenced node children would have more than one parent")
+    override def tree    = target.tree
+    override def value   = if (valuex==null)   super.value   else valuex
+    override def default = if (defaultx==None) super.default else defaultx.get
+  }
 
   /** The second implementation for navigable trees. Unsafe 
    */
@@ -64,15 +69,7 @@ object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
       def params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,StringTree[V]] = builder[V]
       
-      def asRef(valuex:Option[V],defaultx:Option[K=>StringTree[V]],treex:StringTree[V],pathx:K*):StringTree[V] = params.navigable.id match {
-        case 0 => new Abstract[V] with PrefixTreeLikeBuilder.Ref[K,V,StringTree[V]] {
-                    val origin=treex
-                    val path=pathx
-                    override def value   = if (valuex==null)   super.value   else valuex
-                    override def default = if (defaultx==None) super.default else defaultx.get
-                  }
-        case _ => throw new IllegalStateException("references cannot be navigable as a referenced node children would have more than one parent")
-      }
+      def asRef(valuex:Option[V],defaultx:Option[K=>StringTree[V]],treex:StringTree[V],pathx:K*):StringTree[V] = new Ref[V](valuex,defaultx,treex,pathx)
       
       def apply(v: Option[V], t: GenTraversableOnce[(String, StringTree[V])], d: String=>StringTree[V]) = {
         val t0 = params.emptyMap ++ t

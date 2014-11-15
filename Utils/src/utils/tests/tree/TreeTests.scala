@@ -10,7 +10,7 @@ import utils.tree.PrefixTraversableOnce.PullAdapter
 import scala.concurrent.Await
 
 
-object TreeTests2 {
+object TreeTests {
   // test stripEmpty
   
   import scala.language.implicitConversions

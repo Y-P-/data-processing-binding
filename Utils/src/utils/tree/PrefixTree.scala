@@ -54,7 +54,8 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
     override def isNonSignificant = false
   }
   
-  class Ref[K,V](valuex:Option[V], defaultx:Option[K=>PrefixTree[K, V]], val origin:PrefixTree[K,V], val path:Seq[K])(implicit params:P0[K,V]) extends Abstract[K,V] with PrefixTreeLikeBuilder.Ref[K,V,PrefixTree[K,V]] {
+  protected class Ref[K,V](valuex:Option[V], defaultx:Option[K=>PrefixTree[K, V]], val origin:PrefixTree[K,V], val path:Seq[K])(implicit params:P0[K,V]) extends Abstract[K,V] with PrefixTreeLikeBuilder.Ref[K,V,PrefixTree[K,V]] {
+    if (params.navigable.id!=0) throw new IllegalStateException("references cannot be navigable as a referenced node children would have more than one parent")
     override def tree    = target.tree
     override def value   = if (valuex==null)   super.value   else valuex
     override def default = if (defaultx==None) super.default else defaultx.get
@@ -84,10 +85,7 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
       def params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,PrefixTree[K, V]] = builder[K,V]
       
-      def asRef(valuex:Option[V],defaultx:Option[K=>PrefixTree[K, V]],treex:PrefixTree[K, V],pathx:K*):PrefixTree[K, V] = params.navigable.id match {
-        case 0 => new Ref[K,V](valuex,defaultx,treex,pathx)
-        case _ => throw new IllegalStateException("references cannot be navigable as a referenced node children would have more than one parent")
-      }
+      def asRef(valuex:Option[V],defaultx:Option[K=>PrefixTree[K, V]],treex:PrefixTree[K, V],pathx:K*):PrefixTree[K, V] = new Ref[K,V](valuex,defaultx,treex,pathx)
         
       def apply(v: Option[V], t: GenTraversableOnce[(K, PrefixTree[K, V])], d: K=>PrefixTree[K, V]) = {
         val t0 = params.emptyMap ++ t
