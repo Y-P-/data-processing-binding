@@ -23,6 +23,8 @@ object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
     def tree: Map[K,Repr] = params.emptyMap    
     override def isNonSignificant = false
   }
+  
+  protected class Ref[K,V](valuex:Option[V], defaultx:Option[K=>StringTree[V]], origin:StringTree[V], path:Seq[K])(implicit params:P0[V]) extends PrefixTree.Ref[K,V] with PrefixTreeLikeBuilder.Ref[K,V,StringTree[V]]
 
   /** The second implementation for navigable trees. Unsafe 
    */

@@ -154,7 +154,7 @@ object PrefixTreeLikeBuilder {
   /** This trait is used to create references to other nodes
    */
   trait Ref[K,+V,+This<:PrefixTreeLike[K,V,This]] { this:This=>
-    protected val origin:This
+    protected val origin:This //lazy
     protected val path:Seq[K]
     protected[this] var target:This = _
     override def get(key: K) = target.get(key)
