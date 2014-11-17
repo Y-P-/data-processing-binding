@@ -45,7 +45,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
      with Subtractable[K, This]
      with Equals { self:This =>
   override def repr:Repr = self
-  
+      
   /** The general parameters used for building the tree.
    */
   type Params <: PrefixTreeLike.Params[K,V,Repr]
@@ -141,7 +141,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   /** As apply above, but for a succession of keys.
    */
-  def apply(k1:K, k2:K, k: K*): Repr = { var r=apply(k1)(k2); k.foreach(x=>r=r(x)); r}
+  def apply(keys: K*): Repr = { var r=this; keys.foreach(x=>r=r(x)); r}
   
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
