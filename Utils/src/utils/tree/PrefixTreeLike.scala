@@ -9,13 +9,12 @@ import scala.collection.GenTraversable
 import scala.collection.generic.CanBuildFrom
 import scala.collection.generic.Subtractable
 import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.ArrayStack
 import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 import java.util.NoSuchElementException
 
 /** Describes a tree where data is reached through a succession of keys.
- *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
+ *  The actual data of type V is optional in intermediary nodes, but a well formed tree should not have
  *  empty leaves. Using the methods with (GenTraversable[K],V) parameters (flat view of the tree) rely
  *  on that property (they will omit to output such degenerate branches, and will not build them.)
  *  
@@ -34,6 +33,10 @@ import java.util.NoSuchElementException
  *  - Strong Navigable trees are just like weak navigable trees, but nodes are always rebuilt on assignment.
  *    In particular, these tree nodes always correctly point to the right parent. However, the building
  *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
+ *    
+ *    @tparam K the key type
+ *    @tparam V the contained value type
+ *    @tparam This the prefix tree type
  */
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]
@@ -60,8 +63,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def default: K=>Repr = null
   
   //an internal utility to correctly rebuild default when necessary
-  @inline final def asDefault[L,T](f:L=>T):L=>T = if (default==null) null else f
-      
+  @inline final protected def asDefault[L,T](f:L=>T):L=>T = if (default==null) null else f
+  
   /** The empty tree of the same type as this tree
    *  @return   an empty tree of type `This`.
    */
@@ -90,19 +93,19 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param    key the key to be removed
    *  @return   a new tree without a binding for `key`
    *
-   *  @usecase  def - (key: A): Map[A, B]
+   *  @usecase  def - (key: K): Repr
    *    @inheritdoc
    */
   def - (key: K): Repr
   
   /** Adds a key/(value,tree) pair to this tree, returning a new tree.
    *  Enlarge subtrees without losing information is usualy the expected operation on trees.
-   *  @param    kv the key/(value,tree) pair
-   *  @tparam   T1 the type of the added tree
-   *  @tparam   V1 the type of the added value
+   *  @param    kv the (key,subtree) pair
+   *  @tparam   W the type of the value in the result tree
+   *  @tparam   T the type of the result tree
    *  @return   a new tree with the new binding added to this tree
    *
-   *  @usecase  def + (kv: (K, (V,T)): T
+   *  @usecase  def +[W,T] (kv: (K, T): T
    */
   def + [W>:V,T>:Repr<:PrefixTreeLike[K,W,T]] (kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv)
 
@@ -199,11 +202,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *   @param   key      the key.
    *   @param   default  a computation that yields a default value in case no binding for `key` is
    *                     found in the tree.
-   *   @tparam  D        the result type of the default computation.
+   *   @tparam  T        the result type of the default computation.
    *   @return  the value associated with `key` if it exists,
    *            otherwise the result of the `default` computation.
    *
-   *   @usecase def getOrElse(key: A, default: A => B): B
+   *   @usecase def getOrElse[T](key: K, default: => T): T
    *     @inheritdoc
    */
   def getOrElse[T>:Repr](key: K, default: => T): T = get(key).getOrElse(default)
@@ -272,7 +275,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def keySet: Set[K] = new DefaultKeySet
   
-  /** Returns an iterable over the defined values, these for which isDefinedAt is true.
+  /** Returns an iterable over the defined values.
    */
   def values:Iterable[Repr] = new DefaultValuesIterable
 
@@ -442,13 +445,9 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param    kv1 the first key/value pair
    *  @param    kv2 the second key/value pair
    *  @param    kvs the remaining key/value pairs
-   *  @tparam   V1  the type of the added values
-   *  @tparam   T1  the type of the added tree
+   *  @tparam   W  the type of the added values
+   *  @tparam   T  the type of the added tree
    *  @return   a new tree with the given bindings added to this tree
-   *
-   *  @usecase  def + (kvs: (A, B)*): Map[A, B]
-   *    @inheritdoc
-   *    @param    kvs the key/value pairs
    */
   def + [W>:V,T>:Repr<:PrefixTreeLike[K,W,T]] (kv1:(K,T), kv2:(K,T), kvs:(K,T) *)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
     this +[W,T] kv1 + kv2 ++ kvs
@@ -456,14 +455,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** Adds all key/value pairs in a traversable collection to this tree, returning a new tree.
    *
    *  @param    xs  the collection containing the added key/value pairs
-   *  @tparam   B1  the type of the added values
+   *  @tparam   W  the type of the added values
+   *  @tparam   T  the type of the added tree
    *  @return   a new tree with the given bindings added to this tree
-   *
-   *  @usecase  def ++ (xs: Traversable[(A, B)]): Map[A, B]
-   *    @inheritdoc
    */
-  def ++[W>:V, T1 >: Repr <: PrefixTreeLike[K,W,T1]](xs: GenTraversableOnce[(K, T1)])(implicit bf:PrefixTreeLikeBuilder[K,W,T1]): T1 =
-    ((repr: T1) /: xs.seq) (_ + _)
+  def ++[W>:V, T >: Repr <: PrefixTreeLike[K,W,T]](xs: GenTraversableOnce[(K, T)])(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
+    ((repr: T) /: xs.seq) (_ + _)
 
   /** Returns a new tree obtained by removing all key/value pairs for which the predicate
    *  `p` returns `true`.
@@ -677,3 +674,67 @@ object PrefixTreeLike {
     (l.result, r.result)
   }
  */
+/*
+trait CanBuildFrom[-From, -Elem, +To] {
+// Creates a new builder
+def apply(from: From): Builder[Elem, To]
+}
+
+  /** runs through all entries which hold data.
+   *  @param key, the Key for the current (this) entry
+   */
+  def forDefined[U](key:K)(f:(K,This)=>U):Unit = {
+    if (value!=None) f(key,this)
+    for (x <- iterator) x._2.forDefined(x._1)(f)
+  }
+  /** Tries to turn a one level deep hierarchy to a map*/
+  def toMap:Map[K,V] = try {
+    val m = scala.collection.mutable.HashMap.empty[K,V]
+    for (v <- iterator) {
+      if (!v._2.isEmpty) throw new IllegalStateException("cannot transform hierarchy to map if not exactly 1 level deep")
+      m += ((v._1,v._2.value.get))
+    }
+    m.toMap
+  } catch {
+    case _:Throwable => throw new IllegalStateException("cannot transform hierarchy to a map"+this)
+  }
+
+  /** Adds or replaces T for the given sequence of keys */
+  def add[V1>:V,T>:This<:R[K,V1,T]](keys:Seq[K], tree:T): T = {
+    val x = keys(0)
+    if (keys.length==1) this +[V1,T] ((x,tree))
+    else {
+      val t = get(x) match {
+        case None    => throw new NullPointerException //builder.empty(None)
+        case Some(m) => m 
+      }
+      val t1 = t.add[V1,T](keys.tail,tree)
+      this +[V1,T] ((x,t1))
+    }
+  }
+  /** Removes the value for the given sequence of keys.
+   *  If the result is empty and has no value, the truncated key is removed too.
+   *  This happens as long as the conditions holds walking up the sequence.
+   *  Ex: this rem ("a","b","c") first removes "a"->"b"->"c"
+   *      then it checks if "a"->"b" is still significant (has a proper value or non empty subtree)
+   *      if not it removes it, and in that case it proceeds to "a"...
+   */
+  def rem (keys:K*): This = {
+    if (keys.length==0) return this
+    val x = keys(0)
+    val m = get(x)
+    if (m.isEmpty)               this
+    else if (keys.length==1)     this - x
+    else {
+      val r = (m.get rem (keys.tail:_*))
+      if (r.isEmpty && r.value.isEmpty) this rem (keys.init:_*)
+      else                              repr.updated(x,r)
+    }
+  }
+  
+  /** provides a global iterator ; that iterator is used to visit the whole sub-trees */
+  def seqIterator(topFirst:Boolean):Iterator[(Seq[K], This)] = new TreeIterator(Nil,topFirst)
+  /** flattens the tree to it's canonical state. */
+  def flatten:Seq[(Seq[K],This)] = seqIterator(true).toSeq
+*/
+
