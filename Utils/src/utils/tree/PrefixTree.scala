@@ -11,7 +11,7 @@ import scala.annotation.switch
  *  when it can be subclassed while keeping the same subtype for operation return (such as + etc.)
  *  See the StringTree subclass.
  */
-abstract class PrefixTree[K,+V] protected extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {  
+abstract class PrefixTree[K,+V] protected extends PrefixTreeLike.Abstract[K,V,PrefixTree[K,V]] {
   implicit def params:Params  //make params implicit so that it is automatically used by these methods that rely on it
   def value:Option[V] = None
   def tree: Map[K,Repr]
@@ -54,9 +54,11 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
     override def isNonSignificant = false
   }
   
+  /** Note that references prevent navigation : a referenced child would have more than one parent.
+   */
   protected class Ref[K,V](valuex:Option[V], defaultx:Option[K=>PrefixTree[K, V]], originx: => PrefixTree[K,V], val path:Seq[K])(implicit params:P0[K,V]) extends Abstract[K,V] with PrefixTreeLikeBuilder.Ref[K,V,PrefixTree[K,V]] {
     if (params.navigable.id!=0) throw new IllegalStateException("references cannot be navigable as a referenced node children would have more than one parent")
-    lazy val origin = originx
+    lazy val origin      = originx
     override def tree    = target.tree
     override def value   = if (valuex==null)   super.value   else valuex
     override def default = if (defaultx==None) super.default else defaultx.get
@@ -106,4 +108,6 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
       }
     }
   }
+  
+  implicit def toBuilder[K,V](x:PrefixTree.type)(implicit p:P0[K,V]) = x.builder(p)
 }

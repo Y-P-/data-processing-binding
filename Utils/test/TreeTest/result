@@ -182,5 +182,14 @@ Tree{7-7}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{7-2}()), f -> Tree{6-6}(d -
 java.util.NoSuchElementException: key not found e
 Tree{4-4}(a -> Tree{1-1}(), b -> Tree{7-2}())
 Tree{1-1}()
+Tree{6-6}(d -> Tree{4-4}(b -> Tree{2-2}()))
+Tree{4-4}(b -> Tree{2-2}())
 Tree{7-2}()
 Tree{4-7}()
+----20--------
+Tree(d -> Tree{4+4}(a -> Tree{1*1}()), f -> Tree{12}(d -> Tree{4+4}(b -> Tree{4}())))
+Tree(d -> Tree{4+4}(a -> Tree{1*1}()), f -> Tree(d -> Tree{4+4}(b -> Tree{4}())))
+----21--------
+Tree(d -> Tree{4+4}(a -> Tree{1%1}(), b -> Tree{7%2}()), f -> Tree{12}(d -> Tree(b -> Tree{2*2}())))
+Tree(d -> Tree{4+4}(a -> Tree{1*1}(), b -> Tree{7%2}()), f -> Tree(d -> Tree{4+4}(b -> Tree{2%2}())))
+----22--------
