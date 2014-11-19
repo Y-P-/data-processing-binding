@@ -89,16 +89,8 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   /** an interesting tree which recursively binds to itself whatever the input.
    *  This tree only holds one value which is returned on any key sequence.
    */
-  final def constant(v:V):Tree = selfDefault(apply(Some(v),Nil,null))
-  
-  /** an interesting tree which recursively binds to itself for default
-   */
-  final def selfDefault(t:Tree):Tree = {
-    var e = t
-    e = t.withDefault(k=>e)(this)
-    e
-  }
-  
+  final def constant(v:V):Tree = apply(Some(v),Nil,null).selfDefault
+    
   /** Build a 'Tree' using the flat form. e.g.
    *  (a,b,c) 1
    *  (a) 2
@@ -220,10 +212,6 @@ object PrefixTreeLikeBuilder {
     override def value       = target.value
     override def default     = target.default
   }
-
-  implicit def toBuilder[K,V](g:Gen2)(implicit p:g.P0[K,V])  = g.builder(p)
-  implicit def toBuilder[K,V](g:Gen1[K])(implicit p:g.P0[V]) = g.builder(p)
-  implicit def toBuilder[K,V](g:Gen0[K,V])(implicit p:g.P0)  = g.builder(p)
   
   /** Defines a builder for a tree type where both K and V are free */
   abstract class Gen2 {
@@ -241,7 +229,10 @@ object PrefixTreeLikeBuilder {
       def newBuilder = params.b2.builder(params)
     }
     
+    def constant[K,V](v:V)(implicit p:P0[K,V]) = builder.constant(v)
+    
     def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, Tree[K,V]] { type Params=P0[K,V] }
+    implicit def toBuilder[K,V](g:this.type)(implicit p:P0[K,V]) = g.builder(p)
   }
   
   /** Defines a builder for a tree type where K is fixed and V is free */
@@ -261,7 +252,10 @@ object PrefixTreeLikeBuilder {
       def newBuilder = params.b1.builder[V](params)
     }
 
+    def constant[V](v:V)(implicit p:P0[V]) = builder.constant(v)
+    
     def builder[V](implicit p:P0[V]):PrefixTreeLikeBuilder[K, V, Tree[V]] { type Params=P0[V] }
+    implicit def toBuilder[V](g:this.type)(implicit p:P0[V]) = g.builder(p)
   }
   
   /** Defines a builder for a tree type where both K and V are fixed */
@@ -281,8 +275,11 @@ object PrefixTreeLikeBuilder {
       type Params = P0
       def newBuilder = params.b0.builder(params)
     }
+    
+    def constant(v:V)(implicit p:P0) = builder.constant(v)
 
     def builder(implicit p:P0):PrefixTreeLikeBuilder[K, V, Tree] { type Params=P0 }
+    implicit def toBuilder(g:this.type)(implicit p:P0) = g.builder(p)    
   }
 }
 

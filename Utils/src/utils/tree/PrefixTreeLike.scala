@@ -80,7 +80,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** rebuilds this tree with a specific value */
   final def withValue[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](value:Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withValue(this, value)
   /** rebuilds this tree as defaulting to itself */
-  final def selfDefault:Repr = newBuilder.selfDefault(this)
+  final def selfDefault:Repr = {
+    var e = this
+    e = withDefault(k=>e)(newBuilder)
+    e
+  }
+
   
   /** tells if the two following method should work with no exception */
   def isNavigable:Boolean = false
@@ -145,8 +150,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
-  override def isNonSignificant = value.isEmpty && isEmpty && default==null 
-
+  override def isNonSignificant = value.isEmpty && isEmpty && default==null
+  
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
    *  @return an immutable tree consisting only of those key where the key satisfies

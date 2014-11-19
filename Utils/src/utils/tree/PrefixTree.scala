@@ -108,6 +108,4 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
       }
     }
   }
-  
-  implicit def toBuilder[K,V](x:PrefixTree.type)(implicit p:P0[K,V]) = x.builder(p)
 }
