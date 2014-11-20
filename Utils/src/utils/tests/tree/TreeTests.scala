@@ -95,7 +95,7 @@ object TreeTests {
   def testFilter1(implicit out:PrintWriter) = out.println(m.filterAll(_._1!="b"))
   
   //tests filterView
-  def testFilter2(implicit out:PrintWriter) = out.println(m.filterView(_._1!="b"))
+  def testFilter2(implicit out:PrintWriter) = ()/*out.println(m.filterView(_._1!="b"))*/
   
   //tests get/apply
   def testGet(implicit out:PrintWriter) = {
