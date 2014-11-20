@@ -69,7 +69,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(tt:T,cur: =>Repr):R = {
       val b=bf.newEmpty
-      for (x:(K,This) <- cur)
+      for (x <- cur)
         if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
       b.result(op(tt,cur),null)
     }
@@ -93,7 +93,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(tt:T,cur: =>Repr,oo:O):R = {
       val b=bf.newEmpty
-      for (x:(K,This) <- cur)
+      for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
       b.result(oo.value.flatMap(_(tt,cur)),null)
     }
@@ -113,7 +113,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def zipFull[T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R],L,U](t:T,op:O,k0:K,default:L=>R,strict:Strictness)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
     def recur(tt:T,cur:Repr,oo:O,u:Option[U],default:L=>R):R = {
       val b=bf.newEmpty
-      for (x:(K,This) <- cur)
+      for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) {
           val (t1,o1) = try { (tt(x._1),oo(x._1)) } catch { case _:NoSuchElementException => (tt.empty,oo.empty) }
           o1.value match {
