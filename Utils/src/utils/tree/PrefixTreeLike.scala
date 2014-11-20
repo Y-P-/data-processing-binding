@@ -41,16 +41,14 @@ import java.util.NoSuchElementException
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   extends PartialFunction[K, This]
      with PrefixTraversableOnce[K, V, This]
-     with IterableLike[(K, This with PrefixTreeLike[K, V, This]), This]
+     with IterableLike[(K, This), This]
      with Subtractable[K, This]
-     with Equals { self:This with PrefixTreeLike[K, V, This]=>
+     with Equals { self:This =>
       
   /** The general parameters used for building the tree.
    */
   type Params <: PrefixTreeLike.Params[K,V,Repr]
-  protected[this] type T1 = This with PrefixTreeLike[K, V, This]
   def params:Params
-  override def repr : This with PrefixTreeLike[K, V, This] = this
   
   /** The value for the current node */
   def value: Option[V]
@@ -176,7 +174,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** Similar to the previous method, but the result is a view and doesn't rebuild
    *  a new tree. Such views are only useful when relatively few elements are used ;
    *  in other cases, it may be more performant to use filterAll. 
-   *//*
+   */
   def filterView(p: ((K,Repr)) => Boolean): PrefixTreeLike[K,V,_] = new WithFilter(p)
   
   /** This class yields a filtered view of the current tree.
@@ -199,10 +197,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
      */
     def force:This = {
       val bf = self.newBuilder
-      if (!isEmpty) for (x:((K,T1)) <- this) bf += ((x._1,x._2.force))
+      if (!isEmpty) for (x <- this) bf += ((x._1,x._2.force))
       bf.result(self.value,self.default)
     }
-  }*/
+  }
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the tree.
    *   @param   key      the key.
@@ -357,7 +355,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       //full blown maps (or whatever underlying structure is used in T) by using the
       //empty ++ ((k,t)) construct (which would work, but be awfully inefficient.)
       val bf1 = bf.newEmpty
-      for (x:((K,T1)) <- this) bf += ((x._1,x._2.map(f)(bf1)))
+      for (x <- this) bf += ((x._1,x._2.map(f)(bf1)))
     }
     bf.result(value.map(f),asDefault(default(_:K).map(f)))
   }
@@ -366,7 +364,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   override def clone:Repr = {
     val bf = newBuilder
-    for (x:((K,T1)) <- this) bf += ((x._1,x._2.clone))    
+    for (x <- this) bf += ((x._1,x._2.clone))    
     bf.result(value,default)
   }
   
@@ -481,7 +479,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   override def filterNot(p: ((K, Repr)) => Boolean): Repr = {
     var res: Repr = repr
-    for (kv:((K,T1)) <- this)
+    for (kv <- this)
       if (p(kv)) res -= kv._1
     res
   }

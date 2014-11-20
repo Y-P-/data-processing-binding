@@ -40,14 +40,12 @@ import scala.concurrent.ExecutionContext
  *    In particular, these tree nodes always correctly point to the right parent. However, the building
  *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
  */
-trait PrefixTraversableOnce[K, +V, +This]
-  extends TraversableOnce[(K, This with PrefixTraversableOnce[K, V, This])] { self:This =>
+trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
+  extends TraversableOnce[(K, This)] { self:This =>
   //an alias that concrete classes can use as shortcut to refer to themselves
   protected[this] type Repr = This
   type Key = K
   type Value <: V
-  protected[this] type T0 = This with PrefixTraversableOnce[K, V, This]
-  def repr:T0 = this
   
   /** The value for the current node */
   def value: Option[V]
@@ -68,8 +66,8 @@ trait PrefixTraversableOnce[K, +V, +This]
    *  @param op     an operator that transforms a T node with a This node giving the expected U result
    *  @return the resulting transformed tree
    */
-  def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,This)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(tt:T,cur: =>T0):R = {
+  def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(tt:T,cur: =>Repr):R = {
       val b=bf.newEmpty
       for (x <- cur)
         if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
@@ -92,8 +90,8 @@ trait PrefixTraversableOnce[K, +V, +This]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,This)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(tt:T,cur: =>T0,oo:O):R = {
+  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(tt:T,cur: =>Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
@@ -112,8 +110,8 @@ trait PrefixTraversableOnce[K, +V, +This]
    *             an operator produces the new key (if None, the node is skipped), new value, new default handler (can of course be null.)
    *  @return the resulting transformed tree
    */
-  def zipFull[T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,This)=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R],L,U](t:T,op:O,k0:K,default:L=>R,strict:Strictness)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
-    def recur(tt:T,cur:T0,oo:O,u:Option[U],default:L=>R):R = {
+  def zipFull[T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R],L,U](t:T,op:O,k0:K,default:L=>R,strict:Strictness)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+    def recur(tt:T,cur:Repr,oo:O,u:Option[U],default:L=>R):R = {
       val b=bf.newEmpty
       for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) {
@@ -142,8 +140,8 @@ trait PrefixTraversableOnce[K, +V, +This]
   /** A fold left operation that descends through the subtrees.
    *  Children are evaluated before their parent.
    */
-  def deepFoldLeft[X](z:X,k:K)(f: (X, (K,This)) => X): X = {
-    def recur(x: X, t:(K,T0)):X = f(t._2.foldLeft(x)(recur),t)
+  def deepFoldLeft[X](z:X,k:K)(f: (X, (K,Repr)) => X): X = {
+    def recur(x: X, t:(K,Repr)):X = f(t._2.foldLeft(x)(recur),t)
     recur(z,(k,this))
   }
     
@@ -157,8 +155,8 @@ trait PrefixTraversableOnce[K, +V, +This]
    *             =>Unit   : a byname param that has to be evaluated
    *                        somewhere to evaluate the current element children
    */
-  def deepForeach(k:K)(op: ((K,This),=>Unit) => Unit): Unit = {
-    def recur(elt:(K,T0)):Unit = op(elt,elt._2.foreach(recur))
+  def deepForeach(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
+    def recur(elt:(K,Repr)):Unit = op(elt,elt._2.foreach(recur))
     recur((k,this))
   }
   
@@ -172,8 +170,8 @@ trait PrefixTraversableOnce[K, +V, +This]
    *             Iterator[U] : the iterator on the children
    *             U           : some result
    */
-  def deepForeach[U](k:K)(op: ((K,This),Iterator[U]) => U): U = {
-    def recur(elt:(K,T0)):U = op(elt,elt._2.toIterator.map(recur))
+  def deepForeach[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
+    def recur(elt:(K,Repr)):U = op(elt,elt._2.toIterator.map(recur))
     recur((k,this))
   }
   
@@ -186,9 +184,9 @@ trait PrefixTraversableOnce[K, +V, +This]
    *             Iterator[U] : the iterator on the children
    *             U           : some result
    */
-  def deepForeach2[U](k:K)(op: (This,(K,This),Iterator[U]) => U): U = {
-    def recur(parent:This,elt:(K,T0)):U = op(parent,elt,elt._2.toIterator.map(recur(elt._2,_)))
-    recur(null.asInstanceOf[This],(k,this))
+  def deepForeach2[U](k:K)(op: (Repr,(K,Repr),Iterator[U]) => U): U = {
+    def recur(parent:Repr,elt:(K,Repr)):U = op(parent,elt,elt._2.toIterator.map(recur(elt._2,_)))
+    recur(null.asInstanceOf[Repr],(k,this))
   }
   
   /** As above.
@@ -202,9 +200,9 @@ trait PrefixTraversableOnce[K, +V, +This]
    *             Iterator[U] : the iterator on the children
    *             U           : some result
    */
-  def deepForeach2[U,O<:PrefixTreeLike[K,(This,(K,This),Iterator[U]) => U,O]](k:K,op: O): U = {
-    def recur(parent:This,elt:(K,T0),f:O):U = f.value.get(parent,elt,elt._2.toIterator.map(u=>recur(elt._2,u,f(u._1))))
-    recur(null.asInstanceOf[This],(k,this),op)
+  def deepForeach2[U,O<:PrefixTreeLike[K,(Repr,(K,Repr),Iterator[U]) => U,O]](k:K,op: O): U = {
+    def recur(parent:Repr,elt:(K,Repr),f:O):U = f.value.get(parent,elt,elt._2.toIterator.map(u=>recur(elt._2,u,f(u._1))))
+    recur(null.asInstanceOf[Repr],(k,this),op)
   }  
 
 }
@@ -246,7 +244,7 @@ object PrefixTraversableOnce {
    * @param V, the value type
    * @param item, the blocking buffer
    */
-  class Layer[K,V](item:BlockingData[AnyRef]) extends Iterator[(K,Layer[K,V] with PrefixTraversableOnce[K, V, Layer[K,V]])] with PrefixTraversableOnce[K,V,Layer[K,V]] {
+  class Layer[K,V](item:BlockingData[AnyRef]) extends Iterator[(K,Layer[K,V])] with PrefixTraversableOnce[K,V,Layer[K,V]] {
     var next:(K,Layer[K,V])  = _
     var value:Option[V] = None
     @tailrec final def hasNext:Boolean = item.take match {
