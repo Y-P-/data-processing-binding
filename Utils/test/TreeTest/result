@@ -194,3 +194,5 @@ Tree(d -> Tree{4+4}(a -> Tree{1*1}()), f -> Tree(d -> Tree{4+4}(b -> Tree{4}()))
 Tree(d -> Tree{4+4}(a -> Tree{1%1}(), b -> Tree{7%2}()), f -> Tree{12}(d -> Tree(b -> Tree{2*2}())))
 Tree(d -> Tree{4+4}(a -> Tree{1*1}(), b -> Tree{7%2}()), f -> Tree(d -> Tree{4+4}(b -> Tree{2%2}())))
 ----22--------
+Tree(4 -> Tree{'d4+4}(1 -> Tree{'a1%1}(), 2 -> Tree{'b7%2}()), 6 -> Tree{'f12}())
+Tree(4 -> Tree{'d4+4}(1 -> Tree{'a1*1}(), 2 -> Tree{'b7%2}()))

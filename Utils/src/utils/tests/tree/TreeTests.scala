@@ -271,9 +271,9 @@ object TreeTests {
           (Seq("f","d"),op1),
           (Seq("f","d","b"),op3)
       ))
-    val rx = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,true,opX)
+    val rx = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,FULL_STRICT,opX)
     out.println(rx)
-    val ry = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,true,opY)
+    val ry = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,FULL_STRICT,opY)
     out.println(ry)
   }
   
@@ -302,9 +302,9 @@ object TreeTests {
       ))
     //note here that f exists but has no op: default is not used, and being not strict, this will
     //not stop the tree exploration. But f won't have any value.
-    val rx = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,false,opX)
+    val rx = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,NOT_STRICT,opX)
     out.println(rx)
-    val ry = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,false,opY)
+    val ry = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,NOT_STRICT,opY)
     out.println(ry)
   }
 
@@ -332,10 +332,10 @@ object TreeTests {
           (Seq("f","d"),(op1,opx))
       ))
     //note that f->d has no associated value: the corresponding subtree is excluded (the value becomes the key => no key, no tree...)
-    val rx = m1.zipFull[Int,Symbol,StringTree[Int],PrefixTree[String,O],PrefixTree[Int,Symbol]]("",null,m0,PrefixTraversableOnce.NOT_STRICT,opX)
+    val rx:PrefixTree[Int,Symbol] = m1.zipFull[StringTree[Int],PrefixTree[String,O],PrefixTree[Int,Symbol],Int,Symbol](m0,opX,"",null,NOT_STRICT)
     out.println(rx)
     //note that f has no associated value: itself and its full subtree is excluded
-    val ry = m1.zipFull[Int,Symbol,StringTree[Int],PrefixTree[String,O],PrefixTree[Int,Symbol]]("",null,m0,PrefixTraversableOnce.NOT_STRICT,opY)
+    val ry = m1.zipFull[StringTree[Int],PrefixTree[String,O],PrefixTree[Int,Symbol],Int,Symbol](m0,opY,"",null,NOT_STRICT)
     out.println(ry)
   }
     

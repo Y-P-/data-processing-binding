@@ -225,6 +225,7 @@ object PrefixTreeLikeBuilder {
 
     protected trait Abstract[K,V] {
       implicit val params:P0[K,V]
+      type Value = V
       type Params = P0[K,V]
       def newBuilder = params.b2.builder(params)
     }
@@ -248,6 +249,7 @@ object PrefixTreeLikeBuilder {
 
     protected trait Abstract[V] {
       implicit val params:P0[V]
+      type Value = V
       type Params = P0[V]
       def newBuilder = params.b1.builder[V](params)
     }
@@ -272,6 +274,7 @@ object PrefixTreeLikeBuilder {
 
     protected trait Abstract {
       implicit val params:P0
+      type Value = V0
       type Params = P0
       def newBuilder = params.b0.builder(params)
     }

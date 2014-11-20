@@ -44,6 +44,8 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   extends TraversableOnce[(K, This)] { self:This =>
   //an alias that concrete classes can use as shortcut to refer to themselves
   protected[this] type Repr = This
+  type Key = K
+  type Value <: V
   
   /** The value for the current node */
   def value: Option[V]
@@ -88,11 +90,11 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(tt:T,cur: =>Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
-        if (!strict || tt.isDefinedAt(x._1) && oo.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
+        if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
       b.result(oo.value.flatMap(_(tt,cur)),null)
     }
     recur(t,this,op)
@@ -108,11 +110,11 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             an operator produces the new key (if None, the node is skipped), new value, new default handler (can of course be null.)
    *  @return the resulting transformed tree
    */
-  def zipFull[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R]](k0:K,default:L=>R,t:T,strict:PrefixTraversableOnce.Strictness,op:O)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+  def zipFull[T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R],L,U](t:T,op:O,k0:K,default:L=>R,strict:Strictness)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
     def recur(tt:T,cur:Repr,oo:O,u:Option[U],default:L=>R):R = {
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
-        if ((!strict.tree_strict || tt.isDefinedAt(x._1)) && (!strict.op_strict || oo.isDefinedAt(x._1))) {
+        if (strict.succeeds(tt,oo)(x._1)) {
           val (t1,o1) = try { (tt(x._1),oo(x._1)) } catch { case _:NoSuchElementException => (tt.empty,oo.empty) }
           o1.value match {
             case None    =>
@@ -207,13 +209,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
 object PrefixTraversableOnce {
   import utils.BlockingData
-  
-  sealed protected class Strictness(val op_strict:Boolean, val tree_strict:Boolean)
-  val OP_STRICT    = new Strictness(true,false)
-  val RIGHT_STRICT = new Strictness(false,true)
-  val FULL_STRICT  = new Strictness(true,true)
-  val NOT_STRICT   = new Strictness(false,false)
-  
+    
   /** This interface is sufficient to create a PrefixTraversableOnce
    *  Whenever you have a new key, you push it.
    *  Whenever you have a value for a key, you pull it.
