@@ -100,8 +100,6 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     }
     recur(t,this,op)
   }
-  
-    type XX[X,+Y] = T0 forSome { type T0 <: PrefixTreeLike[X,Y,T0] }
 
   /** Similar to the previous method, but now we can build a tree of a fully different nature (different keys.)
    *  Note that this operation is the most complex for trees and it allows extensive tree transformations.
@@ -149,15 +147,41 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     }
     recur(t,this,op,u0,default)
   }
-
-
     
   /** A fold left operation that descends through the subtrees.
    *  Children are evaluated before their parent.
    */
-  def deepFoldLeft[X](z:X,k:K)(f: (X, (K,Repr)) => X): X = {
-    def recur(x: X, t:(K,Repr)):X = f(t._2.foldLeft(x)(recur),t)
-    recur(z,(k,this))
+  def deepFoldLeft[U](u0:U,k0:K)(f: (U, (K,Repr)) => U): U = {
+    def recur(u: U, t:(K,Repr)):U = f(t._2.foldLeft(u)(recur),t)
+    recur(u0,(k0,this))
+  }
+  /** As above.
+   *  When processing children, access to the parent is handled down.
+   *  @param u0 the initial value
+   *  @param k0 a key for the top element
+   *  @param f the method used for folding ; it takes three parameters
+   *           U the current value
+   *           Seq[(K,Repr)] the element stack from bottom to top
+   */
+  def deepFoldLeft1[U](u0:U,k0:K)(f: (U, Seq[(K,Repr)]) => U): U = {
+    def recur(u: U, elt:Seq[(K,Repr)]):U = f(elt.head._2.foldLeft(u)((uu,ee)=>recur(uu,ee+:elt)),elt)
+    recur(u0,Seq((k0,this)))
+  }
+  /** As above.
+   *  The operation can change as it is provided through a tree.
+   *  Branches for which an operation is missing (NoSuchElementException) are not explored.
+   *  Nodes with no value are ignored (but children are explored.)
+   */
+  def deepFoldLeft2[U](u0:U,k0:K)(op: PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,_]): U = {
+    type O = PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,_]  //see zipFull
+    def recur(u: U, elt:Seq[(K,Repr)], oo:O):U = if (oo==null) u else {
+      val u1 = elt.head._2.foldLeft(u)((uu,ee)=>recur(uu,ee+:elt,try { oo(ee._1).asInstanceOf[O] } catch { case _:NoSuchElementException => null }))
+      oo.value match {
+        case Some(g) => g(u1,elt) //has value: compute current element
+        case None    => u1        //no value: do nothing
+      }
+    }
+    recur(u0,Seq((k0,this)),op)
   }
     
   /** A recursive call that descends through the subtrees.
@@ -185,39 +209,40 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             Iterator[U] : the iterator on the children
    *             U           : some result
    */
-  def deepForeach[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
+  def deepForeach1[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
     def recur(elt:(K,Repr)):U = op(elt,elt._2.toIterator.map(recur))
     recur((k,this))
   }
   
   /** As above.
    *  Children can reach their parent (but not above.)
-   *  @param k an initial key for the top node ; it is hardly used
+   *  @param k0 an initial key for the top node ; it is hardly used
    *  @param op, the operation to execute on each node.
-   *             Repr        : the parent
-   *             (K,Repr)    : the current element and its key
-   *             Iterator[U] : the iterator on the children
-   *             U           : some result
+   *             Seq[(K,Repr)] : the elements sequence, starting from the current element
+   *             Iterator[U]   : the iterator on the children
+   *             U             : some result
    */
-  def deepForeach2[U](k:K)(op: (Repr,(K,Repr),Iterator[U]) => U): U = {
-    def recur(parent:Repr,elt:(K,Repr)):U = op(parent,elt,elt._2.toIterator.map(recur(elt._2,_)))
-    recur(null.asInstanceOf[Repr],(k,this))
+  def deepForeach2[U](k0:K)(op: (Seq[(K,Repr)],Iterator[U]) => U): U = {
+    def recur(elt:Seq[(K,Repr)]):U = op(elt,elt.head._2.toIterator.map(x=>recur(x+:elt)))
+    recur(Seq((k0,this)))
   }
   
   /** As above.
-   *  Children can reach their parent (but not above.)
+   *  Children can reach their parents.
    *  @param k an initial key for the top node ; it is hardly used
    *  @param op, the operation to execute on each node.
    *             this is a tree and the actual operation can change on each key.
    *             all required key entries must have a matching op.
-   *             Repr        : the parent
-   *             (K,Repr)    : the current element and its key
-   *             Iterator[U] : the iterator on the children
-   *             U           : some result
+   *             Repr     : the parent
+   *             (K,Repr) : the current element and its key
+   *             Iterator : the iterator on the children
    */
-  def deepForeach2[U,O<:PrefixTreeLike[K,(Repr,(K,Repr),Iterator[U]) => U,O]](k:K,op: O): U = {
-    def recur(parent:Repr,elt:(K,Repr),f:O):U = f.value.get(parent,elt,elt._2.toIterator.map(u=>recur(elt._2,u,f(u._1))))
-    recur(null.asInstanceOf[Repr],(k,this),op)
+  def deepForeach3(k0:K)(op: PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,_]): Unit = {
+    type O = PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,_]  //see zipFull
+    def recur(elt:Seq[(K,Repr)], oo:O):Unit = if (oo!=null && oo.value!=None) {
+      oo.value.get(elt,elt.head._2.toIterator.map(x=>recur(x+:elt,try { oo(x._1).asInstanceOf[O] } catch { case _:NoSuchElementException => null }))) //has value: compute current element
+    }
+    recur(Seq((k0,this)),op)
   }  
 
 }
@@ -287,7 +312,7 @@ object PrefixTraversableOnce {
   
     /** converts the push/pull sequence through the given operator. */
     def run[U](op: ((K,Layer[K,V]),Iterator[U]) => U)(implicit executionContext:ExecutionContext):Future[U] =
-      Future { (new Layer[K,V](item)).deepForeach[U](null.asInstanceOf[K])(op) }
+      Future { (new Layer[K,V](item)).deepForeach1[U](null.asInstanceOf[K])(op) }
   }
   
   /** Creates a pair for creating a PrefixTraversableOnce using a Push/Pull interface */

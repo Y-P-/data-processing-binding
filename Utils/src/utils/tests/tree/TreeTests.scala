@@ -345,15 +345,50 @@ object TreeTests {
     out.println(ry)
   }
     
-  def testForeach2(implicit out:PrintWriter) = {
+  def testForeach(implicit out:PrintWriter) = {
     import out.print
-    m.deepForeach2[Int](""){(p,t,c)=>
+    type O = (Seq[(String,StringTree[Int])],Iterator[Unit])=>Unit
+    val op1:O = (p,i)=> {
+      val t = p.head
+      print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
+      while (i.hasNext) i.next
+      print(s"}[X]")
+    }
+    val op2:O = (p,i)=> {
+      val t = p.head
+      print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
+      while (i.hasNext) i.next
+      print(s"}[Y]")
+    }
+    val opX = PrefixTree.fromFlat2(Seq(
+        (Seq(),(op1,PrefixTree.constant[String,O](op1))),
+        (Seq("f"),(op2,PrefixTree.constant[String,O](op2)))
+      ))
+    m.deepForeach3("")(opX)
+    out.println
+    m.deepForeach2[Int](""){(p,c)=>
+      val t = p.head
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       var i=0
       while (c.hasNext) { i+=1; c.next }
-      print(s"}[$i in ${if (p!=null) p.value.get else "top"}]")
+      print(s"}[$i in ${if (p.size>1) p(1)._2.value.get else "top"}]")
       i
     }
+    out.println
+    m.deepForeach1[Int](""){(t,c)=>
+      print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
+      var i=0
+      while (c.hasNext) { i+=1; c.next }
+      print(s"}[$i]")
+      i
+    }
+    out.println
+    m.deepForeach(""){(t,recur)=>
+      print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
+      recur
+      print(s"}")
+    }
+    out.println
   }
   
   def testPushPull(implicit out:PrintWriter) = {
@@ -415,7 +450,7 @@ object TreeTests {
       t(testZip2)
       t(testZip2NonStrictAndFromFlatWithDefault)
       t(testZipFull)
-      t(testForeach2)
+      t(testForeach)
       t(testPushPull)
       //navigable
       //navigables in zip/other operations
