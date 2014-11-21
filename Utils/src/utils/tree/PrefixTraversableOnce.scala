@@ -111,41 +111,39 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             an operator produces the new key (if None, the node is skipped), new value, new default handler (can of course be null.)
    *  @return the resulting transformed tree
    */
-  def zipFull[L,U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[L,U,R]](t:T,op:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),_],k0:K,default:L=>R,strict:Strictness)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+  def zipFull[L,U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:PrefixTreeLike[K,(Seq[(K,Repr,T)])=>(Option[L],Option[U],L=>R),_])(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
     //we should declare a generic O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),O]
     //but doing so prevents generic type inferrence
     //we cannot declare a recursive type, hence _ is inferred as Any, and not as <:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),_]
     //so we will safely cast to O (because we know the return of apply to be of the same type)
-    type O = PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),_]
-    def recur(tt:T,cur:Repr,oo:O,u:Option[U],default:L=>R):R = {
+    type O = PrefixTreeLike[K,(Seq[(K,Repr,T)])=>(Option[L],Option[U],L=>R),_]
+    def recur(elt:Seq[(K,Repr,T)],oo:O):(L,R) = {
       val b=bf.newEmpty
-      for (x <- cur)
-        if (strict.succeeds(tt,oo)(x._1)) {
+      for (x <- elt.head._2)
+        if (strict.succeeds(elt.head._3,oo)(x._1)) {
           var t1:T = null.asInstanceOf[T]
           var o1:O = null
-          var ok = true
-          //a missing elt (NoSuchElementException) returned by default will not produce any result
-          try {
-            t1 = tt(x._1)
+          if(try {
+            //a missing elt (NoSuchElementException) will not produce any result
+            t1 = elt.head._3(x._1)
             o1 = oo(x._1).asInstanceOf[O]
-          } catch { case _:NoSuchElementException => ok=false }
-          if (ok) o1.value match {
-              case Some(f)  =>
-                val r = f(x._1,t1,x._2)
-                r._1 match {
-                  case Some(l) => b += ((l, recur(t1,x._2,o1,r._2,r._3)))
-                  case _ =>
-                }
-              case _ =>
-            }
+            true
+          } catch { case _:NoSuchElementException => false }) {
+            val res = recur((x._1,x._2,t1)+:elt,o1)
+            if (res!=null) b += res
+          }
         }
-      b.result(u,default)
+      oo.value match {
+        case None    => null
+        case Some(f) =>
+          val res = f(elt)
+          res._1 match {
+            case Some(l) => (l,b.result(res._2,res._3))
+            case _       => null
+          }
+      }
     }
-    val u0 = op.value match {
-      case None    => None
-      case Some(f) => f(k0,t,this)._2
-    }
-    recur(t,this,op,u0,default)
+    recur(Seq((k0,this,t)),op)._2
   }
     
   /** A fold left operation that descends through the subtrees.

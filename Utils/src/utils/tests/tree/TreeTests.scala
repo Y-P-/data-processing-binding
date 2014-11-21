@@ -318,30 +318,32 @@ object TreeTests {
     //in zipFull, we do a similar transformation as above, but replace the key with the Int value and Strings with Symbols.
     //the result should be close to the previous one, thus easily comparable.
     //this is far from testing all possibilities, but its a good start.
-    type O = (String,StringTree[Int],StringTree[Int])=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol])
-    val op1:O = (s,t1,t2)=>(t2.value,for (v1<-t1.value; v2<-t2.value) yield Symbol(s"$s$v1+$v2"),null)
-    val op2:O = (s,t1,t2)=>(t2.value,for (v1<-t1.value; v2<-t2.value) yield Symbol(s"$s$v1*$v2"),null)
-    val op3:O = (s,t1,t2)=>(t2.value,for (v1<-t1.value; v2<-t2.value) yield Symbol(s"$s${(v1+v2)}"),null)
-    val opc:O = (s,t1,t2)=>(t2.value,for (v1<-t1.value; v2<-t2.value) yield Symbol(s"$s$v1%$v2"),null)
+    type O = Seq[(String,StringTree[Int],StringTree[Int])]=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol])
+    val op1:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1+$v2"),null)}
+    val op2:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1*$v2"),null)}
+    val op3:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${(v1+v2)}"),null)}
+    val opc:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1%$v2"),null)}
     
     val opx = PrefixTree.constant[String,O](opc)
     
     val opX = PrefixTree.fromFlat2(Seq(
+          (Seq(),(op1,opx)),
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(null,null)),
           (Seq("f"),(op3,opx)),
           (Seq("f","d","b"),(op2,opx))
       ))
     val opY = PrefixTree.fromFlat2(Seq(
+          (Seq(),(op1,opx)),
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(op2,opx)),
           (Seq("f","d"),(op1,opx))
       ))
     //note that f->d has no associated value: the corresponding subtree is excluded (the value becomes the key => no key, no tree...)
-    val rx = m1.zipFull(m0,opX,"",null,NOT_STRICT)
+    val rx = m1.zipFull("",NOT_STRICT,m0,opX)
     out.println(rx)
     //note that f has no associated value: itself and its full subtree is excluded
-    val ry = m1.zipFull(m0,opY,"",null,NOT_STRICT)
+    val ry = m1.zipFull("",NOT_STRICT,m0,opY)
     out.println(ry)
   }
     
