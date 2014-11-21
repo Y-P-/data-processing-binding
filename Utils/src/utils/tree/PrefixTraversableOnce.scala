@@ -123,17 +123,23 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
       val b=bf.newEmpty
       for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) {
-          val t1:T = try { tt(x._1) } catch { case _:NoSuchElementException => tt.empty }
-          val o1:O = (try { oo(x._1) } catch { case _:NoSuchElementException => oo.empty }).asInstanceOf[O]
-          o1.value match {
-            case Some(f) if !t1.isNonSignificant =>
-              val r = f(x._1,t1,x._2)
-              r._1 match {
-                case None    =>
-                case Some(l) => b += ((l, recur(t1,x._2,o1,r._2,r._3)))
-              }
-            case _ =>
-          }
+          var t1:T = null.asInstanceOf[T]
+          var o1:O = null
+          var ok = true
+          //a missing elt (NoSuchElementException) returned by default will not produce any result
+          try {
+            t1 = tt(x._1)
+            o1 = oo(x._1).asInstanceOf[O]
+          } catch { case _:NoSuchElementException => ok=false }
+          if (ok) o1.value match {
+              case Some(f)  =>
+                val r = f(x._1,t1,x._2)
+                r._1 match {
+                  case Some(l) => b += ((l, recur(t1,x._2,o1,r._2,r._3)))
+                  case _ =>
+                }
+              case _ =>
+            }
         }
       b.result(u,default)
     }
