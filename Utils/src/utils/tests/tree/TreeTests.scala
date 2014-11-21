@@ -95,7 +95,7 @@ object TreeTests {
   def testFilter1(implicit out:PrintWriter) = out.println(m.filterAll(_._1!="b"))
   
   //tests filterView
-  def testFilter2(implicit out:PrintWriter) = ()/*out.println(m.filterView(_._1!="b"))*/
+  def testFilter2(implicit out:PrintWriter) = out.println(m.filterView(_._1!="b"))
   
   //tests get/apply
   def testGet(implicit out:PrintWriter) = {
@@ -182,7 +182,8 @@ object TreeTests {
   }
   
   def testConstantMap(implicit out:PrintWriter) = {
-    val c = StringTree.constant(3).map[String,StringTree[String]]((_:Int).toString)
+    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
+    val c = StringTree.constant(3).map((_:Int).toString)
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
@@ -203,7 +204,8 @@ object TreeTests {
   }
   
   def testBasicZipStrict(implicit out:PrintWriter) = {
-    val r = m1.zip[String,StringTree[Int],StringTree[String]](m1, true, (t1,t2) =>
+    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
+    val r = m1.zip(m1, true, (t1:StringTree[Int],t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )
     out.println(r)
@@ -223,7 +225,8 @@ object TreeTests {
   
   def testBasicRestrictZipStrict(implicit out:PrintWriter) = {
     //restrict result using m0 instead of full tree
-    val r = m1.zip[String,StringTree[Int],StringTree[String]](m0, true, (t1,t2) =>
+    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
+    val r = m1.zip(m0, true, (t1:StringTree[Int],t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )
     out.println(r)
@@ -235,7 +238,8 @@ object TreeTests {
   
   def testBasicRestrictZip(implicit out:PrintWriter) = {
     //restrict result using m0 instead of full tree
-    val r = m1.zip[String,StringTree[Int],StringTree[String]](m0, false, (t1,t2) =>
+    implicit val b0 = PrefixTree.builder[String,String]  //we have PrefixTree et StringTree builders in view
+    val r = m1.zip(m0, false, (t1:StringTree[Int],t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )
     // /(7) => { d/4 => { a/1, b/2 }, e/5 => { c/3 }, f/6 => { d/4 => { a/1, b/2 }, x/5 => { c/3 } } }
@@ -271,9 +275,10 @@ object TreeTests {
           (Seq("f","d"),op1),
           (Seq("f","d","b"),op3)
       ))
-    val rx = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,FULL_STRICT,opX)
+    implicit val b0 = PrefixTree.builder[String,String]  //we have PrefixTree et StringTree builders in view
+    val rx = m1.zip2(m0,FULL_STRICT,opX)
     out.println(rx)
-    val ry = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,FULL_STRICT,opY)
+    val ry = m1.zip2(m0,FULL_STRICT,opY)
     out.println(ry)
   }
   
@@ -302,9 +307,10 @@ object TreeTests {
       ))
     //note here that f exists but has no op: default is not used, and being not strict, this will
     //not stop the tree exploration. But f won't have any value.
-    val rx = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,NOT_STRICT,opX)
+    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
+    val rx = m1.zip2(m0,NOT_STRICT,opX)
     out.println(rx)
-    val ry = m1.zip2[String,StringTree[Int],PrefixTree[String,O],StringTree[String]](m0,NOT_STRICT,opY)
+    val ry = m1.zip2(m0,NOT_STRICT,opY)
     out.println(ry)
   }
 
@@ -332,10 +338,10 @@ object TreeTests {
           (Seq("f","d"),(op1,opx))
       ))
     //note that f->d has no associated value: the corresponding subtree is excluded (the value becomes the key => no key, no tree...)
-    val rx:PrefixTree[Int,Symbol] = m1.zipFull[StringTree[Int],PrefixTree[String,O],PrefixTree[Int,Symbol],Int,Symbol](m0,opX,"",null,NOT_STRICT)
+    val rx = m1.zipFull(m0,opX,"",null,NOT_STRICT)
     out.println(rx)
     //note that f has no associated value: itself and its full subtree is excluded
-    val ry = m1.zipFull[StringTree[Int],PrefixTree[String,O],PrefixTree[Int,Symbol],Int,Symbol](m0,opY,"",null,NOT_STRICT)
+    val ry = m1.zipFull(m0,opY,"",null,NOT_STRICT)
     out.println(ry)
   }
     

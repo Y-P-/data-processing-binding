@@ -90,16 +90,19 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  def zip2[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:PrefixTreeLike[K,(T,Repr)=>Option[U],_])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    type O = PrefixTreeLike[K,(T,Repr)=>Option[U],_]  //see zipFull
     def recur(tt:T,cur: =>Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x <- cur)
-        if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
+        if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1).asInstanceOf[O]))) } catch { case _:NoSuchElementException => }
       b.result(oo.value.flatMap(_(tt,cur)),null)
     }
     recur(t,this,op)
   }
   
+    type XX[X,+Y] = T0 forSome { type T0 <: PrefixTreeLike[X,Y,T0] }
+
   /** Similar to the previous method, but now we can build a tree of a fully different nature (different keys.)
    *  Note that this operation is the most complex for trees and it allows extensive tree transformations.
    *  @param t   the transformer tree
@@ -110,12 +113,18 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             an operator produces the new key (if None, the node is skipped), new value, new default handler (can of course be null.)
    *  @return the resulting transformed tree
    */
-  def zipFull[T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R],L,U](t:T,op:O,k0:K,default:L=>R,strict:Strictness)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+  def zipFull[L,U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[L,U,R]](t:T,op:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),_],k0:K,default:L=>R,strict:Strictness)(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+    //we should declare a generic O<:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),O]
+    //but doing so prevents generic type inferrence
+    //we cannot declare a recursive type, hence _ is inferred as Any, and not as <:PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),_]
+    //so we will safely cast to O (because we know the return of apply to be of the same type)
+    type O = PrefixTreeLike[K,(K,T,Repr)=>(Option[L],Option[U],L=>R),_]
     def recur(tt:T,cur:Repr,oo:O,u:Option[U],default:L=>R):R = {
       val b=bf.newEmpty
       for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) {
-          val (t1,o1) = try { (tt(x._1),oo(x._1)) } catch { case _:NoSuchElementException => (tt.empty,oo.empty) }
+          val t1:T = try { tt(x._1) } catch { case _:NoSuchElementException => tt.empty }
+          val o1:O = (try { oo(x._1) } catch { case _:NoSuchElementException => oo.empty }).asInstanceOf[O]
           o1.value match {
             case None    =>
             case Some(f) =>
