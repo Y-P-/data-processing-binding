@@ -53,7 +53,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
   def isNonSignificant = value.isEmpty && isEmpty 
-  
+   
   /** Transform this tree with another tree.
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
    *  corresponding sub-node of the transformer tree using the provided `op`.
@@ -153,6 +153,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def recur(u: U, t:(K,Repr)):U = f(t._2.foldLeft(u)(recur),t)
     recur(u0,(k0,this))
   }
+  
   /** As above.
    *  When processing children, access to the parent is handled down.
    *  @param u0 the initial value
@@ -267,6 +268,22 @@ object PrefixTraversableOnce {
     def push(key:K):Unit
     def pull(value:V):Unit
     def pull():Unit
+  }
+  
+  trait X[U,-K,-V] extends PushPull[K,V] {
+    private[this] var k:K = _
+    private[this] var v:Option[V] = _
+    private[this] var s = Seq.empty[U]
+    def f(k:K,v:Option[V],s:Seq[U]):U
+    def push(key:K):Unit   = { k=key; v=null }
+    def pull(value:V):Unit = v=Some(value)
+    def pull():Unit        = s = f(k,v,s) +: s
+    def run() = ()
+  }
+  def toTraversable[K,V]:Traversable[(K,Option[V],Seq[Any])] = new Traversable[(K,Option[V],Seq[Any])] {
+    def foreach[U](f0: ((K,Option[V],Seq[Any]))=>U):Unit = (new X[U,K,V] {
+      def f(k:K,v:Option[V],s:Seq[U]):U = f0(k,v,s.asInstanceOf[Seq[U]])
+    }).run()
   }
   
   /** marker for the PushPull */
