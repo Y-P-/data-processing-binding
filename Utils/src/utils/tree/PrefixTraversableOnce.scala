@@ -57,34 +57,29 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   
   def withActor[U>:V,R,P<:PrefixActor[(K,Repr),U,P,R]](pa:P with PrefixActor[(K,Repr),U,P,R]):R = {
     def recur(cur:Repr,p:P):R = {
-      for (x <- cur) p.onInit(x) match {
-        case null => 
-        case r    => recur(x._2,r) match {
-          case null =>
-          case rr   => p += (x,rr)
+      for (x <- cur)   { val r  = p.onInit(x)
+        if (r!=null)   { val rr = recur(x._2,r)
+          if (rr!=null)  p += (x,rr)
         }
       }
       p.onEnd(cur.value)
     }
     recur(this,pa)
   }
-  def withActorRec[R,P<:PrefixActor[(K,Repr),V,P,R]](k0:K,pa:P with PrefixActor[(K,Repr),V,P,R]):R = {
-    def recur(s:Seq[(K,Repr)],p:P):R = {
-      val cur = s.head._2
-      for (x <- cur) p.onInit(s) match {
-        case null => 
-        case r    => val s1 = x+:s; recur(s1,r) match {
-          case null =>
-          case rr   => p += (s1, rr)
-        }
-      }
-      p.onEnd(cur.value)
+  def withActorRec[R,P<:PrefixActorRec[(K,Repr),P,R]](k0:K,pa:P with PrefixActorRec[(K,Repr),P,R]):R = {
+    def recur(s:Seq[((K,Repr),P)]):R = {
+      val p = s.head._2
+      for (x <- s.head._1._2) p.doIt[P](s,x,recur)
+      p.onEnd(s)
     }
-    recur(Seq((k0,this)),pa)
+    recur(Seq(((k0,this),pa)))
   }
   
   def asTree0[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) = {
     withActor(new Builder)
+  }
+  def asTree1[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) = {
+    withActorRec(null.asInstanceOf[K],new BuilderRec[K,U,R,Repr])
   }
   
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
@@ -438,11 +433,29 @@ object PrefixTraversableOnce {
   }
   
   trait PrefixActor[-X,-V,+P,R] {
-    def onInit(k:X):P
-    def onInit(s:Seq[X]):P = onInit(s.head)
-    def += (k:X,result:R):Unit
-    def += (s:Seq[X],result:R):Unit = += (s.head, result)
+    def onInit(x:X):P
+    def += (x:X,result:R):Unit
     def onEnd(v:Option[V]):R
+    def doIt(x:X,f:(X,P)=>R):Unit = {
+      val r = onInit(x)
+      if (r!=null) {
+        val rr = f(x,r)
+        if (rr!=null)  this += (x,rr)
+      }     
+    }
+  }
+  trait PrefixActorRec[-X,+P,R] {
+    protected[this] type P0>:P
+    def onInit(s:Seq[(X,P0)],x:X):P0
+    def += (s:Seq[(X,P0)],result:R):Unit
+    def onEnd(s:Seq[(X,P0)]):R
+    def doIt[P1<:P0](s:Seq[(X,P0)],x:X,f:Seq[(X,P1)]=>R):Unit = {
+      val r = onInit(s,x)
+      if (r!=null) {
+        val s1 = (x,r)+:s; val rr=f(s1)
+        if (rr!=null) this += (s1, rr)
+      }      
+    }
   }
   
   class Builder[K,V,R<:PrefixTreeLike[K,V,R]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActor[(K,Any),V,Builder[K,V,R],R] {
@@ -450,6 +463,13 @@ object PrefixTraversableOnce {
     def onInit(x:(K,Any)):Builder[K,V,R] = new Builder[K,V,R]
     def += (x:(K,Any),result:R):Unit     = b += ((x._1,result))
     def onEnd(value:Option[V]):R         = b.result(value,null)
+  }
+  class BuilderRec[K,V,R<:PrefixTreeLike[K,V,R],R1<:PrefixTraversableOnce[K,V,R1]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActorRec[(K,R1),BuilderRec[K,V,R,R1],R] {
+    protected[this] type P0=BuilderRec[K,V,R,R1]
+    val b=bf.newEmpty
+    def onInit(s:Seq[((K,R1),P0)],x:(K,R1)):P0 = new BuilderRec[K,V,R,R1]
+    def +=(s:Seq[((K,R1),P0)],result:R):Unit   = b += ((s.head._1._1,result))
+    def onEnd(s:Seq[((K,R1),P0)]):R            = b.result(s.head._1._2.value,null)
   }
 
 }
