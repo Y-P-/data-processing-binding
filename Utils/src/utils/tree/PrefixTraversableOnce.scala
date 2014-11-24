@@ -53,7 +53,29 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
   def isNonSignificant = value.isEmpty && isEmpty 
-   
+  
+  /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
+   */
+  def asTree[U>:V,R<:PrefixTreeLike[K,U,R],O<:PrefixTreeLike[K,K=>R,O]](default:O with PrefixTreeLike[K,K=>R,O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(cur: Repr,oo:O):R = {
+      val b=bf.newEmpty
+      for (x <- cur)
+        try { b += ((x._1, recur(x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
+      b.result(cur.value,oo.value.orNull)
+    }
+    recur(this,default)
+  }  
+  /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
+   */
+  def asTree[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(cur: Repr):R = {
+      val b=bf.newEmpty
+      for (x <- cur) b += ((x._1, recur(x._2)))
+      b.result(cur.value,null)
+    }
+    recur(this)
+  }
+  
   /** Transform this tree with another tree.
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
    *  corresponding sub-node of the transformer tree using the provided `op`.
@@ -67,7 +89,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @return the resulting transformed tree
    */
   def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(tt:T,cur: =>Repr):R = {
+    def recur(tt:T,cur:Repr):R = {
       val b=bf.newEmpty
       for (x <- cur)
         if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
@@ -78,7 +100,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** Same, but creates a view.
    */
   def zipView[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
-    def recur(tt:T,cur: =>Repr):PrefixTraversableOnce.Abstract[K,U] = new PrefixTraversableOnce.Abstract[K,U](op(tt,cur)) {
+    def recur(tt:T,cur:Repr):PrefixTraversableOnce.Abstract[K,U] = new PrefixTraversableOnce.Abstract[K,U](op(tt,cur)) {
       def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = for (x <- cur)
         if (!strict || tt.isDefinedAt(x._1)) try { f((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
     }
@@ -100,7 +122,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @return the resulting transformed tree
    */
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(tt:T,cur: =>Repr,oo:O):R = {
+    def recur(tt:T,cur:Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
@@ -111,7 +133,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** Same, but creates a view.
    */
   def zip2View[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
-    def recur(tt:T,cur: =>Repr,oo:O):PrefixTraversableOnce.Abstract[K,U] = new PrefixTraversableOnce.Abstract[K,U](oo.value.flatMap(_(tt,cur))) {
+    def recur(tt:T,cur:Repr,oo:O):PrefixTraversableOnce.Abstract[K,U] = new PrefixTraversableOnce.Abstract[K,U](oo.value.flatMap(_(tt,cur))) {
       def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = for (x <- cur)
         if (strict.succeeds(tt,oo)(x._1)) try { f((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
     }
