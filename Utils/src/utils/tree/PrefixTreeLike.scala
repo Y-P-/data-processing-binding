@@ -327,13 +327,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  override def zip2[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:PrefixTreeLike[K,(T,Repr)=>Option[U],_])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    type O=PrefixTreeLike[K,(T,Repr)=>Option[U],_]  //see super.zipFull
+  override def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(tt:T,cur:Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
-        if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1).asInstanceOf[O]))) } catch { case _:NoSuchElementException => }
-      b.result(oo.value.flatMap(_(tt,cur)),cur.asDefault(k=>recur(if (!strict.tree_strict || tt.isDefinedAt(k)) tt(k) else tt.params.noDefault(k),cur.default(k),(if (!strict.op_strict || oo.isDefinedAt(k)) oo(k) else oo.params.noDefault(k)).asInstanceOf[O])))
+        if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
+      b.result(oo.value.flatMap(_(tt,cur)),cur.asDefault(k=>recur(if (!strict.tree_strict || tt.isDefinedAt(k)) tt(k) else tt.params.noDefault(k),cur.default(k),(if (!strict.op_strict || oo.isDefinedAt(k)) oo(k) else oo.params.noDefault(k)))))
     }
     recur(t,this,op)
   }
