@@ -18,6 +18,7 @@ import scala.util.Success
 import scala.util.Failure
 import scala.concurrent.Future
 import scala.concurrent.ExecutionContext
+import PrefixTraversableOnce._
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
@@ -52,7 +53,39 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
       
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
-  def isNonSignificant = value.isEmpty && isEmpty 
+  def isNonSignificant = value.isEmpty && isEmpty
+  
+  def withActor[U>:V,R,P<:PrefixActor[(K,Repr),U,P,R]](pa:P with PrefixActor[(K,Repr),U,P,R]):R = {
+    def recur(cur:Repr,p:P):R = {
+      for (x <- cur) p.onInit(x) match {
+        case null => 
+        case r    => recur(x._2,r) match {
+          case null =>
+          case rr   => p += (x,rr)
+        }
+      }
+      p.onEnd(cur.value)
+    }
+    recur(this,pa)
+  }
+  def withActorRec[R,P<:PrefixActor[(K,Repr),V,P,R]](k0:K,pa:P with PrefixActor[(K,Repr),V,P,R]):R = {
+    def recur(s:Seq[(K,Repr)],p:P):R = {
+      val cur = s.head._2
+      for (x <- cur) p.onInit(s) match {
+        case null => 
+        case r    => val s1 = x+:s; recur(s1,r) match {
+          case null =>
+          case rr   => p += (s1, rr)
+        }
+      }
+      p.onEnd(cur.value)
+    }
+    recur(Seq((k0,this)),pa)
+  }
+  
+  def asTree0[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) = {
+    withActor(new Builder)
+  }
   
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    */
@@ -105,6 +138,24 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
         if (!strict || tt.isDefinedAt(x._1)) try { f((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
     }
     recur(t,this)
+  }
+  /** Same, but creates a view.
+   *  Access to all parents of the current element is possible.
+   */
+  def zipViewRec[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:Seq[(T,Repr)]=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
+    def recur(s:Seq[(T,Repr)]):PrefixTraversableOnce.Abstract[K,U] = {
+      new PrefixTraversableOnce.Abstract[K,U](op(s)) {
+        def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = {
+          val cur = s.head
+          for (x <- cur._2)
+            if (!strict || cur._1.isDefinedAt(x._1)) try {
+              val s1 = (cur._1(x._1),x._2) +: s
+              f((x._1, recur(s1)))
+            } catch { case _:NoSuchElementException => }
+        }
+      }
+    }
+    recur(Seq((t,this)))
   }
   
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
@@ -384,6 +435,21 @@ object PrefixTraversableOnce {
   
   abstract class Abstract[K,V](val value:Option[V]) extends Traversable[(K,Abstract[K,V])] with PrefixTraversableOnce[K,V,Abstract[K,V]] {
     this:Abstract[K,V] =>
+  }
+  
+  trait PrefixActor[-X,-V,+P,R] {
+    def onInit(k:X):P
+    def onInit(s:Seq[X]):P = onInit(s.head)
+    def += (k:X,result:R):Unit
+    def += (s:Seq[X],result:R):Unit = += (s.head, result)
+    def onEnd(v:Option[V]):R
+  }
+  
+  class Builder[K,V,R<:PrefixTreeLike[K,V,R]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActor[(K,Any),V,Builder[K,V,R],R] {
+    val b=bf.newEmpty
+    def onInit(x:(K,Any)):Builder[K,V,R] = new Builder[K,V,R]
+    def += (x:(K,Any),result:R):Unit     = b += ((x._1,result))
+    def onEnd(value:Option[V]):R         = b.result(value,null)
   }
 
 }
