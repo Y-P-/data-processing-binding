@@ -66,20 +66,17 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     }
     recur(this,pa)
   }
-  def withActorRec[R,P<:PrefixActorRec[(K,Repr),P,R]](k0:K,pa:P with PrefixActorRec[(K,Repr),P,R]):R = {
-    def recur(s:Seq[((K,Repr),P)]):R = {
-      val p = s.head._2
-      for (x <- s.head._1._2) p.doIt[P](s,x,recur)
-      p.onEnd(s)
-    }
-    recur(Seq(((k0,this),pa)))
+  
+  def withActorRec[R](k0:K,pa:PrefixActorRec[(K,Repr),R,_]):R = {
+    pa.recur((k0,this))
   }
+  
   
   def asTree0[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) = {
     withActor(new Builder)
   }
-  def asTree1[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) = {
-    withActorRec(null.asInstanceOf[K],new BuilderRec[K,U,R,Repr])
+  def asTree1[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    new BuilderRec[K,U,R,Repr].recur((null.asInstanceOf[K],this))
   }
   
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
@@ -436,26 +433,28 @@ object PrefixTraversableOnce {
     def onInit(x:X):P
     def += (x:X,result:R):Unit
     def onEnd(v:Option[V]):R
-    def doIt(x:X,f:(X,P)=>R):Unit = {
-      val r = onInit(x)
-      if (r!=null) {
-        val rr = f(x,r)
-        if (rr!=null)  this += (x,rr)
-      }     
-    }
   }
-  trait PrefixActorRec[-X,+P,R] {
-    protected[this] type P0>:P
-    def onInit(s:Seq[(X,P0)],x:X):P0
-    def += (s:Seq[(X,P0)],result:R):Unit
-    def onEnd(s:Seq[(X,P0)]):R
-    def doIt[P1<:P0](s:Seq[(X,P0)],x:X,f:Seq[(X,P1)]=>R):Unit = {
-      val r = onInit(s,x)
-      if (r!=null) {
-        val s1 = (x,r)+:s; val rr=f(s1)
-        if (rr!=null) this += (s1, rr)
-      }      
+  
+  trait PrefixActorRec[-X,+R,+P] { this:P=>
+    protected[this] type P0=P
+    
+    protected[this] def i(x:X):Iterable[X]
+    protected[this] def onInit(s:Seq[(X,P)],x:X):P0
+    protected[this] def += (s:Seq[(X,P)],result:R):Unit
+    protected[this] def onEnd(s:Seq[(X,P)]):R
+    
+    protected[this] def recur(s:Seq[(X,P)]):R = {
+      val p = s.head._2
+      i(s.head._1).foreach { x=>
+        val r = onInit(s,x)
+        if (r!=null) {
+          val s1 = (x,r)+:s; val rr=recur(s1)
+          if (rr!=null) this += (s1, rr)
+        }      
+      }
+      onEnd(s)
     }
+    def recur(x:X):R = recur(Seq((x,this)))
   }
   
   class Builder[K,V,R<:PrefixTreeLike[K,V,R]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActor[(K,Any),V,Builder[K,V,R],R] {
@@ -464,13 +463,32 @@ object PrefixTraversableOnce {
     def += (x:(K,Any),result:R):Unit     = b += ((x._1,result))
     def onEnd(value:Option[V]):R         = b.result(value,null)
   }
-  class BuilderRec[K,V,R<:PrefixTreeLike[K,V,R],R1<:PrefixTraversableOnce[K,V,R1]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActorRec[(K,R1),BuilderRec[K,V,R,R1],R] {
-    protected[this] type P0=BuilderRec[K,V,R,R1]
-    val b=bf.newEmpty
-    def onInit(s:Seq[((K,R1),P0)],x:(K,R1)):P0 = new BuilderRec[K,V,R,R1]
-    def +=(s:Seq[((K,R1),P0)],result:R):Unit   = b += ((s.head._1._1,result))
-    def onEnd(s:Seq[((K,R1),P0)]):R            = b.result(s.head._1._2.value,null)
+  class BuilderRec[K,+V,+R<:PrefixTreeLike[K,V,R],R1<:PrefixTraversableOnce[K,V,R1]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActorRec[(K,R1),R,BuilderRec[K,V,R,R1]] {
+    protected[this] type S = Seq[((K,R1),BuilderRec[K,V,R,R1])]
+    protected[this] val b=bf.newEmpty
+    protected[this] def i(x:(K,R1)):Iterable[(K,R1)] = x._2.toIterable
+    protected[this] def onInit(s:S,x:(K,R1)):P0 = new BuilderRec[K,V,R,R1]
+    protected[this] def +=(s:S,result:R):Unit   = b += ((s.head._1._1,result))
+    protected[this] def onEnd(s:S):R            = b.result(s.head._1._2.value,null)
   }
+  
+  abstract class UU[K,-V,R] extends scala.collection.Seq[(K,UU[K,V,R])] with PushPull[K,V] with PrefixActorRec[K,R,UU[K,V,R]] {
+    protected[this] var v:Option[V] = None
+    /*
+    def push(key:K):Unit   = onInit(s,key)
+    def pull(value:V):Unit = v = Some(value)
+    def pull():Unit        = s.head._2.+=(s,onEnd(s))
+    
+    protected[this] def i(x:K):Iterable[K] = null
+    protected[this] def onInit(s:S,x:K):P0 = new UU((x,this)+:s)
+    protected       def += (s:S,result:R):Unit
+    protected[this] def onEnd(s:S):R    */
+ //   def rcv() = head._2.+=(this,onEnd(this))
+    
+    def iterator: Iterator[(K, UU[K,V,R])] = ???
+    def apply(idx: Int): (K, UU[K,V,R]) = ???
+    def length: Int = ???     
+  }  
 
 }
 
