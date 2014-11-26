@@ -76,7 +76,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     withActor(new Builder)
   }
   def asTree1[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    new BuilderRec[K,U,R,Repr].recur((null.asInstanceOf[K],this))
+    null.asInstanceOf[R] //new BuilderRec[K,U,R,Repr].recur((null.asInstanceOf[K],this))
   }
   
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.

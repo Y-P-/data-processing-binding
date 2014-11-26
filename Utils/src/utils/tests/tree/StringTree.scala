@@ -16,26 +16,27 @@ abstract class StringTree[+V] extends PrefixTree[String,V] with PrefixTreeLike[S
 object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
   type Tree[+v] = StringTree[v]
   type P0[+v]   = Params[v,Tree[v]]
-
-		  /** The second implementation for navigable trees. Unsafe 
-		   */
-		  protected class Navigable[V](override val value:Option[V], override val tree:Map[K,StringTree[V]], override val default:K=>StringTree[V])(implicit val params:P0[V])
-		                     extends StringTree[V] with super.Abstract[V] with PrefixTreeLikeBuilder.Navigable[K, V, StringTree[V]]
-		  
-		  /** The second implementation for navigable trees. Safe 
-		   */
-		  protected class Navigable1[V](value:Option[V], data:Iterable[(K,StringTree[V])], default0:K=>StringTree[V])(implicit params:P0[V])
-		                     extends Navigable[V](value,null,default0) {
-		    override val tree = params.emptyMap ++ (data.map(x=>(x._1,rebuild(x._2))))
-		    override val default = (k:K) => rebuild(default0(k))
-		    def rebuild(t:StringTree[V]):StringTree[V] = if (t.isNavigable) { val r=new Navigable(t.value,t.tree,t.default); r.parent0=this; r } else t
-		    override def initNav() = ()
-		  }
+  
   /** The full actual StringTree class used. It is designed to be sub-classed to minimize memory footprint.
    */
-  protected class Abstract[V](implicit val params:P0[V]) extends StringTree[V] with super.Abstract[V] {
+  class Abstract[V](implicit val params:P0[V]) extends StringTree[V] with super.Abstract[V] {
     def tree: Map[K,Repr] = params.emptyMap    
     override def isNonSignificant = false
+  }
+
+  /** The second implementation for navigable trees. Unsafe 
+   */
+  protected class Navigable[V](override val value:Option[V], override val tree:Map[K,StringTree[V]], override val default:K=>StringTree[V])(implicit params:P0[V])
+                     extends Abstract[V] with PrefixTreeLikeBuilder.Navigable[K, V, StringTree[V]]
+  
+  /** The second implementation for navigable trees. Safe 
+   */
+  protected class Navigable1[V](value:Option[V], data:Iterable[(K,StringTree[V])], default0:K=>StringTree[V])(implicit params:P0[V])
+                     extends Navigable[V](value,null,default0) {
+    override val tree = params.emptyMap ++ (data.map(x=>(x._1,rebuild(x._2))))
+    override val default = (k:K) => rebuild(default0(k))
+    def rebuild(t:StringTree[V]):StringTree[V] = if (t.isNavigable) { val r=new Navigable(t.value,t.tree,t.default); r.parent0=this; r } else t
+    override def initNav() = ()
   }
   
   protected class Ref[V](valuex:Option[V], defaultx:Option[K=>StringTree[V]], originx: => StringTree[V], val path:Seq[K])(implicit params:P0[V]) extends Abstract[V] with PrefixTreeLikeBuilder.Ref[K,V,StringTree[V]] {

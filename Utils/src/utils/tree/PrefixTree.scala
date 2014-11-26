@@ -30,11 +30,18 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
   type Tree[k,+v] = PrefixTree[k, v]
   type P0[k,+v]   = Params[k,v,PrefixTree[k, v]]
   
+  /** The non navigable PrefixTree class used. It is designed to be sub-classed to minimize memory footprint.
+   */
+  class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V] {
+    def tree: Map[K,Repr] = params.emptyMap
+    override def isNonSignificant = false
+  }
+  
   /** The first implementation for navigable trees. Unsafe.
    *  Default values usually are unsafe to navigate upwards.
    */
-  protected class Navigable[K,V](override val value:Option[V], override val tree:Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V])(implicit val params:P0[K,V])
-                      extends PrefixTree[K, V] with super.Abstract[K,V] with PrefixTreeLikeBuilder.Navigable[K, V, PrefixTree[K, V]]
+  protected class Navigable[K,V](override val value:Option[V], override val tree:Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V])(implicit params:P0[K,V])
+                      extends Abstract[K,V] with PrefixTreeLikeBuilder.Navigable[K, V, PrefixTree[K, V]]
   
   /** The second implementation for navigable trees. Safe.
    *  Even default values will have a correct parent if they return an element isNavigable.
@@ -45,13 +52,6 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
     override val default = (k:K) => rebuild(default0(k))
     def rebuild(t:PrefixTree[K,V]):PrefixTree[K,V] = if (t.isNavigable) { val r=new Navigable(t.value,t.tree,t.default); r.parent0=this; r } else t
     override def initNav() = ()
-  }
-  
-  /** The non navigable PrefixTree class used. It is designed to be sub-classed to minimize memory footprint.
-   */
-  protected class Abstract[K,V](implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V] {
-    def tree: Map[K,Repr] = params.emptyMap
-    override def isNonSignificant = false
   }
   
   /** Note that references prevent navigation : a referenced child would have more than one parent.
