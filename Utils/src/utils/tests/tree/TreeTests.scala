@@ -6,7 +6,7 @@ import java.io.PrintWriter
 import utils.LogTester._
 import org.junit.Test
 import scala.collection.GenTraversableOnce
-import utils.tree.PrefixTraversableOnce.PullAdapter
+import utils.tree.PushPull.PullAdapter
 import scala.concurrent.Await
 
 /** Tests on trees.
@@ -16,7 +16,7 @@ import scala.concurrent.Await
  */
 object TreeTests {
   // test stripEmpty
-  
+
   import scala.language.implicitConversions
   /*
    * Testing with tree:
@@ -72,37 +72,37 @@ object TreeTests {
     c13 = StringTree(6,Seq("d"->c11,"x"->c12),f2)
     m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13),f3)
     (m,Array(m,c1,c2,c3,c11,c12,c13)) //an array for mapping operation from Int => StringTree[Int]
-  }  
-  
+  }
+
   val amap = Array(m,c1,c2,c3,c11,c12,c13) //an array for mapping operation from Int => StringTree[Int]
-  
+
   def mapper(i:Int) = amap(i-1).seqView()
   def mapper1(i:Int) = amap(i-1)
-  
+
   //tests the toString operation
   def testPrint(implicit out:PrintWriter) = out.println(m)
-  
+
   //tests the map operation to PrefixTree[String,String]
   def testMap1(implicit out:PrintWriter)  = out.println(m.map[String,PrefixTree[String,String]]((_:Int).toString+"y"))
-  
+
   //tests the map operation to StringTree[String]
   def testMap2(implicit out:PrintWriter)  = out.println(m.map[String,StringTree[String]]((_:Int).toString+"y"))
-  
+
   //tests the map operation to PrefixTree[Int,String] (full mapping of key and value)
   def testMap3(implicit out:PrintWriter)  = out.println(m.mapFull[Int,String,PrefixTree[Int,String]](_(0)-'a',null,_.toString+"y"))
-  
+
   //tests filterAll
   def testFilter1(implicit out:PrintWriter) = out.println(m.filterAll(_._1!="b"))
-  
+
   //tests filterView
   def testFilter2(implicit out:PrintWriter) = out.println(m.filterView(_._1!="b"))
-  
+
   //tests get/apply
   def testGet(implicit out:PrintWriter) = {
     out.println(m.get("d"))
     out.println(m("d"))
   }
-  
+
   //tests get/apply on SeqView
   def testGetSeq(implicit out:PrintWriter) = {
     val v = m.seqView()
@@ -112,13 +112,13 @@ object TreeTests {
     out.println(v.get("d","a","c"))
     out.printExc(v("d","a","c"))
   }
-  
+
   //tests seqView
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
-  
+
   //tests FlatMap for SeqView
   def testSeqFlatMap(implicit out:PrintWriter) = StringTree.fromFlat(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
-  
+
   //tests FlatMap for SeqView
   def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _).seqView().foreach(out.println)
 
@@ -156,7 +156,7 @@ object TreeTests {
     out.println(m2("d")("a")("a").value)       //apply flatMap on f1("a")=c1 => old top (7)
     out.println(m2("d")("a")("o").value)       //apply flatMap on f1("o")=old top => c13 (6)
   }
-  
+
   def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.fromFlat(Seq(
       (Seq("x","y"),1),
       (Seq("x","y","z"),2),
@@ -166,7 +166,7 @@ object TreeTests {
       (Seq("z","a","b"),6),
       (Seq("z"),7)
     )))
-    
+
   def testConstant(implicit out:PrintWriter) = {
     val c = StringTree.constant(3)
     //test that constant works
@@ -180,7 +180,7 @@ object TreeTests {
     out.println(c1("a"))
     out.println(c1("a")("b")("c"))
   }
-  
+
   def testConstantMap(implicit out:PrintWriter) = {
     implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
     val c = StringTree.constant(3).map((_:Int).toString)
@@ -188,7 +188,7 @@ object TreeTests {
     out.println(c("a"))
     out.println(c("a")("b")("c"))
   }
-  
+
   def testBasicZip(implicit out:PrintWriter) = {
     val r = m1.zip[String,StringTree[Int],StringTree[String]](m1, false, (t1,t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
@@ -202,7 +202,7 @@ object TreeTests {
     out.println(r("f","d","a"))
     out.println(r("f","d","a","x"))
   }
-  
+
   def testBasicZipStrict(implicit out:PrintWriter) = {
     implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
     val r = m1.zip(m1, true, (t1:StringTree[Int],t2) =>
@@ -222,7 +222,7 @@ object TreeTests {
     out.println(r("d","a"))
     out.println(r("d","b"))
   }
-  
+
   def testBasicRestrictZipStrict(implicit out:PrintWriter) = {
     //restrict result using m0 instead of full tree
     implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
@@ -235,7 +235,7 @@ object TreeTests {
     out.println(r("d","a"))  // a in m0(d)
     out.printExc(r("d","b")) // b not in m0(d)
   }
-  
+
   def testBasicRestrictZip(implicit out:PrintWriter) = {
     //restrict result using m0 instead of full tree
     implicit val b0 = PrefixTree.builder[String,String]  //we have PrefixTree et StringTree builders in view
@@ -250,11 +250,11 @@ object TreeTests {
     out.println(r("d","a"))      // a in m0(d)
     out.println(r("f"))          // f in m0
     out.println(r("f","d"))      // d in m0(f)
-    out.println(r("f","d","b"))  // b in m0(f,d) 
+    out.println(r("f","d","b"))  // b in m0(f,d)
     out.println(r("d","d"))      // d->d not in m0(d) but defaults to m, d not in m1(d) but defaults to c1 through f4
     out.println(r("d","b","d"))  // that's hotter: in m1, d->b->b=m (following defaults), in m0 this gives c11 (again following defaults)
   }
-  
+
   def testZip2(implicit out:PrintWriter) = {
     //in zip2, we concentrate on checking that the right method is called
     type O = (StringTree[Int],StringTree[Int])=>Option[String]
@@ -281,7 +281,7 @@ object TreeTests {
     val ry = m1.zip2(m0,FULL_STRICT,opY)
     out.println(ry)
   }
-  
+
   def testZip2NonStrictAndFromFlatWithDefault(implicit out:PrintWriter) = {
     //in zip2, we concentrate on checking that the right method is called
     type O = (StringTree[Int],StringTree[Int])=>Option[String]
@@ -289,9 +289,9 @@ object TreeTests {
     val op2:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"$v1*$v2"
     val op3:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"${(v1+v2)}"
     val opc:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"$v1%$v2"
-    
+
     val opx = PrefixTree.constant[String,O](opc)
-    
+
     val opX = PrefixTree.fromFlat2(Seq(
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(null,null)),
@@ -318,14 +318,18 @@ object TreeTests {
     //in zipFull, we do a similar transformation as above, but replace the key with the Int value and Strings with Symbols.
     //the result should be close to the previous one, thus easily comparable.
     //this is far from testing all possibilities, but its a good start.
+    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],F)]=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol]))
     type O = Seq[(String,StringTree[Int],StringTree[Int])]=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol])
-    val op1:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1+$v2"),null)}
-    val op2:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1*$v2"),null)}
+    val op1:F = new F { def apply(s:Seq[(String,StringTree[Int],StringTree[Int],F)])= {
+        val cur=s.head; val t2=cur._3; val t1=cur._2; val o=cur._4
+        (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1+$v2"),null)
+        }}
+/*    val op2:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1*$v2"),null)}
     val op3:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${(v1+v2)}"),null)}
     val opc:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1%$v2"),null)}
-    
+
     val opx = PrefixTree.constant[String,O](opc)
-    
+
     val opX = PrefixTree.fromFlat2(Seq(
           (Seq(),(op1,opx)),
           (Seq("d"),(op1,opx)),
@@ -344,9 +348,9 @@ object TreeTests {
     out.println(rx)
     //note that f has no associated value: itself and its full subtree is excluded
     val ry = m1.zipFull("",NOT_STRICT,m0,opY)
-    out.println(ry)
+    out.println(ry)*/
   }
-    
+
   def testForeach(implicit out:PrintWriter) = {
     import out.print
     type O = (Seq[(String,StringTree[Int])],Iterator[Unit])=>Unit
@@ -392,12 +396,12 @@ object TreeTests {
     }
     out.println
   }
-  
+
   def testPushPull(implicit out:PrintWriter) = {
     import scala.concurrent.duration._
     import scala.concurrent.ExecutionContext
     implicit val executionContext = ExecutionContext.global
-    val (s,r) = PrefixTraversableOnce[Unit,String,String] { (t,r)=>
+    val (s,r) = PushPull[Unit,String,String] { (t,r)=>
       out.print(s"${t._1}={")
       val i=r.foldLeft(0)((i,u)=>i+1)
       out.print(s"}(${if(t._2.value!=None) t._2.value.get else ""})[$i]")
@@ -422,7 +426,7 @@ object TreeTests {
     s.pull
     Await.result(r, 10 millis)
   }
-    
+
   @Test class TreeTest extends StandardTester {
     def apply(file:Solver,out:PrintWriter) = {
       implicit val o = out
@@ -456,7 +460,6 @@ object TreeTests {
       t(testPushPull)
       //navigable
       //navigables in zip/other operations
-      //foreach
       //references
       //references in zip/other operations
       //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)

@@ -6,25 +6,23 @@ import scala.collection.AbstractIterator
 import scala.collection.AbstractIterable
 import scala.collection.GenTraversableOnce
 import scala.collection.GenTraversable
-import scala.collection.generic.CanBuildFrom
 import scala.collection.generic.Subtractable
 import scala.collection.mutable.ArrayBuffer
 import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
-import java.util.NoSuchElementException
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optional in intermediary nodes, but a well formed tree should not have
  *  empty leaves. Using the methods with (GenTraversable[K],V) parameters (flat view of the tree) rely
  *  on that property (they will omit to output such degenerate branches, and will not build them.)
- *  
+ *
  *  Operations on trees are not to take lightly ; the recursive nature of trees usually involves that
  *  any transformation be done by rebuilding it. This is even true of the withFilter operation : at this
  *  stage, there is yet no `view` for trees.
- *  
+ *
  *  The `default` operation usually suggests that it can handle any other value not listed in the
  *  iterable part of the tree. It itself defaults on a generic (but user provided) method.
- *  
+ *
  *  There are usually three kinds of trees, in ascending order of complexity, memory footprint, building speed:
  *  - Standard trees provide no way to ascend into the tree.
  *  - Weak Navigable trees allow access to the parent, BUT it relies on mutation and may sometimes be
@@ -33,7 +31,7 @@ import java.util.NoSuchElementException
  *  - Strong Navigable trees are just like weak navigable trees, but nodes are always rebuilt on assignment.
  *    In particular, these tree nodes always correctly point to the right parent. However, the building
  *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
- *    
+ *
  *    @tparam K the key type
  *    @tparam V the contained value type
  *    @tparam This the prefix tree type
@@ -44,15 +42,15 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
      with IterableLike[(K, This), This]
      with Subtractable[K, This]
      with Equals { self:This =>
-      
+
   /** The general parameters used for building the tree.
    */
   type Params <: PrefixTreeLike.Params[K,V,Repr]
   def params:Params
-  
+
   /** The value for the current node */
   def value: Option[V]
-  
+
   /** Defines the default value computation for the tree, returned when a key is not found.
    *  It can be null, in which case a fallback default (usually an exception) is used.
    *  This is assumed to throw `NoSuchElementException` when it doesn't handle a given key.
@@ -60,20 +58,20 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param key the given key value for which a binding is missing.
    */
   def default: K=>Repr = null
-  
+
   //an internal utility to correctly rebuild default when necessary
   @inline final protected def asDefault[L,T](f:L=>T):L=>T = if (default==null) null else f
-  
+
   /** The empty tree of the same type as this tree
    *  @return   an empty tree of type `This`.
    */
   def empty: Repr = newBuilder(None,Nil,null)
-  
+
   /** A new instance of builder similar to the one used to build this tree element.
    *  It can be used to build elements of the same tree kind.
    */
   protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
-  
+
   /** rebuilds this tree with a specific default */
   final def withDefault[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](default:K=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withDefault(this, default)
   /** rebuilds this tree with a specific value */
@@ -85,14 +83,14 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     e
   }
 
-  
+
   /** tells if the two following method should work with no exception */
   def isNavigable:Boolean = false
   /** the parent of that PrefixTree ; this is not required and usually makes the implementation heavier */
   def parent:Repr = throw new NotImplementedError(s"parent is not accessible in that implementation: $getClass")
   /** the depth within the tree ; this is not required and usually makes the implementation heavier */
   def depth:Int   = throw new NotImplementedError(s"depth is not accessible in that implementation: $getClass")
-  
+
   /** Removes a key from this tree, returning a new tree.
    *  @param    key the key to be removed
    *  @return   a new tree without a binding for `key`
@@ -101,7 +99,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *    @inheritdoc
    */
   def - (key: K): Repr
-  
+
   /** Adds a key/(value,tree) pair to this tree, returning a new tree.
    *  Enlarge subtrees without losing information is usualy the expected operation on trees.
    *  @param    kv the (key,subtree) pair
@@ -128,7 +126,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *          or `None` if none exists.
    */
   def get(key: K): Option[Repr]
-  
+
   /** Retrieves the value which is associated with the given key. This
    *  method invokes the `default` method of the tree if there is no mapping
    *  from the given key to a value. Unless overridden, the `default` method throws a
@@ -138,19 +136,21 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return     the value associated with the given key, or the result of the
    *              tree's `default` method, if none exists.
    */
+  @throws(classOf[java.util.NoSuchElementException])
   def apply(key: K): This = get(key) match {
     case None => if (default!=null) default(key) else params.noDefault(key)
     case Some(value) => value
   }
-  
+
   /** As apply above, but for a succession of keys.
    */
+  @throws(classOf[java.util.NoSuchElementException])
   def apply(keys: K*): This = { var r=this; keys.foreach(x=>r=r(x)); r}
-  
+
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
   override def isNonSignificant = value.isEmpty && isEmpty && default==null
-  
+
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
    *  @return an immutable tree consisting only of those key where the key satisfies
@@ -158,7 +158,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *          removed now fall back on the default method.
    */
   def filterKeys(p: K => Boolean): This = filterAll(x => p(x._1))
-  
+
   /** Filters this map by retaining only key/value satisfying a predicate.
    *  @param  p   the predicate used to test key/value
    *  @return an immutable tree consisting only of those items which satisfy
@@ -170,13 +170,13 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     if (!isEmpty) for (x:(K,Repr) <- this if p(x)) bf += ((x._1,x._2.filterAll(p)))
     bf.result(value,default)
   }
-  
+
   /** Similar to the previous method, but the result is a view and doesn't rebuild
    *  a new tree. Such views are only useful when relatively few elements are used ;
-   *  in other cases, it may be more performant to use filterAll. 
+   *  in other cases, it may be more performant to use filterAll.
    */
   def filterView(p: ((K,Repr)) => Boolean): PrefixTreeLike[K,V,_] = new WithFilter(p)
-  
+
   /** This class yields a filtered view of the current tree.
    *  Default apply and may be filtered : in that case they fall back on the noDefault method.
    *  Some operations will not work on views, in particular all methods that return Repr.
@@ -225,7 +225,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Tests whether this tree contains a binding for a key. This method,
    *  which implements an abstract method of trait `PartialFunction`,
-   *  is equivalent to `contains`. Note that the default function doesn't 
+   *  is equivalent to `contains`. Note that the default function doesn't
    *  qualify for the success of `isDefinedAt` in the standard implementation.
    *  However it is possible to overload this method to account for the values
    *  covered by the default.
@@ -234,7 +234,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return    `true` if there is a binding for `key` in this tree, `false` otherwise.
    */
   def isDefinedAt(key: K): Boolean = contains(key)
-  
+
   def seq: Repr = this
 
   /** The implementation class of the set returned by `keySet`.
@@ -256,7 +256,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     def hasNext = iter.hasNext
     def next() = iter.next()._1
   }
-  
+
   /** Creates an iterator for all values in this tree.
    *  @return an iterator over all values that are associated with some key in this tree.
    */
@@ -273,12 +273,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     override def size = self.size
     override def foreach[C](f: Repr => C) = iterator.foreach(f)
   }
-  
+
   /** Collects all keys of this tree in a set.
    * @return  a set containing all keys of this tree.
    */
   def keySet: Set[K] = new DefaultKeySet
-  
+
   /** Returns an iterable over the defined values.
    */
   def values:Iterable[Repr] = new DefaultValuesIterable
@@ -290,7 +290,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def orElse[W>:V, T>:Repr<:PrefixTreeLike[K,W,T]](that: T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
     bf(value,that ++ this,default)
-  
+
   /** Transform this tree with another tree.
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
    *  corresponding sub-node of the transformer tree using the provided `op`.
@@ -312,7 +312,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     }
     recur(t,this)
   }
-  
+
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
    *  'in parallel' too.
    *  Default values for both trees are used but exceptions will end the transformation ungracefully.
@@ -321,7 +321,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  zip above can be expressed here by using a constant op tree ; various map operations can be expressed by
    *  zipping a tree with itself etc...
    *  @param t   the transformer tree
-   *  @param strict is true if we don't accept the use of default values for the second tree or op tree for 
+   *  @param strict is true if we don't accept the use of default values for the second tree or op tree for
    *                defined values in the first tree : in that case we fall back on the zipped default : this
    *                usually only makes sense if the T.noDefault or O.noDefault is an error or similar answer (e.g. empty)
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
@@ -359,15 +359,15 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     }
     bf.result(value.map(f),asDefault(default(_:K).map(f)))
   }
-  
+
   /** The clone of this tree is the same tree using the same builder, cloning each sub-tree
    */
   override def clone:Repr = {
     val bf = newBuilder
-    for (x <- this) bf += ((x._1,x._2.clone))    
+    for (x <- this) bf += ((x._1,x._2.clone))
     bf.result(value,default)
   }
-  
+
   /** Transforms this tree by applying a function to every retrieved value and key.
    *  It works also on default values, but be aware that using deep trees
    *  in the default results may lead to a severe performance load.
@@ -376,7 +376,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *            and in that case, f._2 must be given ; otherwise it can be null
    *            and bijectivity is not compulsory
    *  @return a tree which maps every element of this tree.
-   *          The resulting tree is a new tree. 
+   *          The resulting tree is a new tree.
    */
   def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
     if (!isEmpty) {
@@ -385,7 +385,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     }
     bf.result(value.map(f._3), asDefault((l:L)=>default(f._2(l)).mapFull(f)))
   }
-  
+
   /** Transforms this tree by applying a function to every key.
    *  It works also on default values, but be aware that using deep trees
    *  in the default results may lead to a severe performance load.
@@ -400,7 +400,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     }
     bf.result(value, asDefault((l:L)=>default(f._2(l)).mapKeys[L,W,T](f)))
   }
-  
+
   /** Transforms this tree by applying a function to every retrieved value.
    *  It works also on default values.
    *  This is a non intuitive transformation that should be handled with care.
@@ -423,7 +423,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     }
     bf.result(e.value, asDefault(default(_:K).flatMap[W,T](f)))
   }
-  
+
   /** Creates a new tree obtained by updating this tree with a given key/value pair.
    *  @param    kv the key/value pair
    *  @tparam   L the type of the new keys
@@ -431,11 +431,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return   A new tree with the new key/value mapping added to this map.
    */
   def update1[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T
-  
+
   /** Identical to the previous method, but more than one element is updated.
    */
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T)*)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv)
-  
+
   /** Identical to the previous method, but elements are passed through an iterable like rather than a built Seq.
    */
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
@@ -491,21 +491,21 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     copyToBuffer[C](result)
     result
   }
-  
+
   /** Creates the canonical flat representation of the tree.
    *  Working with this supposes that your tree doesn't use degenerate branches (with no children and no value,
    *  i.e. with empty as a node somewhere in the tree)
    *  @return the canonical view of the tree
    */
   def seqView(topFirst:Boolean=true,trackDuplicate:Boolean=false) = new SeqView(topFirst,trackDuplicate)
-  
+
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
    *  @param topFirst is true if an element appears before its children, false otherwise
    *  @param seen is a set that is updated to track internal cross references ; if null, no such tracking happens (performance gain, but infinite loops possible)
    */
   protected class TreeIterator(cur:Seq[K],topFirst:Boolean,seen:scala.collection.mutable.Set[Repr]) extends AbstractIterator[(Seq[K], Repr)] {
-    if (seen!=null) seen.add(repr)                             //remember that this tree is already being processed, to avoid loops in trees containing self-references 
+    if (seen!=null) seen.add(repr)                             //remember that this tree is already being processed, to avoid loops in trees containing self-references
     protected[this] val iter = iterator                        //iterator for this level
     protected[this] var i:Iterator[(Seq[K], Repr)] = getSub    //current sub-iterator
     protected[this] var done:Boolean = false                   //true when this item has been provided
@@ -532,7 +532,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
         null                                                   //return null when finished
     }
   }
-  
+
   /** The Tree can conveniently be viewed almost as a 'Map' with sequences of keys as key.
    *  This is very convenient to iterate through it.
    *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
@@ -555,12 +555,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     /** Transforms this seqView by applying a function to every retrieved value and key.
      *  @param  f the function used to transform the keys and values of this tree.
      *  @return a tree which maps every element of this tree.
-     *          The resulting tree is a new tree. 
+     *          The resulting tree is a new tree.
      */
     def flatMap[W](f:V=>GenTraversable[(GenTraversable[K],W)]):GenTraversable[(GenTraversable[K],W)] =
       for (x <- iterator.toTraversable; r <- f(x._2)) yield ((x._1 ++ r._1, r._2))
   }
-  
+
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
    *  The written text begins with the string `start` and ends with the string `end`.
    *  Inside, the string representations of all bindings of this tree.
@@ -589,14 +589,14 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
 object PrefixTreeLike {
   type Gen[K,V] = PrefixTreeLike[K,V,_<:PrefixTreeLike[K,V,_]]
-  
+
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
-  
+
   sealed class NavigableMode(val id:Int)
   val nonNavigable    = new NavigableMode(0)
   val unsafeNavigable = new NavigableMode(1)
   val safeNavigable   = new NavigableMode(2)
-  
+
   /** The minimum for building the Params used by the Tree implementation.
    */
   class Params[K,+V,+T<:PrefixTreeLike[K,V,T]] (
@@ -617,7 +617,7 @@ object PrefixTreeLike {
      */
     val navigable:NavigableMode
   )
-  
+
   /** An abstract class for the trait. Used to share code.
    */
   abstract class Abstract[K, +V, +This <: PrefixTreeLike[K, V, This]] extends AbstractPartialFunction[K, This] with PrefixTreeLike[K, V, This] { this:This=>
@@ -710,7 +710,7 @@ def apply(from: From): Builder[Elem, To]
     else {
       val t = get(x) match {
         case None    => throw new NullPointerException //builder.empty(None)
-        case Some(m) => m 
+        case Some(m) => m
       }
       val t1 = t.add[V1,T](keys.tail,tree)
       this +[V1,T] ((x,t1))
@@ -735,7 +735,7 @@ def apply(from: From): Builder[Elem, To]
       else                              repr.updated(x,r)
     }
   }
-  
+
   /** provides a global iterator ; that iterator is used to visit the whole sub-trees */
   def seqIterator(topFirst:Boolean):Iterator[(Seq[K], This)] = new TreeIterator(Nil,topFirst)
   /** flattens the tree to it's canonical state. */

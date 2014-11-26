@@ -1,37 +1,18 @@
 package utils.tree
 
-import scala.collection.TraversableLike
-import scala.collection.AbstractSet
-import scala.collection.AbstractIterator
-import scala.collection.AbstractIterable
-import scala.collection.GenTraversableOnce
-import scala.collection.GenTraversable
-import scala.collection.generic.CanBuildFrom
-import scala.collection.generic.Subtractable
-import scala.collection.mutable.ArrayBuffer
-import scala.collection.mutable.ArrayStack
-import scala.annotation.tailrec
-import scala.runtime.AbstractPartialFunction
-import java.util.NoSuchElementException
-import scala.collection.IterableLike
-import scala.util.Success
-import scala.util.Failure
-import scala.concurrent.Future
-import scala.concurrent.ExecutionContext
-import PrefixTraversableOnce._
 
 /** Describes a tree where data is reached through a succession of keys.
  *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
  *  empty leaves. Using the methods with (GenTraversable[K],V) parameters (flat view of the tree) rely
  *  on that property (they will omit to output such degenerate branches, and will not build them.)
- *  
+ *
  *  Operations on trees are not to take lightly ; the recursive nature of trees usually involves that
  *  any transformation be done by rebuilding it. This is even true of the withFilter operation : at this
  *  stage, there is yet no `view` for trees.
- *  
+ *
  *  The `default` operation usually suggests that it can handle any other value not listed in the
  *  iterable part of the tree. It itself defaults on a generic (but user provided) method.
- *  
+ *
  *  There are usually three kinds of trees, in ascending order of complexity, memory footprint, building speed:
  *  - Standard trees provide no way to ascend into the tree.
  *  - Weak Navigable trees allow access to the parent, BUT it relies on mutation and may sometimes be
@@ -47,49 +28,26 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   protected[this] type Repr = This
   type Key = K
   type Value <: V
-  
+
   /** The value for the current node */
   def value: Option[V]
-      
+
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
   def isNonSignificant = value.isEmpty && isEmpty
-  
-  def withActor[U>:V,R,P<:PrefixActor[(K,Repr),U,P,R]](pa:P with PrefixActor[(K,Repr),U,P,R]):R = {
-    def recur(cur:Repr,p:P):R = {
-      for (x <- cur)   { val r  = p.onInit(x)
-        if (r!=null)   { val rr = recur(x._2,r)
-          if (rr!=null)  p += (x,rr)
-        }
-      }
-      p.onEnd(cur.value)
-    }
-    recur(this,pa)
-  }
-  
-  def withActorRec[R](k0:K,pa:PrefixActorRec[(K,Repr),R,_]):R = {
-    pa.recur((k0,this))
-  }
-  
-  
-  def asTree0[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) = {
-    withActor(new Builder)
-  }
-  def asTree1[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    null.asInstanceOf[R] //new BuilderRec[K,U,R,Repr].recur((null.asInstanceOf[K],this))
-  }
-  
+
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
+   *  You can provide defaults, and error when fetching defaults are ignored (no default in such cases.)
    */
   def asTree[U>:V,R<:PrefixTreeLike[K,U,R],O<:PrefixTreeLike[K,K=>R,O]](default:O with PrefixTreeLike[K,K=>R,O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(cur: Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x <- cur)
-        try { b += ((x._1, recur(x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
-      b.result(cur.value,oo.value.orNull)
+        b += ((x._1, recur(x._2,try { oo(x._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] })))
+      b.result(cur.value, if(oo==null) null else oo.value.orNull)
     }
     recur(this,default)
-  }  
+  }
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    */
   def asTree[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
@@ -100,7 +58,11 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     }
     recur(this)
   }
-  
+
+  /** Forces this PrefixTraversableOnce into a PrefixTree with no default.
+   */
+  def asPrefixTree:PrefixTree[K,V] = asTree[V,PrefixTree[K,V]]
+
   /** Transform this tree with another tree.
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
    *  corresponding sub-node of the transformer tree using the provided `op`.
@@ -149,7 +111,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     }
     recur(Seq((t,this)))
   }
-  
+
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
    *  'in parallel' too.
    *  Default values for both trees are used but exceptions will end the transformation ungracefully.
@@ -158,7 +120,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  zip above can be expressed here by using a constant op tree ; various map operations can be expressed by
    *  zipping a tree with itself etc...
    *  @param t   the transformer tree
-   *  @param strict is true if we don't accept the use of default values for the second tree or op tree for 
+   *  @param strict is true if we don't accept the use of default values for the second tree or op tree for
    *                defined values in the first tree : in that case we fall back on the zipped default : this
    *                usually only makes sense if the T.noDefault or O.noDefault is an error or similar answer (e.g. empty)
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
@@ -182,11 +144,29 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     }
     recur(t,this,op)
   }
+  /** Same, but creates a view.
+   *  Access to all parents of the current element is possible.
+   */
+  def zip2ViewRec[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,Seq[(T,Repr,O)]=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,Seq[(T,Repr,O)]=>Option[U],O]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
+    def recur(s:Seq[(T,Repr,O)]):PrefixTraversableOnce.Abstract[K,U] = {
+      val cur = s.head
+      new PrefixTraversableOnce.Abstract[K,U](cur._3.value.flatMap(_(s))) {
+        def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = {
+          for (x <- cur._2)
+            if (strict.succeeds(cur._1,cur._3)(x._1)) try {
+              val s1 = (cur._1(x._1),x._2,cur._3(x._1)) +: s
+              f((x._1, recur(s1)))
+            } catch { case _:NoSuchElementException => }
+        }
+      }
+    }
+    recur(Seq((t,this,op)))
+  }
 
   /** Similar to the previous method, but now we can build a tree of a fully different nature (different keys.)
    *  Note that this operation is the most complex for trees and it allows extensive tree transformations.
    *  @param t   the transformer tree
-   *  @param strict is true if we don't accept the use of default values for the second tree or op tree for 
+   *  @param strict is true if we don't accept the use of default values for the second tree or op tree for
    *                defined values in the first tree : in that case we fall back on the zipped default : this
    *                usually only makes sense if the T.noDefault or O.noDefault is an error or similar answer (e.g. empty)
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node.
@@ -252,7 +232,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
       }
     recur(Seq((k0,this,t)),op)._2
   }
-  
+
   /** A fold left operation that descends through the subtrees.
    *  Children are evaluated before their parent.
    */
@@ -260,7 +240,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def recur(u: U, t:(K,Repr)):U = f(t._2.foldLeft(u)(recur),t)
     recur(u0,(k0,this))
   }
-  
+
   /** As above.
    *  When processing children, access to the parent is handled down.
    *  @param u0 the initial value
@@ -288,7 +268,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     }
     recur(u0,Seq((k0,this)),op)
   }
-    
+
   /** A recursive call that descends through the subtrees.
    *  Children are all evaluated within the context of their parent, i.e.
    *  within the 'op' call on their parent.
@@ -303,7 +283,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def recur(elt:(K,Repr)):Unit = op(elt,elt._2.foreach(recur))
     recur((k,this))
   }
-  
+
   /** As above.
    *  Evaluating children produces results that can be used by the parent.
    *  Furthermore, children can be evaluated but don't have to be.
@@ -318,7 +298,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def recur(elt:(K,Repr)):U = op(elt,elt._2.toIterator.map(recur))
     recur((k,this))
   }
-  
+
   /** As above.
    *  Children can reach their parent (but not above.)
    *  @param k0 an initial key for the top node ; it is hardly used
@@ -331,7 +311,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def recur(elt:Seq[(K,Repr)]):U = op(elt,elt.head._2.toIterator.map(x=>recur(x+:elt)))
     recur(Seq((k0,this)))
   }
-  
+
   /** As above.
    *  Children can reach their parents.
    *  @param k an initial key for the top node ; it is hardly used
@@ -347,148 +327,15 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
       oo.value.get(elt,elt.head._2.toIterator.map(x=>recur(x+:elt,try { oo(x._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }))) //has value: compute current element
     }
     recur(Seq((k0,this)),op)
-  }  
+  }
 
 }
 
 object PrefixTraversableOnce {
-  import utils.BlockingData
-    
-  /** This interface is sufficient to create a PrefixTraversableOnce
-   *  Whenever you have a new key, you push it.
-   *  Whenever you have a value for a key, you pull it.
-   *  Whenever you reach the end of a layer, you pull out.
-   *  e.g. for this xml: <a><b>1</b>2<c>3</c></a>
-   *     push(a)
-   *     push(b)
-   *     pull(1)
-   *     pull
-   *     pull(2)
-   *     push(c)
-   *     pull(3)
-   *     pull
-   *     pull
-   */
-  trait PushPull[-K,-V] {
-    def push(key:K):Unit
-    def pull(value:V):Unit
-    def pull():Unit
-  }
-  
-  /** marker for the PushPull */
-  val End = new AnyRef
-  
-  /** Used to turn the push/pull into a PrefixTraversableOnce.
-   *  The 'once' is not to trifle with: even 'hasNext' cannot be called more than once per element!
-   *  This implementation is naive as it doesn't care about handling any error.
-   *  In particular, the sending thread will lock if a second value is sent to the same item.
-   *  XXX improve the naive implementation
-   *  
-   * @param K, the key type ; it is not allowed to be an Option, nor to be null.
-   * @param V, the value type
-   * @param item, the blocking buffer
-   */
-  class Layer[K,V](item:BlockingData[AnyRef]) extends Iterator[(K,Layer[K,V])] with PrefixTraversableOnce[K,V,Layer[K,V]] {
-    var next:(K,Layer[K,V])  = _
-    var value:Option[V] = None
-    @tailrec final def hasNext:Boolean = item.take match {
-        case `End`       => false
-        case o:Option[V] => if (value.isDefined) throw new IllegalStateException("the same element cannot receive two values")
-                            value = o
-                            hasNext
-        case k:K         => next = (k,new Layer[K,V](item))
-                            true
-      }    
-  }
-  
-  /** Complement to the previous class to send the push/pull commands.
-   * @param K, the key type ; it is not allowed to be an Option, nor to be null
-   * @param V, the value type
-   */
-  class PullAdapter[K<:AnyRef,V] extends PushPull[K,V] {
-  
-    protected val item = new BlockingData[AnyRef]
-    
-    /** sends the appropriate command to the imbedded Layer */
-    final def push(k:K) = item.put(k)
-    final def pull(v:V) = item.put(Some(v))
-    final def pull      = item.put(End)
-  
-    /** converts the push/pull sequence through the given operator. */
-    def run[U](op: ((K,Layer[K,V]),Iterator[U]) => U)(implicit executionContext:ExecutionContext):Future[U] =
-      Future { (new Layer[K,V](item)).deepForeach1[U](null.asInstanceOf[K])(op) }
-  }
-  
-  /** Creates a pair for creating a PrefixTraversableOnce using a Push/Pull interface */
-  def apply[U,K<:AnyRef,V](op: ((K,Layer[K,V]),Iterator[U]) => U)(implicit executionContext:ExecutionContext):(PushPull[K,V],Future[U]) = {
-    val p = new PullAdapter[K,V]
-    (p, p.run(op))
-  }
-  
+
   abstract class Abstract[K,V](val value:Option[V]) extends Traversable[(K,Abstract[K,V])] with PrefixTraversableOnce[K,V,Abstract[K,V]] {
     this:Abstract[K,V] =>
   }
-  
-  trait PrefixActor[-X,-V,+P,R] {
-    def onInit(x:X):P
-    def += (x:X,result:R):Unit
-    def onEnd(v:Option[V]):R
-  }
-  
-  trait PrefixActorRec[-X,+R,+P] { this:P=>
-    protected[this] type P0=P
-    
-    protected[this] def i(x:X):Iterable[X]
-    protected[this] def onInit(s:Seq[(X,P)],x:X):P0
-    protected[this] def += (s:Seq[(X,P)],result:R):Unit
-    protected[this] def onEnd(s:Seq[(X,P)]):R
-    
-    protected[this] def recur(s:Seq[(X,P)]):R = {
-      val p = s.head._2
-      i(s.head._1).foreach { x=>
-        val r = onInit(s,x)
-        if (r!=null) {
-          val s1 = (x,r)+:s; val rr=recur(s1)
-          if (rr!=null) this += (s1, rr)
-        }      
-      }
-      onEnd(s)
-    }
-    def recur(x:X):R = recur(Seq((x,this)))
-  }
-  
-  class Builder[K,V,R<:PrefixTreeLike[K,V,R]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActor[(K,Any),V,Builder[K,V,R],R] {
-    val b=bf.newEmpty
-    def onInit(x:(K,Any)):Builder[K,V,R] = new Builder[K,V,R]
-    def += (x:(K,Any),result:R):Unit     = b += ((x._1,result))
-    def onEnd(value:Option[V]):R         = b.result(value,null)
-  }
-  class BuilderRec[K,+V,+R<:PrefixTreeLike[K,V,R],R1<:PrefixTraversableOnce[K,V,R1]](implicit bf:PrefixTreeLikeBuilder[K,V,R]) extends PrefixActorRec[(K,R1),R,BuilderRec[K,V,R,R1]] {
-    protected[this] type S = Seq[((K,R1),BuilderRec[K,V,R,R1])]
-    protected[this] val b=bf.newEmpty
-    protected[this] def i(x:(K,R1)):Iterable[(K,R1)] = x._2.toIterable
-    protected[this] def onInit(s:S,x:(K,R1)):P0 = new BuilderRec[K,V,R,R1]
-    protected[this] def +=(s:S,result:R):Unit   = b += ((s.head._1._1,result))
-    protected[this] def onEnd(s:S):R            = b.result(s.head._1._2.value,null)
-  }
-  
-  abstract class UU[K,-V,R] extends scala.collection.Seq[(K,UU[K,V,R])] with PushPull[K,V] with PrefixActorRec[K,R,UU[K,V,R]] {
-    protected[this] var v:Option[V] = None
-    /*
-    def push(key:K):Unit   = onInit(s,key)
-    def pull(value:V):Unit = v = Some(value)
-    def pull():Unit        = s.head._2.+=(s,onEnd(s))
-    
-    protected[this] def i(x:K):Iterable[K] = null
-    protected[this] def onInit(s:S,x:K):P0 = new UU((x,this)+:s)
-    protected       def += (s:S,result:R):Unit
-    protected[this] def onEnd(s:S):R    */
- //   def rcv() = head._2.+=(this,onEnd(this))
-    
-    def iterator: Iterator[(K, UU[K,V,R])] = ???
-    def apply(idx: Int): (K, UU[K,V,R]) = ???
-    def length: Int = ???     
-  }  
 
 }
 
