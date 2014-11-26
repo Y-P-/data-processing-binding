@@ -10,8 +10,8 @@ import scala.runtime.AbstractPartialFunction
 
 /** A generic Builder for PrefixTreeLike which extends the standard Builder class.
  */
-abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
-  type Repr = Tree
+abstract class PrefixTreeLikeBuilder[K,V,Tree] extends Builder[(K,Tree),Tree] {
+  type Repr = Tree with PrefixTreeLike[K,V,Tree]
   type Params
   implicit def params:Params
   
@@ -31,7 +31,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    *  @param default the default function to build a child tree that is not is the above list
    *  @return a new Node
    */
-  def apply(value:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
+  def apply(value:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Repr
   
   /** sipmlified factories for no value */
   def apply(tree:(K,Tree)*):Tree                                        = apply(None,tree,null)
@@ -79,12 +79,12 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   def newEmpty:PrefixTreeLikeBuilder[K,V,Tree]
   
   /** The empty value is often used */
-  def empty: Tree = apply(None,Nil,null)
+  def empty: Repr = apply(None,Nil,null)
   
   /** rebuilds t with a specific, different value */
-  def withValue(t:Tree,v:Option[V]):Tree = apply(v,t,t.default)
+  def withValue(t:Repr,v:Option[V]):Tree = apply(v,t,t.default)
   /** rebuilds t with a specific, different value ; use null to fallback on the 'default' default */
-  def withDefault(t:Tree,default:K=>Tree):Tree = apply(t.value,t,default)
+  def withDefault(t:Repr,default:K=>Tree):Tree = apply(t.value,t,default)
   
   /** an interesting tree which recursively binds to itself whatever the input.
    *  This tree only holds one value which is returned on any key sequence.
@@ -99,7 +99,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    *  
    *  It has no default.
    */
-  final def fromFlat(flat:GenTraversableOnce[(GenTraversable[K],V)]):Tree = {
+  final def fromFlat(flat:GenTraversableOnce[(GenTraversable[K],V)]):Repr = {
     val r = deepen(flat)
     apply(r._1,r._2,empty.default)
   } 
@@ -115,21 +115,21 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   /** Similar to the above, but it allows for defaults.
    *  However, it assumes that V cannot normally be null (i.e. null is None)
    */
-  final def fromFlat2(flat:GenTraversableOnce[(GenTraversable[K],(V,K=>Tree))]):Tree = {
+  final def fromFlat2(flat:GenTraversableOnce[(GenTraversable[K],(V,K=>Repr))]):Repr = {
     val r = deepen2(flat)
     apply2(r._1,r._2)
   }
   
   /** utility to build the map of trees for a flat representation with default.
    */
-  protected def deepen2(flat:GenTraversableOnce[(GenTraversable[K],(V,K=>Tree))]):(Option[(V,K=>Tree)],LinkedHashMap[K,Tree]) = {
+  protected def deepen2(flat:GenTraversableOnce[(GenTraversable[K],(V,K=>Repr))]):(Option[(V,K=>Repr)],LinkedHashMap[K,Repr]) = {
     val d = develop(flat)
     (d._1, for ((k,(v,l)) <- d._2) yield (k,apply2(v,fromFlat2(l.reverse))))  //put back the list in the right order
   }
   
   /** Utility to open up (V,K=>Tree) and build a Tree node
    */
-  protected def apply2(w:Option[(V, K => Tree)], l:GenTraversableOnce[(K,Tree)]) = {
+  protected def apply2(w:Option[(V, K => Repr)], l:GenTraversableOnce[(K,Repr)]):Repr = {
     val (v,d) = w match {
       case Some((v1,d1)) => (Option(v1),d1)
       case None          => (None,null)
@@ -173,14 +173,15 @@ object PrefixTreeLikeBuilder {
    *  @see PrefixTree to understand how it is used in both ways (safe and unsafe.)
    */
   trait Navigable[K,V,This<:PrefixTreeLike[K,V,This]] extends PrefixTreeLike[K, V, This] { this:This=>
-    var parent0:Repr with Navigable[K, V, This] = _
-    override def parent:Repr = parent0
+    private[this] type This0 = This with Navigable[K, V, This]
+    var parent0:This0 = _
+    override def parent:This0 = parent0
     override def isNavigable = true
     override def depth:Int = if (parent0==null) 0 else 1+parent0.depth
     override def isNonSignificant = value.isEmpty && isEmpty && default==null
-    def detach():Unit = parent0=null.asInstanceOf[Repr with Navigable[K, V, This]]
-    def attach(parent:Repr with Navigable[K, V, This]):Unit = parent0=parent
-    abstract override def -(key:K):Repr = {
+    def detach():Unit = parent0=null.asInstanceOf[This0]
+    def attach(parent:This0):Unit = parent0=parent
+    abstract override def -(key:K):This = {
       //on removal, clear the parent
       get(key) match {
         case Some(n) if n.isInstanceOf[Navigable[K,V,This]]=> n.asInstanceOf[Navigable[K,V,This]].detach()
