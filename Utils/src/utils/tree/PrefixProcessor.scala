@@ -48,7 +48,9 @@ class Stack[K,V] {
   var cur:P1 = _
   var f: ((K, P1)) ⇒ Any = _
 
-  def run:Unit = ()
+  def run[R](k0:K)(f: ((K, P1)) => R):R = {
+
+  }
 
   class P1(key:K, val top:P1) extends Processor[K,V,P1](key) with Traversable[(K,P1)] with PrefixTraversableOnce[K,V,P1] {
     override def stringPrefix:String = super[PrefixTraversableOnce].stringPrefix
