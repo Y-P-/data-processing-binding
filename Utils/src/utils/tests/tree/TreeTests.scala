@@ -318,17 +318,19 @@ object TreeTests {
     //in zipFull, we do a similar transformation as above, but replace the key with the Int value and Strings with Symbols.
     //the result should be close to the previous one, thus easily comparable.
     //this is far from testing all possibilities, but its a good start.
-    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],F)]=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol]))
-    type O = Seq[(String,StringTree[Int],StringTree[Int])]=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol])
-    val op1:F = new F { def apply(s:Seq[(String,StringTree[Int],StringTree[Int],F)])= {
+    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])]=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol])) {
+      def merge(x:Int, y:Int):String
+      def apply(s:Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])])= {
         val cur=s.head; val t2=cur._3; val t1=cur._2; val o=cur._4
-        (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1+$v2"),null)
-        }}
-/*    val op2:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1*$v2"),null)}
-    val op3:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${(v1+v2)}"),null)}
-    val opc:O = (s)=>{ val cur=s.head; val t2=cur._3; val t1=cur._2; (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}$v1%$v2"),null)}
+        (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${merge(v1,v2)}"),null)
+      }
+    }
+    val op1:F = new F { def merge(x:Int, y:Int) = s"$x+$y" }
+    val op2:F = new F { def merge(x:Int, y:Int) = s"$x*$y" }
+    val op3:F = new F { def merge(x:Int, y:Int) = s"${x+y}" }
+    val opc:F = new F { def merge(x:Int, y:Int) = s"$x%$y" }
 
-    val opx = PrefixTree.constant[String,O](opc)
+    val opx = PrefixTree.constant[String,F](opc)
 
     val opX = PrefixTree.fromFlat2(Seq(
           (Seq(),(op1,opx)),
@@ -344,11 +346,43 @@ object TreeTests {
           (Seq("f","d"),(op1,opx))
       ))
     //note that f->d has no associated value: the corresponding subtree is excluded (the value becomes the key => no key, no tree...)
-    val rx = m1.zipFull("",NOT_STRICT,m0,opX)
-    out.println(rx)
+    out.println(m1.zipFull("",NOT_STRICT,m0,opX))
     //note that f has no associated value: itself and its full subtree is excluded
-    val ry = m1.zipFull("",NOT_STRICT,m0,opY)
-    out.println(ry)*/
+    out.println(m1.zipFull("",NOT_STRICT,m0,opY))
+  }
+  def testZipFullView(implicit out:PrintWriter) = {
+    //This test must give the same result as testZipFull
+    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])]=>(Option[Int],Option[Symbol])) {
+      def merge(x:Int, y:Int):String
+      def apply(s:Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])])= {
+        val cur=s.head; val t2=cur._3; val t1=cur._2; val o=cur._4
+        (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${merge(v1,v2)}"))
+      }
+    }
+    val op1:F = new F { def merge(x:Int, y:Int) = s"$x+$y" }
+    val op2:F = new F { def merge(x:Int, y:Int) = s"$x*$y" }
+    val op3:F = new F { def merge(x:Int, y:Int) = s"${x+y}" }
+    val opc:F = new F { def merge(x:Int, y:Int) = s"$x%$y" }
+
+    val opx = PrefixTree.constant[String,F](opc)
+
+    val opX = PrefixTree.fromFlat2(Seq(
+          (Seq(),(op1,opx)),
+          (Seq("d"),(op1,opx)),
+          (Seq("d","a"),(null,null)),
+          (Seq("f"),(op3,opx)),
+          (Seq("f","d","b"),(op2,opx))
+      ))
+    val opY = PrefixTree.fromFlat2(Seq(
+          (Seq(),(op1,opx)),
+          (Seq("d"),(op1,opx)),
+          (Seq("d","a"),(op2,opx)),
+          (Seq("f","d"),(op1,opx))
+      ))
+    //note that f->d has no associated value: the corresponding subtree is excluded (the value becomes the key => no key, no tree...)
+    out.println(m1.zipFullView("",NOT_STRICT,m0,opX))
+    //note that f has no associated value: itself and its full subtree is excluded
+    out.println(m1.zipFullView("",NOT_STRICT,m0,opY))
   }
 
   def testForeach(implicit out:PrintWriter) = {
@@ -456,6 +490,7 @@ object TreeTests {
       t(testZip2)
       t(testZip2NonStrictAndFromFlatWithDefault)
       t(testZipFull)
+      t(testZipFullView)
       t(testForeach)
       t(testPushPull)
       //navigable

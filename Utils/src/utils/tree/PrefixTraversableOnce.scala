@@ -173,8 +173,9 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             an operator produces the new key (if None, the node is skipped), new value, new default handler (can of course be null.)
    *  @return the resulting transformed tree
    */
-  def zipFull[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T)])=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T)])=>(Option[L],Option[U],L=>R),O])(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
-    def recur(elt:Seq[(K,Repr,T)],oo:O):(L,R) = {
+  def zipFull[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O])(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+    def recur(elt:Seq[(K,Repr,T,O)]):(L,R) = {
+      val oo:O = elt.head._4
       val b=bf.newEmpty
       for (x <- elt.head._2)
         if (strict.succeeds(elt.head._3,oo)(x._1)) {
@@ -186,7 +187,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
             o1 = oo(x._1)
             true
           } catch { case _:NoSuchElementException => false }) {
-            val res = recur((x._1,x._2,t1)+:elt,o1)
+            val res = recur((x._1,x._2,t1,o1)+:elt)
             if (res!=null) b += res
           }
         }
@@ -200,12 +201,13 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
           }
       }
     }
-    recur(Seq((k0,this,t)),op)._2
+    recur(Seq((k0,this,t,op)))._2
   }
   /** Same, but creates a view. The default value method goes away in this case.
    */
-  def zipFullView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T)])=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T)])=>(Option[L],Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
-    def recur(elt:Seq[(K,Repr,T)],oo:O):(L,PrefixTraversableOnce.Abstract[L,U]) =
+  def zipFullView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
+    def recur(elt:Seq[(K,Repr,T,O)]):(L,PrefixTraversableOnce.Abstract[L,U]) = {
+      val oo = elt.head._4
       oo.value match {
         case None    => null
         case Some(f) =>
@@ -222,7 +224,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
                     o1 = oo(x._1)
                     true
                   } catch { case _:NoSuchElementException => false }) {
-                    val res = recur((x._1,x._2,t1)+:elt,o1)
+                    val res = recur((x._1,x._2,t1,o1)+:elt)
                     if (res!=null) g(res)
                   }
                 }
@@ -230,7 +232,8 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
             case _ => null
           }
       }
-    recur(Seq((k0,this,t)),op)._2
+    }
+    recur(Seq((k0,this,t,op)))._2
   }
 
   /** A fold left operation that descends through the subtrees.
@@ -329,12 +332,43 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     recur(Seq((k0,this)),op)
   }
 
+  /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
+   *  The written text begins with the string `start` and ends with the string `end`.
+   *  Inside, the string representations of all bindings of this tree.
+   *  in the form of `key -> value` are separated by the string `sep`.
+   *
+   *  @param b     the builder to which strings are appended.
+   *  @param start the starting string.
+   *  @param sep   the separator string.
+   *  @param end   the ending string.
+   *  @return      the string builder `b` to which elements were appended.
+   */
+  override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder =
+    this.map { case (k, v) => s"$k -> $v" }.addString(b, start, sep, end)
+
+  /** Defines the prefix of this object's `toString` representation.
+   *  @return  a string representation which starts the result of `toString` applied to this $coll.
+   *           Unless overridden in subclasses, the string prefix of every tree is `"Map"`.
+   */
+  def stringPrefix: String = value match {
+    case None    => "Tree"
+    case Some(v) => "Tree{"+v+"}"
+  }
+
+  override def toString = {
+    val b = new StringBuilder
+    b.append(stringPrefix)
+    addString(b,"(",",",")")
+    b.toString
+  }
+
 }
 
 object PrefixTraversableOnce {
 
   abstract class Abstract[K,V](val value:Option[V]) extends Traversable[(K,Abstract[K,V])] with PrefixTraversableOnce[K,V,Abstract[K,V]] {
     this:Abstract[K,V] =>
+    override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
   }
 
 }
