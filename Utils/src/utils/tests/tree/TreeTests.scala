@@ -346,9 +346,9 @@ object TreeTests {
           (Seq("f","d"),(op1,opx))
       ))
     //note that f->d has no associated value: the corresponding subtree is excluded (the value becomes the key => no key, no tree...)
-    out.println(m1.zipFull("",NOT_STRICT,m0,opX))
+    out.println(m1.zipFullRec("",NOT_STRICT,m0,opX))
     //note that f has no associated value: itself and its full subtree is excluded
-    out.println(m1.zipFull("",NOT_STRICT,m0,opY))
+    out.println(m1.zipFullRec("",NOT_STRICT,m0,opY))
   }
   def testZipFullView(implicit out:PrintWriter) = {
     //This test must give the same result as testZipFull
@@ -380,9 +380,9 @@ object TreeTests {
           (Seq("f","d"),(op1,opx))
       ))
     //note that f->d has no associated value: the corresponding subtree is excluded (the value becomes the key => no key, no tree...)
-    out.println(m1.zipFullView("",NOT_STRICT,m0,opX))
+    out.println(m1.zipFullRecView("",NOT_STRICT,m0,opX))
     //note that f has no associated value: itself and its full subtree is excluded
-    out.println(m1.zipFullView("",NOT_STRICT,m0,opY))
+    out.println(m1.zipFullRecView("",NOT_STRICT,m0,opY))
   }
 
   def testForeach(implicit out:PrintWriter) = {

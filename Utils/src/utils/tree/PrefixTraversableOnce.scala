@@ -173,7 +173,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             an operator produces the new key (if None, the node is skipped), new value, new default handler (can of course be null.)
    *  @return the resulting transformed tree
    */
-  def zipFull[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O])(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+  def zipFullRec[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O])(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
     def recur(elt:Seq[(K,Repr,T,O)]):(L,R) = {
       val oo:O = elt.head._4
       val b=bf.newEmpty
@@ -205,7 +205,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
   /** Same, but creates a view. The default value method goes away in this case.
    */
-  def zipFullView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
+  def zipFullRecView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
     def recur(elt:Seq[(K,Repr,T,O)]):(L,PrefixTraversableOnce.Abstract[L,U]) = {
       val oo = elt.head._4
       oo.value match {
