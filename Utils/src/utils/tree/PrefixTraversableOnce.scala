@@ -39,7 +39,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    *  You can provide defaults, and error when fetching defaults are ignored (no default in such cases.)
    */
-  def asTree[U>:V,R<:PrefixTreeLike[K,U,R],O<:PrefixTreeLike[K,K=>R,O]](default:O with PrefixTreeLike[K,K=>R,O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  def toTree[U>:V,R<:PrefixTreeLike[K,U,R],O<:PrefixTreeLike[K,K=>R,O]](default:O with PrefixTreeLike[K,K=>R,O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(cur: Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x <- cur)
@@ -50,7 +50,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    */
-  def asTree[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  def toTree[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(cur: Repr):R = {
       val b=bf.newEmpty
       for (x <- cur) b += ((x._1, recur(x._2)))
@@ -61,7 +61,34 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
   /** Forces this PrefixTraversableOnce into a PrefixTree with no default.
    */
-  def asPrefixTree:PrefixTree[K,V] = asTree[V,PrefixTree[K,V]]
+  def toPrefixTree:PrefixTree[K,V] = toTree[V,PrefixTree[K,V]]
+
+  /** Simple map for the value element.
+   */
+  def mapView[U](f:V=>U):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
+    def recur(cur:Repr):PrefixTraversableOnce.Abstract[K,U] = new PrefixTraversableOnce.Abstract[K,U](cur.value.map(f)) {
+      def foreach[X](f0:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = for (x <- cur)
+        f0((x._1, recur(x._2)))
+    }
+    recur(this)
+  }
+
+  /** Complex map/filter operation acting both on key and value.
+   *  The map operation may refer to any of the current element parent key or element.
+   *  It returns a (L,Option[U]) pair, which can be null: such null values are filtered out (as are their children.)
+   */
+  def mapViewRec[L,U](k0:K)(f:(Seq[(K,Repr)])=>(L,Option[U])):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
+    def recur(cur:Seq[(K,Repr)],u:Option[U]):PrefixTraversableOnce.Abstract[L,U] = new PrefixTraversableOnce.Abstract[L,U](u) {
+      def foreach[X](f0:((L,PrefixTraversableOnce.Abstract[L,U]))=>X):Unit = for (x <- cur.head._2) {
+        val s1 = x+:cur
+        val zz = f(s1)
+        if (zz!=null) f0((zz._1, recur(s1,zz._2)))
+      }
+    }
+    val s = Seq((k0,this))
+    val zz = f(s)
+    if (zz._1!=None) recur(s,zz._2) else PrefixTraversableOnce.empty[L,U]
+  }
 
   /** Transform this tree with another tree.
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
@@ -205,15 +232,16 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
   /** Same, but creates a view. The default value method goes away in this case.
    */
-  def zipFullRecView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
+  def zipFullRecView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(L,Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
     def recur(elt:Seq[(K,Repr,T,O)]):(L,PrefixTraversableOnce.Abstract[L,U]) = {
       val oo = elt.head._4
       oo.value match {
         case None    => null
         case Some(f) =>
           val res = f(elt)
-          res._1 match {
-            case Some(l) => (l,new PrefixTraversableOnce.Abstract[L,U](res._2) {
+          res match {
+            case null => null
+            case _    => (l,new PrefixTraversableOnce.Abstract[L,U](res._2) {
               def foreach[X](g:((L,PrefixTraversableOnce.Abstract[L,U]))=>X):Unit = for (x <- elt.head._2)
                 if (strict.succeeds(elt.head._3,oo)(x._1)) {
                   var t1:T = null.asInstanceOf[T]
@@ -369,6 +397,10 @@ object PrefixTraversableOnce {
   abstract class Abstract[K,V](val value:Option[V]) extends Traversable[(K,Abstract[K,V])] with PrefixTraversableOnce[K,V,Abstract[K,V]] {
     this:Abstract[K,V] =>
     override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
+  }
+
+  def empty[K,V] = new Abstract[K,V](None) {
+    def foreach[X](f0:((K,Abstract[K,V]))=>X):Unit = ()
   }
 
 }

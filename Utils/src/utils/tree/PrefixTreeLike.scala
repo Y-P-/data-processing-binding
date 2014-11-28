@@ -561,30 +561,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       for (x <- iterator.toTraversable; r <- f(x._2)) yield ((x._1 ++ r._1, r._2))
   }
 
-  /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
-   *  The written text begins with the string `start` and ends with the string `end`.
-   *  Inside, the string representations of all bindings of this tree.
-   *  in the form of `key -> value` are separated by the string `sep`.
-   *
-   *  @param b     the builder to which strings are appended.
-   *  @param start the starting string.
-   *  @param sep   the separator string.
-   *  @param end   the ending string.
-   *  @return      the string builder `b` to which elements were appended.
-   */
-  override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder =
-    this.iterator.map { case (k, v) => s"$k -> $v" }.addString(b, start, sep, end)
-
-  /** Defines the prefix of this object's `toString` representation.
-   *  @return  a string representation which starts the result of `toString` applied to this $coll.
-   *           Unless overridden in subclasses, the string prefix of every tree is `"Map"`.
-   */
-  override def stringPrefix: String = value match {
-    case None    => "Tree"
-    case Some(v) => "Tree{"+v+"}"
-  }
-
-  override def toString = super[IterableLike].toString
+  override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
 }
 
 object PrefixTreeLike {

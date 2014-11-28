@@ -44,24 +44,49 @@ abstract class Processor[K,V,+This](val key:K) {this:This=>
   def top:This
 }
 
-class Stack[K,V] {
+abstract class Stack[K,V] {
   var cur:P1 = _
   var f: ((K, P1)) ⇒ Any = _
 
   def run[R](k0:K)(f: ((K, P1)) => R):R = {
-
+    cur.foreach(f)
+    f(k0,cur)
   }
+
+  def run()
 
   class P1(key:K, val top:P1) extends Processor[K,V,P1](key) with Traversable[(K,P1)] with PrefixTraversableOnce[K,V,P1] {
     override def stringPrefix:String = super[PrefixTraversableOnce].stringPrefix
     def onInit(key:K):P1 = new P1(key,this)
     def foreach[U](f: ((K, P1)) ⇒ U): Unit = {
       Stack.this.f = f
-      run
+      run()
     }
   }
 
   def push(key:K)        = cur = cur.onInit(key)
   def pull(value:V):Unit = cur.onValue(value)
   def pull():Unit        = { val c=cur; cur=cur.top; f((c.key,c.onEnd())) }
+}
+
+object Stack {
+
+  object S extends Stack[String,Int] {
+    def run = {
+      push("a")
+      pull(1)
+      push("b")
+      push("c")
+      pull(3)
+      pull
+      pull(2)
+      pull
+      pull
+    }
+  }
+
+  def main(args:Array[String]) = {
+    S.run
+  }
+
 }
