@@ -1,26 +1,49 @@
 package utils.tree
 
 
-/** Describes a tree where data is reached through a succession of keys.
- *  The actual data of type V is optionnal in intermediary nodes, but a well formed tree should not have
- *  empty leaves. Using the methods with (GenTraversable[K],V) parameters (flat view of the tree) rely
- *  on that property (they will omit to output such degenerate branches, and will not build them.)
- *
- *  Operations on trees are not to take lightly ; the recursive nature of trees usually involves that
- *  any transformation be done by rebuilding it. This is even true of the withFilter operation : at this
- *  stage, there is yet no `view` for trees.
- *
- *  The `default` operation usually suggests that it can handle any other value not listed in the
- *  iterable part of the tree. It itself defaults on a generic (but user provided) method.
- *
- *  There are usually three kinds of trees, in ascending order of complexity, memory footprint, building speed:
- *  - Standard trees provide no way to ascend into the tree.
- *  - Weak Navigable trees allow access to the parent, BUT it relies on mutation and may sometimes be
- *    unsafe to use ; in particular, a tree that is built using shared branches may have incorrect parents.
- *    These trees can contain sub-parts that are not navigable.
- *  - Strong Navigable trees are just like weak navigable trees, but nodes are always rebuilt on assignment.
- *    In particular, these tree nodes always correctly point to the right parent. However, the building
- *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
+/** Describes a tree precursor where data is reached through an iterable (key,sub-tree).
+ *  As such, this structure presents a numerous number of interesting properties, the least of which
+ *  being that this representation can also be used as views to actual PrefixTree implementations.
+ *  Thus, when some complex operation on a tree is undertaken, and one doesn't want to build intermediate
+ *  trees, lifting a real Tree to this representation will gain some benefits.
+ *  
+ *  Methods are provided to go both ways between PrefixTreeLike and PrefixTraversableOnce.
+ *  
+ *  For more information about PrefixTreeLike, se that class description which contains additional information.
+ *  
+ *  Methods in this class often come by three:
+ *  
+ *  method        => does something and return an actual Tree structure (usually through an implicit builder)
+ *                   it is best used when one requires an actual tree as result
+ *  methodView    => as method, but returns a view, i.e. PrefixTraversableOnce
+ *                   it is best used when the result is going to be passed to some other tree transforming method
+ *  methodViewRec => as mehodView, but in addition the functions passed as parameter can reach up to the top
+ *                   of the (key,subtree) recursion, getting information about the parents
+ *                   it is obviously more expensive and complex as the other methods and should only be used
+ *                   when necessary. No version returning an actual tree is provided as this is not thought to
+ *                   bring any significant gain.
+ *  
+ *  These methods often take a transforming function as parameter.
+ *  When this function returns a Tuple or an Option, then as a general contract, it is also allowed to return
+ *  null: this indicates that the element (and subtree) is not to be processed and this can serve as an imbedded
+ *  filter method : using filter is very often useless (and indeed more costly) when used in conjunction with
+ *  such methods.
+ *  
+ *  Methods:
+ *  - filter remove elements (and their subtree) from the result
+ *  - map transforms a tree into another tree using some transformation way
+ *  - zip transform a tree into another tree by using at least one other tree ran in parallel
+ *  - deepForeach runs through the tree elements in depth, in the tree order, but beginning at the bottom
+ *    hence, the last elemen processed is usually the top tree itself
+ *  - deepFoldLeft is similar to foldleft in other collections, but it runs through all elements in the
+ *    same way as described in deepForeach
+ *    
+ *  In many cases, the transformation methods can themselves be provided as trees, which are also ran through
+ *  in parallel with the processed tree. This paves the way to some very complex tree transformations.
+ *  
+ *  Also note that for regularity, most methods require that you pass a "virtual" key for the top tree (which
+ *  by definition is not assumed to be a sub-tree and not attached with a key); such a key may or may not be
+ *  significant depending on your own provided transformation methods : the methods here have no use with it.
  */
 trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   extends TraversableOnce[(K, This)] { self:This =>
@@ -62,7 +85,11 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** Forces this PrefixTraversableOnce into a PrefixTree with no default.
    */
   def toPrefixTree:PrefixTree[K,V] = toTree[V,PrefixTree[K,V]]
-
+  
+  /** Forces this PrefixTraversableOnce into a PrefixTree with some default.
+   */
+  def toPrefixTree[U>:V,O<:PrefixTreeLike[K,K=>PrefixTree[K,U],O]](default:O with PrefixTreeLike[K,K=>PrefixTree[K,U],O]):PrefixTree[K,U] = toTree[U,PrefixTree[K,U],O](default)
+  
   /** Simple map for the value element.
    */
   def mapView[U](f:V=>U):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
@@ -78,16 +105,19 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  It returns a (L,Option[U]) pair, which can be null: such null values are filtered out (as are their children.)
    */
   def mapViewRec[L,U](k0:K)(f:(Seq[(K,Repr)])=>(L,Option[U])):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
-    def recur(cur:Seq[(K,Repr)],u:Option[U]):PrefixTraversableOnce.Abstract[L,U] = new PrefixTraversableOnce.Abstract[L,U](u) {
-      def foreach[X](f0:((L,PrefixTraversableOnce.Abstract[L,U]))=>X):Unit = for (x <- cur.head._2) {
-        val s1 = x+:cur
-        val zz = f(s1)
-        if (zz!=null) f0((zz._1, recur(s1,zz._2)))
-      }
+    def recur(cur:Seq[(K,Repr)]):(L,PrefixTraversableOnce.Abstract[L,U]) = f(cur) match {
+      case null => null
+      case zz   => (zz._1,new PrefixTraversableOnce.Abstract[L,U](zz._2) {
+        def foreach[X](f0:((L,PrefixTraversableOnce.Abstract[L,U]))=>X):Unit = for (x <- cur.head._2) {
+          val r1 = recur(x+:cur)
+          if (r1!=null) f0(r1)
+        }
+      })
     }
-    val s = Seq((k0,this))
-    val zz = f(s)
-    if (zz._1!=None) recur(s,zz._2) else PrefixTraversableOnce.empty[L,U]
+    recur(Seq((k0,this))) match {
+      case null  => null
+      case (_,r) => r
+    }
   }
 
   /** Transform this tree with another tree.
@@ -103,20 +133,30 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @return the resulting transformed tree
    */
   def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(tt:T,cur:Repr):R = {
-      val b=bf.newEmpty
+    def recur(tt:T,cur:Repr):R = op(tt,cur) match {
+      case null => null.asInstanceOf[R]
+      case u    => val b=bf.newEmpty
       for (x <- cur)
-        if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
-      b.result(op(tt,cur),null)
+        if (!strict || tt.isDefinedAt(x._1)) try {
+          val r1 = recur(tt(x._1),x._2)
+          if (r1!=null) b += ((x._1, r1))
+        } catch { case _:NoSuchElementException => }
+      b.result(u,null)
     }
     recur(t,this)
   }
   /** Same, but creates a view.
    */
   def zipView[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
-    def recur(tt:T,cur:Repr):PrefixTraversableOnce.Abstract[K,U] = new PrefixTraversableOnce.Abstract[K,U](op(tt,cur)) {
-      def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = for (x <- cur)
-        if (!strict || tt.isDefinedAt(x._1)) try { f((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
+    def recur(tt:T,cur:Repr):PrefixTraversableOnce.Abstract[K,U] = op(tt,cur) match {
+      case null => null
+      case u    => new PrefixTraversableOnce.Abstract[K,U](u) {
+        def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = for (x <- cur)
+          if (!strict || tt.isDefinedAt(x._1)) try {
+            val r1 = recur(tt(x._1),x._2)
+            if (r1!=null) f((x._1,r1))
+          } catch { case _:NoSuchElementException => }
+      }
     }
     recur(t,this)
   }
@@ -124,14 +164,15 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  Access to all parents of the current element is possible.
    */
   def zipViewRec[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:Seq[(T,Repr)]=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
-    def recur(s:Seq[(T,Repr)]):PrefixTraversableOnce.Abstract[K,U] = {
-      new PrefixTraversableOnce.Abstract[K,U](op(s)) {
+    def recur(s:Seq[(T,Repr)]):PrefixTraversableOnce.Abstract[K,U] = op(s) match {
+      case null => null
+      case u    => new PrefixTraversableOnce.Abstract[K,U](u) {
         def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = {
           val cur = s.head
           for (x <- cur._2)
             if (!strict || cur._1.isDefinedAt(x._1)) try {
-              val s1 = (cur._1(x._1),x._2) +: s
-              f((x._1, recur(s1)))
+              val r1 = recur((cur._1(x._1),x._2) +: s)
+              if (r1!=null) f((x._1, r1))
             } catch { case _:NoSuchElementException => }
         }
       }
@@ -154,20 +195,31 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @return the resulting transformed tree
    */
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(tt:T,cur:Repr,oo:O):R = {
-      val b=bf.newEmpty
-      for (x <- cur)
-        if (strict.succeeds(tt,oo)(x._1)) try { b += ((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
-      b.result(oo.value.flatMap(_(tt,cur)),null)
+    def recur(tt:T,cur:Repr,oo:O):R = oo.value.flatMap(_(tt,cur)) match {
+      case null => null.asInstanceOf[R]
+      case u    =>
+        val b=bf.newEmpty
+        for (x <- cur)
+          if (strict.succeeds(tt,oo)(x._1)) try {
+            val r1 = recur(tt(x._1),x._2,oo(x._1))
+            if (r1!=null) b += ((x._1, r1))
+          } catch { case _:NoSuchElementException => }
+        b.result(u,null)
     }
     recur(t,this,op)
   }
   /** Same, but creates a view.
    */
   def zip2View[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
-    def recur(tt:T,cur:Repr,oo:O):PrefixTraversableOnce.Abstract[K,U] = new PrefixTraversableOnce.Abstract[K,U](oo.value.flatMap(_(tt,cur))) {
-      def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = for (x <- cur)
-        if (strict.succeeds(tt,oo)(x._1)) try { f((x._1, recur(tt(x._1),x._2,oo(x._1)))) } catch { case _:NoSuchElementException => }
+    def recur(tt:T,cur:Repr,oo:O):PrefixTraversableOnce.Abstract[K,U] = oo.value.flatMap(_(tt,cur)) match {
+      case null => null
+      case u    => new PrefixTraversableOnce.Abstract[K,U](u) {
+        def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = for (x <- cur)
+          if (strict.succeeds(tt,oo)(x._1)) try {
+            val r1 = recur(tt(x._1),x._2,oo(x._1))
+            if (r1!=null) f((x._1, r1))
+          } catch { case _:NoSuchElementException => }
+      }
     }
     recur(t,this,op)
   }
@@ -177,14 +229,17 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def zip2ViewRec[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,Seq[(T,Repr,O)]=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,Seq[(T,Repr,O)]=>Option[U],O]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
     def recur(s:Seq[(T,Repr,O)]):PrefixTraversableOnce.Abstract[K,U] = {
       val cur = s.head
-      new PrefixTraversableOnce.Abstract[K,U](cur._3.value.flatMap(_(s))) {
+      cur._3.value.flatMap(_(s)) match {
+        case null => null
+        case u    => new PrefixTraversableOnce.Abstract[K,U](u) {
         def foreach[X](f:((K,PrefixTraversableOnce.Abstract[K,U]))=>X):Unit = {
           for (x <- cur._2)
             if (strict.succeeds(cur._1,cur._3)(x._1)) try {
-              val s1 = (cur._1(x._1),x._2,cur._3(x._1)) +: s
-              f((x._1, recur(s1)))
+              val r1 = recur((cur._1(x._1),x._2,cur._3(x._1)) +: s)
+              if (r1!=null) f((x._1,r1))
             } catch { case _:NoSuchElementException => }
         }
+      }
       }
     }
     recur(Seq((t,this,op)))
@@ -200,7 +255,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             an operator produces the new key (if None, the node is skipped), new value, new default handler (can of course be null.)
    *  @return the resulting transformed tree
    */
-  def zipFullRec[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U],L=>R),O])(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
+  def zipFullRec[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(L,Option[U],L=>R),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(L,Option[U],L=>R),O])(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R = {
     def recur(elt:Seq[(K,Repr,T,O)]):(L,R) = {
       val oo:O = elt.head._4
       val b=bf.newEmpty
@@ -220,45 +275,40 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
         }
       oo.value match {
         case None    => null
-        case Some(f) =>
-          val res = f(elt)
-          res._1 match {
-            case Some(l) => (l,b.result(res._2,res._3))
-            case _       => null
-          }
+        case Some(f) => f(elt) match {
+          case null => null
+          case res  => (res._1,b.result(res._2,res._3))
+        }
       }
     }
     recur(Seq((k0,this,t,op)))._2
   }
   /** Same, but creates a view. The default value method goes away in this case.
    */
-  def zipFullRecView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(L,Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(Option[L],Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
+  def zipFullRecView[L,U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(L,Option[U]),O],R<:PrefixTreeLike[L,U,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[(K,Repr,T,O)])=>(L,Option[U]),O]):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] = {
     def recur(elt:Seq[(K,Repr,T,O)]):(L,PrefixTraversableOnce.Abstract[L,U]) = {
       val oo = elt.head._4
       oo.value match {
         case None    => null
-        case Some(f) =>
-          val res = f(elt)
-          res match {
-            case null => null
-            case _    => (l,new PrefixTraversableOnce.Abstract[L,U](res._2) {
-              def foreach[X](g:((L,PrefixTraversableOnce.Abstract[L,U]))=>X):Unit = for (x <- elt.head._2)
-                if (strict.succeeds(elt.head._3,oo)(x._1)) {
-                  var t1:T = null.asInstanceOf[T]
-                  var o1:O = null.asInstanceOf[O]
-                  if(try {
-                    //a missing elt (NoSuchElementException) will not produce any result
-                    t1 = elt.head._3(x._1)
-                    o1 = oo(x._1)
-                    true
-                  } catch { case _:NoSuchElementException => false }) {
-                    val res = recur((x._1,x._2,t1,o1)+:elt)
-                    if (res!=null) g(res)
-                  }
+        case Some(f) => f(elt) match {
+          case null => null
+          case res  => (res._1,new PrefixTraversableOnce.Abstract[L,U](res._2) {
+            def foreach[X](g:((L,PrefixTraversableOnce.Abstract[L,U]))=>X):Unit = for (x <- elt.head._2)
+              if (strict.succeeds(elt.head._3,oo)(x._1)) {
+                var t1:T = null.asInstanceOf[T]
+                var o1:O = null.asInstanceOf[O]
+                if(try {
+                  //a missing elt (NoSuchElementException) will not produce any result
+                  t1 = elt.head._3(x._1)
+                  o1 = oo(x._1)
+                  true
+                } catch { case _:NoSuchElementException => false }) {
+                  val res = recur((x._1,x._2,t1,o1)+:elt)
+                  if (res!=null) g(res)
                 }
-            })
-            case _ => null
-          }
+              }
+          })
+        }
       }
     }
     recur(Seq((k0,this,t,op)))._2
@@ -280,7 +330,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *           U the current value
    *           Seq[(K,Repr)] the element stack from bottom to top
    */
-  def deepFoldLeft1[U](u0:U,k0:K)(f: (U, Seq[(K,Repr)]) => U): U = {
+  def deepFoldLeftRec[U](u0:U,k0:K)(f: (U, Seq[(K,Repr)]) => U): U = {
     def recur(u: U, elt:Seq[(K,Repr)]):U = f(elt.head._2.foldLeft(u)((uu,ee)=>recur(uu,ee+:elt)),elt)
     recur(u0,Seq((k0,this)))
   }
@@ -289,7 +339,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  Branches for which an operation is missing (NoSuchElementException) are not explored.
    *  Nodes with no value are ignored (but children are explored.)
    */
-  def deepFoldLeft2[U,O<:PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,O]](u0:U,k0:K)(op: O with PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,O]): U = {
+  def deepFoldLeftRec[U,O<:PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,O]](u0:U,k0:K)(op: O with PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,O]): U = {
     def recur(u: U, elt:Seq[(K,Repr)], oo:O):U = if (oo==null) u else {
       val u1 = elt.head._2.foldLeft(u)((uu,ee)=>recur(uu,ee+:elt,try { oo(ee._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }))
       oo.value match {
@@ -310,7 +360,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             =>Unit   : a byname param that has to be evaluated
    *                        somewhere to evaluate the current element children
    */
-  def deepForeach(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
+  def deepForeachFull(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
     def recur(elt:(K,Repr)):Unit = op(elt,elt._2.foreach(recur))
     recur((k,this))
   }
@@ -325,7 +375,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             Iterator[U] : the iterator on the children
    *             U           : some result
    */
-  def deepForeach1[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
+  def deepForeach[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
     def recur(elt:(K,Repr)):U = op(elt,elt._2.toIterator.map(recur))
     recur((k,this))
   }
@@ -338,7 +388,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             Iterator[U]   : the iterator on the children
    *             U             : some result
    */
-  def deepForeach2[U](k0:K)(op: (Seq[(K,Repr)],Iterator[U]) => U): U = {
+  def deepForeachRec1[U](k0:K)(op: (Seq[(K,Repr)],Iterator[U]) => U): U = {
     def recur(elt:Seq[(K,Repr)]):U = op(elt,elt.head._2.toIterator.map(x=>recur(x+:elt)))
     recur(Seq((k0,this)))
   }
@@ -353,7 +403,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *             (K,Repr) : the current element and its key
    *             Iterator : the iterator on the children
    */
-  def deepForeach3[O<:PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,O]](k0:K)(op: O with PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,O]): Unit = {
+  def deepForeachRec2[O<:PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,O]](k0:K)(op: O with PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,O]): Unit = {
     def recur(elt:Seq[(K,Repr)], oo:O):Unit = if (oo!=null && oo.value!=None) {
       oo.value.get(elt,elt.head._2.toIterator.map(x=>recur(x+:elt,try { oo(x._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }))) //has value: compute current element
     }

@@ -318,11 +318,11 @@ object TreeTests {
     //in zipFull, we do a similar transformation as above, but replace the key with the Int value and Strings with Symbols.
     //the result should be close to the previous one, thus easily comparable.
     //this is far from testing all possibilities, but its a good start.
-    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])]=>(Option[Int],Option[Symbol],Int=>PrefixTree[Int,Symbol])) {
+    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])]=>(Int,Option[Symbol],Int=>PrefixTree[Int,Symbol])) {
       def merge(x:Int, y:Int):String
       def apply(s:Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])])= {
         val cur=s.head; val t2=cur._3; val t1=cur._2; val o=cur._4
-        (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${merge(v1,v2)}"),null)
+        (t1.value.get,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${merge(v1,v2)}"),null)
       }
     }
     val op1:F = new F { def merge(x:Int, y:Int) = s"$x+$y" }
@@ -352,11 +352,11 @@ object TreeTests {
   }
   def testZipFullView(implicit out:PrintWriter) = {
     //This test must give the same result as testZipFull
-    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])]=>(Option[Int],Option[Symbol])) {
+    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])]=>(Int,Option[Symbol])) {
       def merge(x:Int, y:Int):String
       def apply(s:Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])])= {
         val cur=s.head; val t2=cur._3; val t1=cur._2; val o=cur._4
-        (t1.value,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${merge(v1,v2)}"))
+        (t1.value.get,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${merge(v1,v2)}"))
       }
     }
     val op1:F = new F { def merge(x:Int, y:Int) = s"$x+$y" }
@@ -404,9 +404,9 @@ object TreeTests {
         (Seq(),(op1,PrefixTree.constant[String,O](op1))),
         (Seq("f"),(op2,PrefixTree.constant[String,O](op2)))
       ))
-    m.deepForeach3("")(opX)
+    m.deepForeachRec2("")(opX)
     out.println
-    m.deepForeach2[Int](""){(p,c)=>
+    m.deepForeachRec1[Int](""){(p,c)=>
       val t = p.head
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       var i=0
@@ -415,7 +415,7 @@ object TreeTests {
       i
     }
     out.println
-    m.deepForeach1[Int](""){(t,c)=>
+    m.deepForeach[Int](""){(t,c)=>
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       var i=0
       while (c.hasNext) { i+=1; c.next }
@@ -423,7 +423,7 @@ object TreeTests {
       i
     }
     out.println
-    m.deepForeach(""){(t,recur)=>
+    m.deepForeachFull(""){(t,recur)=>
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       recur
       print(s"}")
