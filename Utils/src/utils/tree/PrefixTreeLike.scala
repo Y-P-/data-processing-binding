@@ -323,7 +323,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  override def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  def zip2A[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](k0:K,t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     def recur(tt:T,cur:Repr,oo:O):R = {
       val b=bf.newEmpty
       for (x:(K,This) <- cur)
@@ -332,7 +332,16 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     }
     recur(t,this,op)
   }
-
+  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](k0:K,t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    (new Recur[(T,O),U,R] {
+      val default = (d:Data)=>buildDefault(d,d._1._2.default)
+      def mapValue(cur:Data):Option[U]       = cur._2._2.value.flatMap(_(cur._2._1,cur._1._2))
+      def nextX(next:(K,Repr),x:(T,O)):(T,O) = try { 
+        if (strict.succeeds(x._1,x._2)(next._1)) (x._1(next._1),x._2(next._1)) else null
+      } catch { case _:NoSuchElementException => null }
+    })(k0,(t,op))
+  }
+    
   /** Transforms this tree by applying a function to every retrieved value.
    *  It works also on default values, but be aware that using deep trees
    *  in the default results may lead to a severe performance load.

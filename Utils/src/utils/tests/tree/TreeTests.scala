@@ -308,10 +308,11 @@ object TreeTests {
     //note here that f exists but has no op: default is not used, and being not strict, this will
     //not stop the tree exploration. But f won't have any value.
     implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
-    val rx = m1.zip2(m0,NOT_STRICT,opX)
+    val rx = m1.zip2(m0,NOT_STRICT,opX)           //has default
     out.println(rx)
-    val ry = m1.zip2(m0,NOT_STRICT,opY)
+    val ry = m1.zip2(m0,NOT_STRICT,opY)           //has no default
     out.println(ry)
+    //out.println(rx("f")("f"))
   }
 
   def testZipFull(implicit out:PrintWriter) = {

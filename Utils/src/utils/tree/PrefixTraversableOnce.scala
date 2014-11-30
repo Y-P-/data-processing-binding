@@ -58,7 +58,136 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
   def isNonSignificant = value.isEmpty && isEmpty
-
+  
+  /** A generic class that highlights the recursion algorithm.
+   *  Most methods will use it in derived form to achieve their own purpose.
+   */
+  protected[this] abstract class Recur[X,U,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) {
+    type Data = ((K,Repr),X)
+    /** Building the value for the child
+     *  @param cur, the child
+     *  @return a node value, which can be null (child ignored)
+     */
+    def mapValue(cur:Data):Option[U]
+    /** Building the data for the child
+     *  @param cur, the child
+     *  @param x, the parent's data
+     *  @return a data value, which can be null (child ignored)
+     */
+    def nextX(child:(K,Repr),x:X):X
+    /** Building the child for the current Data
+     *  @param cur, the data for that child
+     *  @return a node value, which can be null (ignored)
+     */
+    def child(cur:Data):R = recur(cur,default(cur))
+    /** The default function
+     */
+    val default:Data=> K=>R
+    /** Building a recursive default from a K=>Repr default.
+     */
+    def buildDefault(cur:Data,defa:K=>Repr): K=>R = k => {
+      val chld = (k,defa(k))
+      nextX(chld,cur._2) match {
+        case null => bf.empty
+        case x1   => child((chld,x1)) match {
+          case null => bf.empty
+          case r1   => r1
+        }
+      }
+    }
+    /**The recursive call to walk the tree
+     * @param cur, the current node and node param values
+     * @param defa, the default function for the node being built
+     * @return a node value, which can be null (ignored)
+     */
+    def recur(cur:Data,defa:K=>R):R = mapValue(cur) match {
+      case null => null.asInstanceOf[R]
+      case u    => val b=bf.newEmpty
+        for (z <- cur._1._2) nextX(z,cur._2) match {
+          case null =>
+          case x1   => child((z,x1)) match {
+            case null =>
+            case r1   => b += ((z._1, r1))
+          }
+        }
+      b.result(u,defa)
+    }
+    /** Running against the current tree.
+     */
+    def apply(k0:K,x:X) = {
+      val cur = ((k0,PrefixTraversableOnce.this),x)
+      recur(cur,default(cur)) match {
+        case null => bf.empty
+        case r    => r
+      }
+    }
+  }
+  
+  /** A generic class that highlights the recursion algorithm.
+   *  Most methods will use it in derived form to achieve their own purpose.
+   */
+  protected[this] abstract class RecurRec[X,U,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]) {
+    type Data = ((K,Repr),X)
+    /** Building the value for the child
+     *  @param cur, the child
+     *  @return a node value, which can be null (child ignored)
+     */
+    def mapValue(cur:Seq[Data]):Option[U]
+    /** Building the data for the child
+     *  @param cur, the child
+     *  @param x, the parent's data
+     *  @return a data value, which can be null (child ignored)
+     */
+    def nextX(child:(K,Repr),x:X):X
+    /** Building the child for the current Data
+     *  @param cur, the data for that child
+     *  @return a node value, which can be null (ignored)
+     */
+    def child(cur:Seq[Data]):R = recur(cur,default(cur))
+    /** The default function
+     */
+    val default:Seq[Data]=> K=>R
+    /** Building a recursive default from a K=>Repr default.
+     */
+    def buildDefault(s:Seq[Data],defa:K=>Repr): K=>R = k => {
+      val chld = (k,defa(k))
+      nextX(chld,s.head._2) match {
+        case null => bf.empty
+        case x1   => child((chld,x1)+:s) match {
+          case null => bf.empty
+          case r1   => r1
+        }
+      }
+    }
+    /**The recursive call to walk the tree
+     * @param cur, the current node and node param values
+     * @param defa, the default function for the node being built
+     * @return a node value, which can be null (ignored)
+     */
+    def recur(s:Seq[Data],defa:K=>R):R = mapValue(s) match {
+      case null => null.asInstanceOf[R]
+      case u    => val b=bf.newEmpty
+        val cur = s.head
+        for (z <- cur._1._2) nextX(z,cur._2) match {
+          case null =>
+          case x1   => child((z,x1)+:s) match {
+            case null =>
+            case r1   => b += ((z._1, r1))
+          }
+        }
+      b.result(u,defa)
+    }
+    /** Running against the current tree.
+     */
+    def apply(k0:K,x:X) = {
+      val cur = Seq(((k0,PrefixTraversableOnce.this),x))
+      recur(cur,default(cur)) match {
+        case null => bf.empty
+        case r    => r
+      }
+    }
+  }
+  
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    *  You can provide defaults, and error when fetching defaults are ignored (no default in such cases.)
    */
@@ -97,6 +226,15 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     recur(s,default(s))
   }
 
+  def zipi[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](k0:K,t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O],default0:(((K,This),(T,O)))=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    (new Recur[(T,O),U,R] {
+      val default = default0
+      def mapValue(cur:Data):Option[U]       = cur._2._2.value.flatMap(_(cur._2._1,cur._1._2))
+      def nextX(next:(K,Repr),x:(T,O)):(T,O) = try { 
+        if (strict.succeeds(x._1,x._2)(next._1)) (x._1(next._1),x._2(next._1)) else null
+      } catch { case _:NoSuchElementException => null }
+    })(k0,(t,op))
+  }
   /** Forces this PrefixTraversableOnce into a PrefixTree with no default.
    */
   def toPrefixTree:PrefixTree[K,V] = toTree[V,PrefixTree[K,V]](null.asInstanceOf[K])(x=>null)
@@ -248,6 +386,9 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @return the resulting transformed tree
    */
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    val d:(((K,This),(T,O)))=>K=>R = _=>null
+    zipi(null.asInstanceOf[K],t,strict,op,d)
+    /*
     def recur(tt:T,cur:Repr,oo:O):R = oo.value.flatMap(_(tt,cur)) match {
       case null => null.asInstanceOf[R]
       case u    =>
@@ -262,7 +403,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     recur(t,this,op) match {
       case null => bf.empty
       case r    => r
-    }
+    }*/
   }
   /** Same, but creates a view.
    */
