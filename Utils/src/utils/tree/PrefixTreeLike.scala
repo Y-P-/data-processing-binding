@@ -165,17 +165,13 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *          the predicate `p`. This results in a new tree in which keys that
    *          were removed now fall back on the default method.
    */
-  def filterAll(p: ((K,Repr)) => Boolean): This = {
-    val bf = newBuilder
-    if (!isEmpty) for (x:(K,Repr) <- this if p(x)) bf += ((x._1,x._2.filterAll(p)))
-    bf.result(value,default)
-  }
+  def filterAll(p: ((K,Repr)) => Boolean): This = filter(null.asInstanceOf[K])(p,x => x._2.default)(newBuilder)
 
   /** Similar to the previous method, but the result is a view and doesn't rebuild
    *  a new tree. Such views are only useful when relatively few elements are used ;
    *  in other cases, it may be more performant to use filterAll.
    */
-  def filterView(p: ((K,Repr)) => Boolean): PrefixTreeLike[K,V,_] = new WithFilter(p)
+  def filterView(p: ((K,Repr)) => Boolean): This = super.filter(null.asInstanceOf[K])(p,x => x._2.default)(newBuilder)
 
   /** This class yields a filtered view of the current tree.
    *  Default apply and may be filtered : in that case they fall back on the noDefault method.
@@ -344,21 +340,9 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *            The resulting tree is a new tree.
    */
-  def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
-    if (!isEmpty) {
-      //OK: one explanation here, but it is the same everywhere:
-      //We must duplicate bf to have an empty copy to work on with children : the bf used at
-      //this level is in used and cannot be shared with children!
-      //However, that copy can be shared between chidren, because the result for one child is
-      //built before we pass it on to the next child, and taking the result resets the builder.
-      //working in this way lets us use much more performant ArrayBuffer[(K,T)] rather than
-      //full blown maps (or whatever underlying structure is used in T) by using the
-      //empty ++ ((k,t)) construct (which would work, but be awfully inefficient.)
-      val bf1 = bf.newEmpty
-      for (x <- this) bf += ((x._1,x._2.map(f)(bf1)))
-    }
-    bf.result(value.map(f),asDefault(default(_:K).map(f)))
-  }
+  def map[W,T<:PrefixTreeLike[K,W,T]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T =
+    super.map(null.asInstanceOf[K])(f,x => x._2.asDefault(default(_:K).map(f)))
+
 
   /** The clone of this tree is the same tree using the same builder, cloning each sub-tree
    */

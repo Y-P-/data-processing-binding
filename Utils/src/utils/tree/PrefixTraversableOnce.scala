@@ -73,22 +73,66 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    */
-  def toTree[U>:V,R<:PrefixTreeLike[K,U,R]](implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(cur: Repr):R = {
+  def toTree[U>:V,R<:PrefixTreeLike[K,U,R]](k0:K)(default:((K,This))=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(cur: Repr,defa:K=>R):R = {
       val b=bf.newEmpty
-      for (x <- cur) b += ((x._1, recur(x._2)))
-      b.result(cur.value,null)
+      for (x <- cur) b += ((x._1, recur(x._2,default(x))))
+      b.result(cur.value,defa)
     }
-    recur(this)
+    recur(this,default(k0,this))
+  }
+  /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
+   */
+  def toTreeRec[U>:V,R<:PrefixTreeLike[K,U,R]](k0:K)(default:(Seq[(K,This)])=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(s: Seq[(K,Repr)],defa:K=>R):R = {
+      val b=bf.newEmpty
+      val cur=s.head._2
+      for (x <- cur) {
+        val s1 = x+:s
+        b += ((x._1, recur(s1,default(s1))))
+      }
+      b.result(cur.value,defa)
+    }
+    val s = Seq((k0,this))
+    recur(s,default(s))
   }
 
   /** Forces this PrefixTraversableOnce into a PrefixTree with no default.
    */
-  def toPrefixTree:PrefixTree[K,V] = toTree[V,PrefixTree[K,V]]
+  def toPrefixTree:PrefixTree[K,V] = toTree[V,PrefixTree[K,V]](null.asInstanceOf[K])(x=>null)
   
   /** Forces this PrefixTraversableOnce into a PrefixTree with some default.
    */
   def toPrefixTree[U>:V,O<:PrefixTreeLike[K,K=>PrefixTree[K,U],O]](default:O with PrefixTreeLike[K,K=>PrefixTree[K,U],O]):PrefixTree[K,U] = toTree[U,PrefixTree[K,U],O](default)
+
+  
+  /** filter this tree according to some criteria.
+   */
+  def filter[U>:V,R<:PrefixTreeLike[K,U,R]](k0:K)(f:((K,This))=> Boolean, default:((K,This))=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(cur:Repr,defa:K=>R):R = {
+      val b = bf.newEmpty
+      for (x <- cur) if (f(x)) b += ((x._1, recur(x._2,default(x))))
+      b.result(cur.value,defa)
+    }
+    recur(this,default((k0,this)))
+  }
+  
+  /** Complex filter operation acting both on key and value including the current element parents.
+   *  A slightly faster implementation might be done directly.
+   */
+  def filterViewRec(k0:K)(f:(Seq[(K,Repr)])=>Boolean):PrefixTraversableOnce[K,V,PrefixTraversableOnce.Abstract[K,V]] =
+    mapViewRec[K,V](k0)(s => if (f(s)) (s.head._1,s.head._2.value) else null)
+  
+  /** Simple map for the value element.
+   */
+  def map[U,R<:PrefixTreeLike[K,U,R]](k0:K)(f:V=>U,default:((K,This))=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    def recur(cur:Repr,defa:K=>R):R = {
+      val b = bf.newEmpty
+      for (x <- cur) b += ((x._1, recur(x._2,default(x))))
+      b.result(if (cur.value==None) None else Some(f(cur.value.get)),defa)
+    }
+    recur(this,default(k0,this))
+  }
   
   /** Simple map for the value element.
    */
@@ -115,7 +159,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
       })
     }
     recur(Seq((k0,this))) match {
-      case null  => null
+      case null  => PrefixTraversableOnce.empty
       case (_,r) => r
     }
   }
@@ -136,14 +180,17 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def recur(tt:T,cur:Repr):R = op(tt,cur) match {
       case null => null.asInstanceOf[R]
       case u    => val b=bf.newEmpty
-      for (x <- cur)
-        if (!strict || tt.isDefinedAt(x._1)) try {
-          val r1 = recur(tt(x._1),x._2)
-          if (r1!=null) b += ((x._1, r1))
-        } catch { case _:NoSuchElementException => }
-      b.result(u,null)
+        for (x <- cur)
+          if (!strict || tt.isDefinedAt(x._1)) try {
+            val r1 = recur(tt(x._1),x._2)
+            if (r1!=null) b += ((x._1, r1))
+          } catch { case _:NoSuchElementException => }
+        b.result(u,null)
     }
-    recur(t,this)
+    recur(t,this) match {
+      case null => bf.empty
+      case r    => r
+    }
   }
   /** Same, but creates a view.
    */
@@ -158,7 +205,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
           } catch { case _:NoSuchElementException => }
       }
     }
-    recur(t,this)
+    recur(t,this) match {
+      case null => PrefixTraversableOnce.empty
+      case r    => r
+    }
   }
   /** Same, but creates a view.
    *  Access to all parents of the current element is possible.
@@ -177,7 +227,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
         }
       }
     }
-    recur(Seq((t,this)))
+    recur(Seq((t,this))) match {
+      case null => PrefixTraversableOnce.empty
+      case r    => r
+    }
   }
 
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
@@ -206,7 +259,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
           } catch { case _:NoSuchElementException => }
         b.result(u,null)
     }
-    recur(t,this,op)
+    recur(t,this,op) match {
+      case null => bf.empty
+      case r    => r
+    }
   }
   /** Same, but creates a view.
    */
@@ -221,7 +277,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
           } catch { case _:NoSuchElementException => }
       }
     }
-    recur(t,this,op)
+    recur(t,this,op) match {
+      case null => PrefixTraversableOnce.empty
+      case r    => r
+    }
   }
   /** Same, but creates a view.
    *  Access to all parents of the current element is possible.
@@ -242,7 +301,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
       }
       }
     }
-    recur(Seq((t,this,op)))
+    recur(Seq((t,this,op))) match {
+      case null => PrefixTraversableOnce.empty
+      case r    => r
+    }
   }
 
   /** Similar to the previous method, but now we can build a tree of a fully different nature (different keys.)
@@ -281,7 +343,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
         }
       }
     }
-    recur(Seq((k0,this,t,op)))._2
+    recur(Seq((k0,this,t,op))) match {
+      case null => bf.empty
+      case r    => r._2
+    }
   }
   /** Same, but creates a view. The default value method goes away in this case.
    */
@@ -311,7 +376,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
         }
       }
     }
-    recur(Seq((k0,this,t,op)))._2
+    recur(Seq((k0,this,t,op))) match {
+      case null => PrefixTraversableOnce.empty
+      case r    => r._2
+    }
   }
 
   /** A fold left operation that descends through the subtrees.
@@ -422,7 +490,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @return      the string builder `b` to which elements were appended.
    */
   override def addString(b: StringBuilder, start: String, sep: String, end: String): StringBuilder =
-    this.map { case (k, v) => s"$k -> $v" }.addString(b, start, sep, end)
+    (this.asInstanceOf[TraversableOnce[(K,This)]]).map { case (k, v) => s"$k -> $v" }.addString(b, start, sep, end)
 
   /** Defines the prefix of this object's `toString` representation.
    *  @return  a string representation which starts the result of `toString` applied to this $coll.
@@ -444,7 +512,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
 object PrefixTraversableOnce {
 
-  abstract class Abstract[K,V](val value:Option[V]) extends Traversable[(K,Abstract[K,V])] with PrefixTraversableOnce[K,V,Abstract[K,V]] {
+  abstract class Abstract[K,+V](val value:Option[V]) extends Traversable[(K,Abstract[K,V])] with PrefixTraversableOnce[K,V,Abstract[K,V]] {
     this:Abstract[K,V] =>
     override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
   }
