@@ -43,6 +43,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
      with Subtractable[K, This]
      with Equals { self:This =>
 
+  import PrefixTraversableOnce._
+
   /** The general parameters used for building the tree.
    */
   type Params <: PrefixTreeLike.Params[K,V,Repr]
@@ -333,15 +335,18 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     recur(t,this,op)
   }
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](k0:K,t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    (new Recur[(T,O),U,R] {
+    (new RecurSameKey[(T,O),K,V,U,R,This] {
       val default = (d:Data)=>buildDefault(d,d._1._2.default)
-      def mapValue(cur:Data):Option[U]       = cur._2._2.value.flatMap(_(cur._2._1,cur._1._2))
-      def nextX(next:(K,Repr),x:(T,O)):(T,O) = try { 
-        if (strict.succeeds(x._1,x._2)(next._1)) (x._1(next._1),x._2(next._1)) else null
+      def mapValues(cur:Data):Option[U]      = cur._2._2.value.flatMap(_(cur._2._1,cur._1._2))
+      def nextX(child:(K,This),s:Data):(T,O) = try {
+        val k = child._1
+        val v1 = s._2._1
+        val v2 = s._2._2
+        if (strict.succeeds(v1,v2)(k)) (v1(k),v2(k)) else null
       } catch { case _:NoSuchElementException => null }
-    })(k0,(t,op))
+    })(k0,(t,op),this)
   }
-    
+
   /** Transforms this tree by applying a function to every retrieved value.
    *  It works also on default values, but be aware that using deep trees
    *  in the default results may lead to a severe performance load.
