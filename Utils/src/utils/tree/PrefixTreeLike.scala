@@ -336,8 +336,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   }
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](k0:K,t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     (new RecurSameKey[(T,O),K,V,U,R,This] {
-      val default = (d:Data)=>buildDefault(d,d._1._2.default)
-      def mapValues(cur:Data):Option[U]      = cur._2._2.value.flatMap(_(cur._2._1,cur._1._2))
+      def mapValues(cur:Data):(Option[U],K=>R) = (cur._2._2.value.flatMap(_(cur._2._1,cur._1._2)),buildDefault(cur,cur._1._2.default))
       def nextX(child:(K,This),s:Data):(T,O) = try {
         val k = child._1
         val v1 = s._2._1

@@ -319,11 +319,11 @@ object TreeTests {
     //in zipFull, we do a similar transformation as above, but replace the key with the Int value and Strings with Symbols.
     //the result should be close to the previous one, thus easily comparable.
     //this is far from testing all possibilities, but its a good start.
-    abstract class F extends (Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])]=>(Int,Option[Symbol],Int=>PrefixTree[Int,Symbol])) {
+    abstract class F extends (Seq[((String,StringTree[Int]),(StringTree[Int],PrefixTree[String,F]))]=>(Int,Option[Symbol],Int=>PrefixTree[Int,Symbol])) {
       def merge(x:Int, y:Int):String
-      def apply(s:Seq[(String,StringTree[Int],StringTree[Int],PrefixTree[String,F])])= {
-        val cur=s.head; val t2=cur._3; val t1=cur._2; val o=cur._4
-        (t1.value.get,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1}${merge(v1,v2)}"),null)
+      def apply(s:Seq[((String,StringTree[Int]),(StringTree[Int],PrefixTree[String,F]))])= {
+        val cur=s.head; val t2=cur._2._1; val t1=cur._1._2; val o=cur._2._2
+        (t1.value.get,for (v1<-t2.value; v2<-t1.value) yield Symbol(s"${s.head._1._1}${merge(v1,v2)}"),null)
       }
     }
     val op1:F = new F { def merge(x:Int, y:Int) = s"$x+$y" }
