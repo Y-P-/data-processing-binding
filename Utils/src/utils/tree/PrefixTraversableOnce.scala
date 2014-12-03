@@ -200,13 +200,13 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     new FoldDeep(u0).left(k0,this,topFirst,f)
   def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,Repr)]) => U): U =
     new FoldDeep(u0).leftRec(k0,this,topFirst,f)
-  def deepFoldLeftTreeRec[U,O<:PrefixTreeLike[K,(U,(K,This)) => U,O]](u0:U,k0:K,topFirst:Boolean)(op: O): U =
+  def deepFoldLeftTreeRec[U](u0:U,k0:K,topFirst:Boolean)(op: PrefixTreeLike.Tree[K,(U,(K,This)) => U]): U =
     new FoldDeep(u0).leftTreeRec(k0,this,topFirst,op)
   def deepFoldRight[U](u0:U,k0:K,topFirst:Boolean)(f: ((K,Repr),U) => U): U =
     new FoldDeep(u0).right(k0,this,topFirst,f)
   def deepFoldRightRec[U](u0:U,k0:K,topFirst:Boolean)(f: (Seq[(K,Repr)],U) => U): U =
     new FoldDeep(u0).rightRec(k0,this,topFirst,f)
-  def deepFoldRightTreeRec[U,O<:PrefixTreeLike[K,((K,This),U) => U,O]](u0:U,k0:K,topFirst:Boolean)(op: O): U =
+  def deepFoldRightTreeRec[U](u0:U,k0:K,topFirst:Boolean)(op: PrefixTreeLike.Tree[K,((K,This),U) => U]): U =
     new FoldDeep(u0).rightTreeRec(k0,this,topFirst,op)
 
 
@@ -282,12 +282,12 @@ object PrefixTraversableOnce {
     var x:X = x0
     def recD(s:(K,This),f:(X,(K,This))=>X):Unit = { for (z <- s._2) recD(z,f); x=f(x,s) }
     def recDR(s:Seq[(K,This)],f:(X,Seq[(K,This)])=>X):Unit = { for (z <- s.head._2) recDR(z+:s,f); x=f(x,s) }
-    def recDT[O<:PrefixTreeLike[K,(X,(K,This))=>X,O]](s:(K,This),o:O):Unit = {
-      for (z <- s._2)
-        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
-          case null =>
-          case o1    => recDT(z,o1)
-        }
+    def recDT(s:(K,This),o:PrefixTreeLike.Tree[K,(X,(K,This))=>X]):Unit = {
+      for (z <- s._2) {
+        var o1:PrefixTreeLike.Tree[K,(X,(K,This))=>X] = null
+        try { o1=o(z._1) } catch { case _:NoSuchElementException=> }
+        if (o1!=null) recDT(z,o1)
+      }
       o.value.orNull match {
         case null =>
         case f    => x=f(x,s)
@@ -295,25 +295,25 @@ object PrefixTraversableOnce {
     }
     def recT(s:(K,This),f:(X,(K,This))=>X):X = { x=f(x,s); for (z <- s._2) x=recT(z,f); x }
     def recTR(s:Seq[(K,This)],f:(X,Seq[(K,This)])=>X):X = { f(x,s); for (z <- s.head._2) x=recTR(z+:s,f); x }
-    def recTT[O<:PrefixTreeLike[K,(X,(K,This))=>X,O]](s:(K,This),o:O):Unit = {
+    def recTT(s:(K,This),o:PrefixTreeLike.Tree[K,(X,(K,This))=>X]):Unit = {
        o.value.orNull match {
         case null =>
         case f    => x=f(x,s)
       }
-      for (z <- s._2)
-        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
-          case null =>
-          case o1    => recTT(z,o1)
-        }
+      for (z <- s._2) {
+        var o1:PrefixTreeLike.Tree[K,(X,(K,This))=>X] = null
+        try { o1=o(z._1) } catch { case _:NoSuchElementException=> }
+        if (o1!=null) recTT(z,o1)
+      }
     }
     def rec1D(s:(K,This),f:((K,This),X)=>X):Unit = { for (z <- s._2.reversed) rec1D(z,f); x=f(s,x) }
     def rec1DR(s:Seq[(K,This)],f:(Seq[(K,This)],X)=>X):Unit = { for (z <- s.head._2.reversed) rec1DR(z+:s,f); x=f(s,x) }
-    def rec1DT[O<:PrefixTreeLike[K,((K,This),X)=>X,O]](s:(K,This),o:O):Unit = {
-      for (z <- s._2.reversed)
-        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
-          case null =>
-          case o1    => rec1DT(z,o1)
-        }
+    def rec1DT(s:(K,This),o:PrefixTreeLike.Tree[K,((K,This),X)=>X]):Unit = {
+      for (z <- s._2.reversed) {
+        var o1:PrefixTreeLike.Tree[K,((K,This),X)=>X] = null
+        try { o1=o(z._1) } catch { case _:NoSuchElementException=> }
+        if (o1!=null) rec1DT(z,o1)
+      }
       o.value.orNull match {
         case null =>
         case f    => x=f(s,x)
@@ -321,24 +321,24 @@ object PrefixTraversableOnce {
     }
     def rec1T(s:(K,This),f:((K,This),X)=>X):X = { x=f(s,x); for (z <- s._2.reversed) x=rec1T(z,f); x }
     def rec1TR(s:Seq[(K,This)],f:(Seq[(K,This)],X)=>X):X = { f(s,x); for (z <- s.head._2.reversed) x=rec1TR(z+:s,f); x }
-    def rec1TT[O<:PrefixTreeLike[K,((K,This),X)=>X,O]](s:(K,This),o:O):Unit = {
+    def rec1TT(s:(K,This),o:PrefixTreeLike.Tree[K,((K,This),X)=>X]):Unit = {
        o.value.orNull match {
         case null =>
         case f    => x=f(s,x)
       }
-      for (z <- s._2.reversed)
-        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
-          case null =>
-          case o1    => rec1TT(z,o1)
-        }
+      for (z <- s._2.reversed) {
+        var o1:PrefixTreeLike.Tree[K,((K,This),X)=>X] = null
+        try { o1=o(z._1) } catch { case _:NoSuchElementException=> }
+        if (o1!=null) rec1DT(z,o1)
+      }
     }
 
-    def left(k0:K,tree:This,topFirst:Boolean,f:(X,(K,This))=>X):X                                   = { if (topFirst) recT((k0,tree),f)        else recD((k0,tree),f); x }
-    def leftRec(k0:K,tree:This,topFirst:Boolean,f:(X,Seq[(K,This)])=>X):X                           = { if (topFirst) recTR(Seq((k0,tree)),f)  else recDR(Seq((k0,tree)),f); x }
-    def leftTreeRec[O<:PrefixTreeLike[K,(X,(K,This))=>X,O]](k0:K,tree:This,topFirst:Boolean,o:O):X  = { if (topFirst) recTT((k0,tree),o)       else recDT((k0,tree),o); x}
-    def right(k0:K,tree:This,topFirst:Boolean,f:((K,This),X)=>X):X                                  = { if (topFirst) rec1T((k0,tree),f)       else rec1D((k0,tree),f); x }
-    def rightRec(k0:K,tree:This,topFirst:Boolean,f:(Seq[(K,This)],X)=>X):X                          = { if (topFirst) rec1TR(Seq((k0,tree)),f) else rec1DR(Seq((k0,tree)),f); x }
-    def rightTreeRec[O<:PrefixTreeLike[K,((K,This),X)=>X,O]](k0:K,tree:This,topFirst:Boolean,o:O):X = { if (topFirst) rec1TT((k0,tree),o)      else rec1DT((k0,tree),o); x}
+    def left(k0:K,tree:This,topFirst:Boolean,f:(X,(K,This))=>X):X                                = { if (topFirst) recT((k0,tree),f)        else recD((k0,tree),f); x }
+    def leftRec(k0:K,tree:This,topFirst:Boolean,f:(X,Seq[(K,This)])=>X):X                        = { if (topFirst) recTR(Seq((k0,tree)),f)  else recDR(Seq((k0,tree)),f); x }
+    def leftTreeRec(k0:K,tree:This,topFirst:Boolean,o:PrefixTreeLike.Tree[K,(X,(K,This))=>X]):X  = { if (topFirst) recTT((k0,tree),o)       else recDT((k0,tree),o); x}
+    def right(k0:K,tree:This,topFirst:Boolean,f:((K,This),X)=>X):X                               = { if (topFirst) rec1T((k0,tree),f)       else rec1D((k0,tree),f); x }
+    def rightRec(k0:K,tree:This,topFirst:Boolean,f:(Seq[(K,This)],X)=>X):X                       = { if (topFirst) rec1TR(Seq((k0,tree)),f) else rec1DR(Seq((k0,tree)),f); x }
+    def rightTreeRec(k0:K,tree:This,topFirst:Boolean,o:PrefixTreeLike.Tree[K,((K,This),X)=>X]):X = { if (topFirst) rec1TT((k0,tree),o)      else rec1DT((k0,tree),o); x}
   }
 
   /** A class to define various way to iterate through the whole tree.

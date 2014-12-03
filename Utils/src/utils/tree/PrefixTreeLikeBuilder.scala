@@ -10,6 +10,8 @@ import scala.collection.mutable.ArrayBuffer
  */
 abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
   type Repr = Tree
+  type Value = V
+  type Key = K
   type Params
   implicit def params:Params
 
@@ -162,6 +164,8 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
 
 }
 object PrefixTreeLikeBuilder {
+  //type TreeBuilder[K,V] = PrefixTreeLikeBuilder[K,V,T] forSome { type T<:PrefixTreeLike[K,V,T] }
+  //type TreeBuilder[T<:PrefixTreeLike[_,_,T]] = PrefixTreeLikeBuilder[_,_,T] forSome { type T<:PrefixTreeLike[K,V,T] }
   val noElt = (x:Any) => throw new NoSuchElementException(s"key not found $x")
 
   /** This trait provides an easy way to build navigable trees, but there are other ways
