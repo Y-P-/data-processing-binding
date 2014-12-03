@@ -63,6 +63,8 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    */
   def isNonSignificant = value.isEmpty && isEmpty
 
+  protected override def reversed = super.reversed
+
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    */
   def toTree[U>:V,R<:PrefixTreeLike[K,U,R],O<:PrefixTreeLike[K,K=>R,O]](default:O with PrefixTreeLike[K,K=>R,O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
@@ -194,86 +196,37 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  Children are evaluated before their parent.
    *  The top tree is evaluated last with k0 as key.
    */
-  def deepFoldLeft[U](u0:U,k0:K)(f: (U, (K,Repr)) => U): U =
-    new PrefixTraversableOnce.RecurDeep[U,K,This](u0)(f)(k0,this)
-  def deepFoldLeftRec[U](u0:U,k0:K)(f: (U, Seq[(K,Repr)]) => U): U =
-    new PrefixTraversableOnce.RecurDeepRec[U,K,This](u0)(f)(k0,this)
-    
-  /** As above.
-   *  The operation can change as it is provided through a tree.
-   *  Branches for which an operation is missing (NoSuchElementException) are not explored.
-   *  Nodes with no value are ignored (but children are explored.)
-   */
-  def deepFoldLeftRec[U,O<:PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,O]](u0:U,k0:K)(op: O with PrefixTreeLike[K,(U, Seq[(K,Repr)]) => U,O]): U = {
-    def recur(u: U, elt:Seq[(K,Repr)], oo:O):U = if (oo==null) u else {
-      val u1 = elt.head._2.foldLeft(u)((uu,ee)=>recur(uu,ee+:elt,try { oo(ee._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }))
-      oo.value match {
-        case Some(g) => g(u1,elt) //has value: compute current element
-        case None    => u1        //no value: do nothing
-      }
-    }
-    recur(u0,Seq((k0,this)),op)
-  }
+  def deepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,Repr)) => U): U =
+    new FoldDeep(u0).left(k0,this,topFirst,f)
+  def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,Repr)]) => U): U =
+    new FoldDeep(u0).leftRec(k0,this,topFirst,f)
+  def deepFoldLeftTreeRec[U,O<:PrefixTreeLike[K,(U,(K,This)) => U,O]](u0:U,k0:K,topFirst:Boolean)(op: O): U =
+    new FoldDeep(u0).leftTreeRec(k0,this,topFirst,op)
+  def deepFoldRight[U](u0:U,k0:K,topFirst:Boolean)(f: ((K,Repr),U) => U): U =
+    new FoldDeep(u0).right(k0,this,topFirst,f)
+  def deepFoldRightRec[U](u0:U,k0:K,topFirst:Boolean)(f: (Seq[(K,Repr)],U) => U): U =
+    new FoldDeep(u0).rightRec(k0,this,topFirst,f)
+  def deepFoldRightTreeRec[U,O<:PrefixTreeLike[K,((K,This),U) => U,O]](u0:U,k0:K,topFirst:Boolean)(op: O): U =
+    new FoldDeep(u0).rightTreeRec(k0,this,topFirst,op)
+
 
   /** A recursive call that descends through the subtrees.
-   *  Children are all evaluated within the context of their parent, i.e.
-   *  within the 'op' call on their parent.
-   *  This produces no result.
-   *  @param k an initial key for the top node
-   *  @param op, the operation to execute on each node.
-   *             (K,Repr) : the current element and its key
-   *             =>Unit   : a byname param that has to be evaluated
-   *                        somewhere to evaluate the current element children
+   *  Children are all evaluated within the context of their parent, and
+   *  should be somewhere invoked through the =>Unit function parameter.
+   *  @param k0 an initial key for the top node
+   *  @param f/op, the operation to execute on each node.
+   *               (K,This) : the current node and its key (or sequence of parent node, head being current node)
+   *                =>Unit   : a by-name parameter that has to be evaluated somewhere to evaluate the current node children
+   *               if the call uses a function tree, then for a given key, three possible cases:
+   *               - matching null sub-tree: ignore that subtree
+   *               - subtree with None value: don't compute that node, but go on with the children
+   *               - subtree with a value: process normally
    */
-  def deepForeachFull(k:K)(op: ((K,Repr),=>Unit) => Unit): Unit = {
-    def recur(elt:(K,Repr)):Unit = op(elt,elt._2.foreach(recur))
-    recur((k,this))
-  }
+  def deepForeach[X](k0:K)(f:((K,Repr),=>Unit)=>X)                                    = Deep.foreach((k0,this), f)
+  def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X)                            = Deep.foreachRec(Seq((k0,this)), f)
+  def deepForeachTree[X](k0:K)(f:PrefixTreeLike.Tree[K,((K,This),=>Unit)=>X])         = Deep.foreachTree((k0,this), f)
+  def deepForeachTreeRec[X](k0:K)(f:PrefixTreeLike.Tree[K,(Seq[(K,This)],=>Unit)=>X]) = Deep.foreachTreeRec(Seq((k0,this)), f)
 
-  /** As above.
-   *  Evaluating children produces results that can be used by the parent.
-   *  Furthermore, children can be evaluated but don't have to be.
-   *  Evaluating children is done by iterating on the provided iterator.
-   *  @param k an initial key for the top node ; it is hardly used
-   *  @param op, the operation to execute on each node.
-   *             (K,Repr)    : the current element and its key
-   *             Iterator[U] : the iterator on the children
-   *             U           : some result
-   */
-  def deepForeach[U](k:K)(op: ((K,Repr),Iterator[U]) => U): U = {
-    def recur(elt:(K,Repr)):U = op(elt,elt._2.toIterator.map(recur))
-    recur((k,this))
-  }
-
-  /** As above.
-   *  Children can reach their parent (but not above.)
-   *  @param k0 an initial key for the top node ; it is hardly used
-   *  @param op, the operation to execute on each node.
-   *             Seq[(K,Repr)] : the elements sequence, starting from the current element
-   *             Iterator[U]   : the iterator on the children
-   *             U             : some result
-   */
-  def deepForeachRec1[U](k0:K)(op: (Seq[(K,Repr)],Iterator[U]) => U): U = {
-    def recur(elt:Seq[(K,Repr)]):U = op(elt,elt.head._2.toIterator.map(x=>recur(x+:elt)))
-    recur(Seq((k0,this)))
-  }
-
-  /** As above.
-   *  Children can reach their parents.
-   *  @param k an initial key for the top node ; it is hardly used
-   *  @param op, the operation to execute on each node.
-   *             this is a tree and the actual operation can change on each key.
-   *             all required key entries must have a matching op.
-   *             Repr     : the parent
-   *             (K,Repr) : the current element and its key
-   *             Iterator : the iterator on the children
-   */
-  def deepForeachRec2[O<:PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,O]](k0:K)(op: O with PrefixTreeLike[K,(Seq[(K,Repr)],Iterator[Unit]) => Unit,O]): Unit = {
-    def recur(elt:Seq[(K,Repr)], oo:O):Unit = if (oo!=null && oo.value!=None) {
-      oo.value.get(elt,elt.head._2.toIterator.map(x=>recur(x+:elt,try { oo(x._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }))) //has value: compute current element
-    }
-    recur(Seq((k0,this)),op)
-  }
 
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
    *  The written text begins with the string `start` and ends with the string `end`.
@@ -321,23 +274,98 @@ object PrefixTraversableOnce {
     override def size = 0
   }
 
-  /** The most generic class that highlights the recursion algorithm on PrefixTraversableOnce.
-   *  Like RecurRecView, but the purpose is to build an actual PrefixTreeLike tree, not just
-   *  a PrefixTraversableOnce (a view) ; it is as complex as its sibling, has most of the same
-   *  properties, and adds the possibility to handle a default function.
-   *  Not using RecurRecView also removes one layer of intermediate object (Abstract.)
+  /** A class to define various ways to fold the whole Tree.
+   *  While the same result can be achieved by using inner methods on the main class,
+   *  this way makes some implementations easier.
    */
-  class RecurDeep[X,K,This<:PrefixTraversableOnce[K,_,This]](x0:X)(f:(X,(K,This))=>X) {
+  class FoldDeep[X,K,This<:PrefixTraversableOnce[K,_,This]](x0:X) {
     var x:X = x0
-    def recur(s:(K,This)):X = { for (z <- s._2) x=recur(z); f(x,s) }
-    def apply(k0:K,tree:This):X = recur((k0,tree))
-  }  
-  class RecurDeepRec[X,K,This<:PrefixTraversableOnce[K,_,This]](x0:X)(f:(X,Seq[(K,This)])=>X) {
-    var x:X = x0
-    def recur(s:Seq[(K,This)]):X = { for (z <- s.head._2) x=recur(z+:s); f(x,s) }
-    def apply(k0:K,tree:This):X = recur(Seq((k0,tree)))
-  }  
-  
+    def recD(s:(K,This),f:(X,(K,This))=>X):Unit = { for (z <- s._2) recD(z,f); x=f(x,s) }
+    def recDR(s:Seq[(K,This)],f:(X,Seq[(K,This)])=>X):Unit = { for (z <- s.head._2) recDR(z+:s,f); x=f(x,s) }
+    def recDT[O<:PrefixTreeLike[K,(X,(K,This))=>X,O]](s:(K,This),o:O):Unit = {
+      for (z <- s._2)
+        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
+          case null =>
+          case o1    => recDT(z,o1)
+        }
+      o.value.orNull match {
+        case null =>
+        case f    => x=f(x,s)
+      }
+    }
+    def recT(s:(K,This),f:(X,(K,This))=>X):X = { x=f(x,s); for (z <- s._2) x=recT(z,f); x }
+    def recTR(s:Seq[(K,This)],f:(X,Seq[(K,This)])=>X):X = { f(x,s); for (z <- s.head._2) x=recTR(z+:s,f); x }
+    def recTT[O<:PrefixTreeLike[K,(X,(K,This))=>X,O]](s:(K,This),o:O):Unit = {
+       o.value.orNull match {
+        case null =>
+        case f    => x=f(x,s)
+      }
+      for (z <- s._2)
+        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
+          case null =>
+          case o1    => recTT(z,o1)
+        }
+    }
+    def rec1D(s:(K,This),f:((K,This),X)=>X):Unit = { for (z <- s._2.reversed) rec1D(z,f); x=f(s,x) }
+    def rec1DR(s:Seq[(K,This)],f:(Seq[(K,This)],X)=>X):Unit = { for (z <- s.head._2.reversed) rec1DR(z+:s,f); x=f(s,x) }
+    def rec1DT[O<:PrefixTreeLike[K,((K,This),X)=>X,O]](s:(K,This),o:O):Unit = {
+      for (z <- s._2.reversed)
+        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
+          case null =>
+          case o1    => rec1DT(z,o1)
+        }
+      o.value.orNull match {
+        case null =>
+        case f    => x=f(s,x)
+      }
+    }
+    def rec1T(s:(K,This),f:((K,This),X)=>X):X = { x=f(s,x); for (z <- s._2.reversed) x=rec1T(z,f); x }
+    def rec1TR(s:Seq[(K,This)],f:(Seq[(K,This)],X)=>X):X = { f(s,x); for (z <- s.head._2.reversed) x=rec1TR(z+:s,f); x }
+    def rec1TT[O<:PrefixTreeLike[K,((K,This),X)=>X,O]](s:(K,This),o:O):Unit = {
+       o.value.orNull match {
+        case null =>
+        case f    => x=f(s,x)
+      }
+      for (z <- s._2.reversed)
+        (try { o(s._1) } catch { case _:NoSuchElementException=>null.asInstanceOf[O] }) match {
+          case null =>
+          case o1    => rec1TT(z,o1)
+        }
+    }
+
+    def left(k0:K,tree:This,topFirst:Boolean,f:(X,(K,This))=>X):X                                   = { if (topFirst) recT((k0,tree),f)        else recD((k0,tree),f); x }
+    def leftRec(k0:K,tree:This,topFirst:Boolean,f:(X,Seq[(K,This)])=>X):X                           = { if (topFirst) recTR(Seq((k0,tree)),f)  else recDR(Seq((k0,tree)),f); x }
+    def leftTreeRec[O<:PrefixTreeLike[K,(X,(K,This))=>X,O]](k0:K,tree:This,topFirst:Boolean,o:O):X  = { if (topFirst) recTT((k0,tree),o)       else recDT((k0,tree),o); x}
+    def right(k0:K,tree:This,topFirst:Boolean,f:((K,This),X)=>X):X                                  = { if (topFirst) rec1T((k0,tree),f)       else rec1D((k0,tree),f); x }
+    def rightRec(k0:K,tree:This,topFirst:Boolean,f:(Seq[(K,This)],X)=>X):X                          = { if (topFirst) rec1TR(Seq((k0,tree)),f) else rec1DR(Seq((k0,tree)),f); x }
+    def rightTreeRec[O<:PrefixTreeLike[K,((K,This),X)=>X,O]](k0:K,tree:This,topFirst:Boolean,o:O):X = { if (topFirst) rec1TT((k0,tree),o)      else rec1DT((k0,tree),o); x}
+  }
+
+  /** A class to define various way to iterate through the whole tree.
+   */
+  object Deep {
+    def foreach[X,K,This<:PrefixTraversableOnce[K,_,This]](s:(K,This),f:((K,This),=>Unit)=>X):Unit = f(s,for (z <- s._2) foreach(z,f))
+    def foreachRec[X,K,This<:PrefixTraversableOnce[K,_,This]](s:Seq[(K,This)],f:(Seq[(K,This)],=>Unit)=>X):Unit = f(s,for (z <- s.head._2) foreachRec(z+:s,f))
+    def foreachTree[X,K,This<:PrefixTraversableOnce[K,_,This]](s:(K,This),o:PrefixTreeLike.Tree[K,((K,This),=>Unit)=>X]):Unit = if (o!=null) {
+      val recur: ()=>Unit =
+        ()=> for (z <- s._2) {
+          var o1:PrefixTreeLike.Tree[K,((K,This),=>Unit)=>X] = null
+          try { o1=o(z._1) } catch { case _:NoSuchElementException=> }
+          foreachTree(z,o1)
+        }
+      if (o.value!=None) o.value.get(s, recur()) else recur()
+    }
+    def foreachTreeRec[X,K,This<:PrefixTraversableOnce[K,_,This]](s:Seq[(K,This)],o:PrefixTreeLike.Tree[K,(Seq[(K,This)],=>Unit)=>X]):Unit = if (o!=null) {
+      val recur: ()=>Unit =
+        ()=> for (z <- s.head._2) {
+          var o1:PrefixTreeLike.Tree[K,(Seq[(K,This)],=>Unit)=>X] = null
+          try { o1=o(z._1) } catch { case _:NoSuchElementException=> }
+          foreachTreeRec(z+:s,o1)
+        }
+      if (o.value!=None) o.value.get(s, recur()) else recur()
+    }
+  }
+
   //General note: the 16 following classes are increasingly complex versions of the last two classes.
   //The 14 first classes can be fully duplicated by the last two, albeit at a higher processing cost (expected,
   //not verified) and a very slightly higher memory footprint.

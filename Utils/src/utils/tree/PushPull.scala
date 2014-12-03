@@ -58,14 +58,16 @@ object PushPull {
    * @param item, the blocking buffer
    */
   class Layer[K,V](item:BlockingData[AnyRef]) extends Iterator[(K,Layer[K,V])] with PrefixTraversableOnce[K,V,Layer[K,V]] {
-    var next:(K,Layer[K,V])  = _
-    var value:Option[V] = None
+    protected var next0:(K,Layer[K,V])  = _
+    protected var value0:Option[V] = None
+    def value = value0
+    def next  = next0
     @tailrec final def hasNext:Boolean = item.take match {
         case `End`       => false
         case o:Option[V] => if (value.isDefined) throw new IllegalStateException("the same element cannot receive two values")
-                            value = o
+                            value0 = o
                             hasNext
-        case k:K         => next = (k,new Layer[K,V](item))
+        case k:K         => next0 = (k,new Layer[K,V](item))
                             true
       }
   }
@@ -84,12 +86,12 @@ object PushPull {
     final def pull      = item.put(End)
 
     /** converts the push/pull sequence through the given operator. */
-    def run[U](op: ((K,Layer[K,V]),Iterator[U]) => U)(implicit executionContext:ExecutionContext):Future[U] =
+    def run[U](op: ((K,Layer[K,V]),=>Unit) => U)(implicit executionContext:ExecutionContext):Future[Unit] =
       Future { (new Layer[K,V](item)).deepForeach[U](null.asInstanceOf[K])(op) }
   }
 
   /** Creates a pair for creating a PrefixTraversableOnce using a Push/Pull interface */
-  def apply[U,K<:AnyRef,V](op: ((K,Layer[K,V]),Iterator[U]) => U)(implicit executionContext:ExecutionContext):(PushPull[K,V],Future[U]) = {
+  def apply[U,K<:AnyRef,V](op: ((K,Layer[K,V]),=>Unit) => U)(implicit executionContext:ExecutionContext):(PushPull[K,V],Future[Unit]) = {
     val p = new PullAdapter[K,V]
     (p, p.run(op))
   }

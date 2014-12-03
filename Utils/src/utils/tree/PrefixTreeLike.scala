@@ -561,7 +561,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 }
 
 object PrefixTreeLike {
-  type Gen[K,V] = PrefixTreeLike[K,V,_<:PrefixTreeLike[K,V,_]]
+  //a usefull type for helping the compiler in type inference : use this for parameters and avoid generics on O
+  type Tree[K,V] = O with AnyRef with PrefixTreeLike[K,V,O] forSome { type O<:PrefixTreeLike[K,V,O] }
 
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
 

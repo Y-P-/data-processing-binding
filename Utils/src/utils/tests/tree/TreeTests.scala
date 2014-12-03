@@ -388,43 +388,35 @@ object TreeTests {
 
   def testForeach(implicit out:PrintWriter) = {
     import out.print
-    type O = (Seq[(String,StringTree[Int])],Iterator[Unit])=>Unit
-    val op1:O = (p,i)=> {
+    type O = (Seq[(String,StringTree[Int])],=>Unit)=>Unit
+    val op:(String) => O = (info) => (p,recur)=> {
       val t = p.head
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
-      while (i.hasNext) i.next
-      print(s"}[X]")
+      recur
+      print(s"}[$info]")
     }
-    val op2:O = (p,i)=> {
-      val t = p.head
-      print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
-      while (i.hasNext) i.next
-      print(s"}[Y]")
-    }
+    val op1 = op("X")
+    val op2 = op("Y")
     val opX = PrefixTree.fromFlat2(Seq(
         (Seq(),(op1,PrefixTree.constant[String,O](op1))),
         (Seq("f"),(op2,PrefixTree.constant[String,O](op2)))
       ))
-    m.deepForeachRec2("")(opX)
+    m.deepForeachTreeRec("")(opX)
     out.println
-    m.deepForeachRec1[Int](""){(p,c)=>
+    m.deepForeachRec(""){(p,recur)=>
       val t = p.head
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
-      var i=0
-      while (c.hasNext) { i+=1; c.next }
-      print(s"}[$i in ${if (p.size>1) p(1)._2.value.get else "top"}]")
-      i
+      recur
+      print(s"}[in ${if (p.size>1) p(1)._2.value.get else "top"}]")
     }
     out.println
-    m.deepForeach[Int](""){(t,c)=>
+    m.deepForeach(""){(t,recur)=>
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
-      var i=0
-      while (c.hasNext) { i+=1; c.next }
-      print(s"}[$i]")
-      i
+      recur
+      print("}")
     }
     out.println
-    m.deepForeachFull(""){(t,recur)=>
+    m.deepForeach(""){(t,recur)=>
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       recur
       print(s"}")
@@ -436,10 +428,10 @@ object TreeTests {
     import scala.concurrent.duration._
     import scala.concurrent.ExecutionContext
     implicit val executionContext = ExecutionContext.global
-    val (s,r) = PushPull[Unit,String,String] { (t,r)=>
+    val (s,r) = PushPull[Unit,String,String] { (t,recur)=>
       out.print(s"${t._1}={")
-      val i=r.foldLeft(0)((i,u)=>i+1)
-      out.print(s"}(${if(t._2.value!=None) t._2.value.get else ""})[$i]")
+      recur
+      out.print(s"}(${if(t._2.value!=None) t._2.value.get else ""})")
     }
     s.push("a")
     s.pull
