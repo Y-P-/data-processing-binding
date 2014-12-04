@@ -83,14 +83,21 @@ object TreeTests {
   def testPrint(implicit out:PrintWriter) = out.println(m)
 
   //tests the map operation to PrefixTree[String,String]
-  def testMap1(implicit out:PrintWriter)  = out.println(m.map[String,PrefixTree[String,String]]((_:Int).toString+"y"))
-
+  def testMap1(implicit out:PrintWriter)  = {
+    import PrefixTree._  //we have PrefixTree and StringTree builders in view:choose
+    out.println(m.map((_:Int).toString+"y"))
+  }
   //tests the map operation to StringTree[String]
-  def testMap2(implicit out:PrintWriter)  = out.println(m.map[String,StringTree[String]]((_:Int).toString+"y"))
+  def testMap2(implicit out:PrintWriter)  = {
+    import StringTree._  //we have PrefixTree and StringTree builders in view:choose
+    out.println(m.map((_:Int).toString+"y"))
+  }
 
   //tests the map operation to PrefixTree[Int,String] (full mapping of key and value)
-  def testMap3(implicit out:PrintWriter)  = out.println(m.mapFull[Int,String,PrefixTree[Int,String]](_(0)-'a',null,_.toString+"y"))
-
+  def testMap3(implicit out:PrintWriter)  = {
+    import PrefixTree._  //we have PrefixTree and StringTree builders in view:choose
+    out.println(m.mapFull("x",_(0)-'a',_.toString+"y",null))
+  }
   //tests filterAll
   def testFilter1(implicit out:PrintWriter) = out.println(m.filterAll(_._1!="b"))
 
@@ -182,7 +189,7 @@ object TreeTests {
   }
 
   def testConstantMap(implicit out:PrintWriter) = {
-    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
+    implicit val b0 = StringTree.builder[String]  //we have PrefixTree and StringTree builders in view
     val c = StringTree.constant(3).map((_:Int).toString)
     out.println(c)
     out.println(c("a"))
@@ -204,7 +211,7 @@ object TreeTests {
   }
 
   def testBasicZipStrict(implicit out:PrintWriter) = {
-    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
+    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view: let us choose StringTree
     val r = m1.zip(m1, true, (t1:StringTree[Int],t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )

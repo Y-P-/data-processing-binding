@@ -85,6 +85,13 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     e = withDefault(k=>e)(newBuilder)
     e
   }
+  /** The clone of this tree is the same tree using the same builder, cloning each sub-tree
+   */
+  override def clone:Repr = {
+    val bf = newBuilder
+    for (x <- this) bf += ((x._1,x._2.clone))
+    bf.result(value,default)
+  }
 
 
   /** tells if the two following method should work with no exception */
@@ -141,7 +148,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   @throws(classOf[java.util.NoSuchElementException])
   def apply(key: K): This = get(key) match {
-    case None => if (default!=null) default(key) else params.noDefault(key)
+    case None => if (default!=null) try { default(key) } catch { case e:PrefixTreeLike.NoDefault[K] => params.noDefault(key) } else params.noDefault(key)
     case Some(value) => value
   }
 
@@ -181,19 +188,16 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  Some operations will not work on views, in particular all methods that return Repr.
    *  A call to 'force' will create a full blown new Tree.
    */
-  protected class WithFilter(p: ((K,Repr)) => Boolean) extends PrefixTreeLike[K,V,This#WithFilter] {
+  protected class WithFilter(p: ((K,Repr)) => Boolean) extends PrefixTreeLike.Abstract[K,V,This#WithFilter] {
     type P = Nothing
     def -(key: K): This#WithFilter = ???
+    def params: Nothing = ???
     override def default:K=>Repr = self.asDefault(k => { val r=self(k); if (p(k,r)) new r.WithFilter(p) else { val r=self.params.noDefault(k); new r.WithFilter(p) } })
     def get(key: K): Option[This#WithFilter] = self.get(key).filter(t=>p(key,t)).map(x => new x.WithFilter(p))
     def iterator: Iterator[(K, This#WithFilter)] = self.iterator.filter(p).map(x => (x._1,new x._2.WithFilter(p)))
     protected[this] def newBuilder: PrefixTreeLikeBuilder[K,V,This#WithFilter] = ???
-    def params: Nothing = ???
     def update1[W >: V, T >: This#WithFilter <: PrefixTreeLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTreeLikeBuilder[K,W,T]): T = ???
     def value: Option[V] = self.value
-    def assoc:self.type = self
-    /** Rebuilds the view as a true PrefixTreeLike. Defaults are again available, and removed keys will fall on default.
-     */
     def force:This = {
       val bf = self.newBuilder
       if (!isEmpty) for (x <- this) bf += ((x._1,x._2.force))
@@ -303,13 +307,10 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return the resulting transformed tree
    */
   override def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    def recur(tt:T,cur:Repr):R = {
-      val b=bf.newEmpty
-      for (x:(K,This) <- cur)
-        if (!strict || tt.isDefinedAt(x._1)) try { b += ((x._1, recur(tt(x._1),x._2))) } catch { case _:NoSuchElementException => }
-      b.result(op(tt,cur),cur.asDefault(k=>recur(if (!strict || tt.isDefinedAt(k)) tt(k) else tt.params.noDefault(k),cur.default(k))))
-    }
-    recur(t,this)
+    type Data = ((K,Repr),T)
+    val values = (cur:Data)              => op(cur._2,cur._1._2)
+    val next   = (child:(K,Repr),s:Data) => if (!strict || s._2.isDefinedAt(child._1)) try { s._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[T] } else null.asInstanceOf[T]
+    genMap(null.asInstanceOf[K],t,values,next)
   }
 
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
@@ -326,11 +327,26 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  def zip2[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](k0:K,t:T,strict:Strictness,op:Tree[K,(T,Repr)=>Option[U]])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  override def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     type Data = ((K,This),(T,PrefixTreeLike.Tree[K,(T,Repr)=>Option[U]]))
-    val v = (cur:Data) => (cur._2._2.value.flatMap(_(cur._2._1,cur._1._2)))
+    val v = (cur:Data) => cur._2._2.value.flatMap(_(cur._2._1,cur._1._2))
     val n = (child:(K,This),s:Data) => strict(child._1,s._2._1,s._2._2)
-    transform(k0,(t,op),v,n)
+    genMap(null.asInstanceOf[K],(t,op),v,n)
+  }
+
+  /** As the previous method, but still more generic since the keys can also be changed.
+   *  However, for the default to work properly, it is necessary to be able to go from a given L to the associated K (meaning
+   *  the transformation K <-> L should be bijective) ; if this cannot be achieved, it is not possible to fall back on the
+   *  appropriate default (deduced from the current node default), and instead the resulting tree will have no default.
+   *  Of course, it is possible to make a yet more generic method (where the L=>K transformation would depend on the
+   *  path, or where another default method could be user provided as a tree or whatever... The reader can probably write
+   *  them himself once he understands the scheme underlying all of the tree transformations.
+   */
+  def zipFullRec[L,W,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[((K,This),(T,O))])=>(L,Option[W]),O],R<:PrefixTreeLike[L,W,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,(Seq[((K,This),(T,O))])=>(L,Option[W]),O],g:L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,R]):R = {
+    type Data = Seq[((K,This),(T,O))]
+    val values = (cur:Data)              => cur.head._2._2.value.map(_(cur)).orNull
+    val next   = (child:(K,This),s:Data) => strict(child._1,s.head._2._1,s.head._2._2)
+    genMapRec(k0,(t,op),values,g,next)
   }
 
   /** Transforms this tree by applying a function to every retrieved value.
@@ -341,16 +357,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *            The resulting tree is a new tree.
    */
   def map[W,R<:PrefixTreeLike[K,W,R]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,R]):R =
-    transform(null.asInstanceOf[K],(x:(K,This))=>(x._2.value.flatMap(z=>Some(f(z)))))
+    genMap(null.asInstanceOf[K],(x:(K,This))=>x._2.value.flatMap(z=>Some(f(z))))
 
-
-  /** The clone of this tree is the same tree using the same builder, cloning each sub-tree
-   */
-  override def clone:Repr = {
-    val bf = newBuilder
-    for (x <- this) bf += ((x._1,x._2.clone))
-    bf.result(value,default)
-  }
 
   /** Transforms this tree by applying a function to every retrieved value and key.
    *  It works also on default values, but be aware that using deep trees
@@ -362,13 +370,9 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */
-  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K,V=>W))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
-    if (!isEmpty) {
-      val bf1 = bf.newEmpty
-      bf ++= (for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapFull(f)(bf1))))
-    }
-    bf.result(value.map(f._3), asDefault((l:L)=>default(f._2(l)).mapFull(f)))
-  }
+  def mapFull[L,W,T<:PrefixTreeLike[L,W,T]](k0:K,fk:K=>L,fv:V=>W,g:L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T =
+    genMap(k0,(x:(K,This))=>(fk(x._1),x._2.value.flatMap(z=>Some(fv(z)))),g)
+
 
   /** Transforms this tree by applying a function to every key.
    *  It works also on default values, but be aware that using deep trees
@@ -377,13 +381,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */
-  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](f:(K=>L,L=>K))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T = {
-    if (!isEmpty) {
-      val bf1 = bf.newEmpty
-      bf ++= (for (x:(K,This) <- this) yield ((f._1(x._1),x._2.mapKeys[L,W,T](f)(bf1))))
-    }
-    bf.result(value, asDefault((l:L)=>default(f._2(l)).mapKeys[L,W,T](f)))
-  }
+  def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](k0:K,fk:K=>L,g:L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T =
+    genMap[L,W,T](k0,(x:(K,This))=>(fk(x._1),x._2.value),g)
 
   /** Transforms this tree by applying a function to every retrieved value.
    *  It works also on default values.
@@ -403,7 +402,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     bf ++= e
     if (!isEmpty) {
       val bf1 = bf.newEmpty
-      bf ++= (for (x:(K,This) <- this) yield ((x._1,x._2.flatMap[W,T](f)(bf1))))
+      for (x:(K,This) <- this) bf +=  ((x._1,x._2.flatMap[W,T](f)(bf1)))
     }
     bf.result(e.value, asDefault(default(_:K).flatMap[W,T](f)))
   }
@@ -546,42 +545,61 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   }
 
   override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
-  
+
   // Common generic transformations on PrefixTreeLike ; they all build a PreficTreeLike
-  def transform[W, R<:PrefixTreeLike[K,W,R]](k0:K,v:((K, Repr))=>Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurNoDataSameKey[K,V,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMap[W, R<:PrefixTreeLike[K,W,R]](k0:K,v:((K, Repr))=>Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurNoDataSameKey[K,V,W,R,This] {
     def mapValues(s: Data): (Option[W], K=>R) = (v(s), buildDefault(s,s._2.default))
   })(k0,this)
-  def transform[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:(((K, Repr), X))=>Option[W], x:((K, Repr),((K, Repr), X))=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurSameKey[X,K,V,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMap[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:(((K, Repr), X))=>Option[W], x:((K, Repr),((K, Repr), X))=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurSameKey[X,K,V,W,R,This] {
     def mapValues(s: Data): (Option[W], K=>R)   = (v(s), buildDefault(s,s._1._2.default))
     override def nextX(child: (K, This), s: Data): X     = x(child,s)
   })(k0,x0,this)
-  def transformRec[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:Seq[(K, Repr)]=>Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecNoDataSameKey[K,V,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMapRec[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:Seq[(K, Repr)]=>Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecNoDataSameKey[K,V,W,R,This] {
     def mapValues(s: Data): (Option[W], K=>R)    = (v(s),buildDefault(s,s.head._2.default))
   })(k0,this)
-  def transformRec[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>Option[W], x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecSameKey[X,K,V,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMapRec[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>Option[W], x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecSameKey[X,K,V,W,R,This] {
     def mapValues(s: Data): (Option[W], K=>R)    = (v(s),buildDefault(s,s.head._1._2.default))
     override def nextX(child: (K, This), s: Data): X      = x(child,s)
   })(k0,x0,this)
-  def transform[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:((K, This))=>(L, Option[W]), g : L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurNoData[K,V,L,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMap[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:((K, This))=>(L, Option[W]), g : L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurNoData[K,V,L,W,R,This] {
     def mapValues(s: Data): (L, Option[W], L=>R) = { val z=v(s); (z._1,z._2,buildDefault(s,s._2.default,g)) }
   })(k0,this)
-  def transform[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W]), g: L=>K, x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new Recur[X,K,V,L,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMap[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W]), g: L=>K, x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new Recur[X,K,V,L,W,R,This] {
     def mapValues(s: Data): (L, Option[W], L=>R) = { val z=v(s); (z._1,z._2,buildDefault(s,s._1._2.default,g)) }
     override def nextX(child: (K, This), s: Data): X      = x(child,s)
   })(k0,x0,this)
-  def transformRec[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:Seq[(K, This)]=>(L, Option[W]), g : L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecNoData[K,V,L,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMapRec[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:Seq[(K, This)]=>(L, Option[W]), g : L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecNoData[K,V,L,W,R,This] {
     def mapValues(s: Data): (L, Option[W], L=>R) = { val z=v(s); (z._1,z._2,buildDefault(s,s.head._2.default,g)) }
   })(k0,this)
-  def transformRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W]), g : L=>K, x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRec[X,K,V,L,W,R,This] {
+
+  @throws(classOf[NoSuchElementException])
+  def genMapRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W]), g : L=>K, x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRec[X,K,V,L,W,R,This] {
     def mapValues(s: Data): (L, Option[W], L=>R) = { val z=v(s); (z._1,z._2,buildDefault(s,s.head._1._2.default,g)) }
     override def nextX(child: (K, This), s: Data): X      = x(child,s)
   })(k0,x0,this)
-  
+
 }
 
 object PrefixTreeLike {
   //a usefull type for helping the compiler in type inference : use this for parameters and avoid generics on O
   type Tree[K,V] = PrefixTreeLike[K,V,O] with O forSome { type O<:PrefixTreeLike[K,V,O] }
+
+  //use this in a default method if you want to fall back on the default 'no default' method.
+  class NoDefault[K](val key:K) extends Exception
 
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
 

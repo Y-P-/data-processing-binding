@@ -10,8 +10,6 @@ import scala.collection.mutable.ArrayBuffer
  */
 abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends Builder[(K,Tree),Tree] {
   type Repr = Tree
-  type Value = V
-  type Key = K
   type Params
   implicit def params:Params
 
