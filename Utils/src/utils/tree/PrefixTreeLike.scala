@@ -402,7 +402,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     bf ++= e
     if (!isEmpty) {
       val bf1 = bf.newEmpty
-      for (x:(K,This) <- this) bf +=  ((x._1,x._2.flatMap[W,T](f)(bf1)))
+      for (x:(K,This) <- this) bf += ((x._1,x._2.flatMap[W,T](f)(bf1)))
     }
     bf.result(e.value, asDefault(default(_:K).flatMap[W,T](f)))
   }

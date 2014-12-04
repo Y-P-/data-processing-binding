@@ -1,5 +1,10 @@
 package utils.tree
 
+import scala.collection.AbstractIterator
+import scala.collection.AbstractIterable
+import scala.collection.GenTraversableOnce
+import scala.collection.GenTraversable
+import scala.annotation.tailrec
 
 /** Describes a tree precursor where data is reached through an iterable (key,sub-tree).
  *  As such, this structure presents a numerous number of interesting properties, the least of which
@@ -224,8 +229,66 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X)                            = Deep.foreachRec(Seq((k0,this)), f)
   def deepForeachTree[X](k0:K)(op:PrefixTreeLike.Tree[K,((K,This),=>Unit)=>X])         = Deep.foreachTree((k0,this), op)
   def deepForeachTreeRec[X](k0:K)(op:PrefixTreeLike.Tree[K,(Seq[(K,This)],=>Unit)=>X]) = Deep.foreachTreeRec(Seq((k0,this)), op)
-
-
+  
+  /** This class is used to iterate deeply through the tree.
+   *  @param cur the current sequence of key for the current element (from bottom to top!)
+   *  @param topFirst is true if an element appears before its children, false otherwise
+   *  @param seen is a set that is updated to track internal cross references ; if null, no such tracking happens (performance gain, but infinite loops possible)
+   */
+  protected class TreeIterator(cur:Seq[K],topFirst:Boolean) extends AbstractIterator[(Seq[K], Repr)] {
+    protected[this] val iter = self.toIterator                 //iterator for this level
+    protected[this] var i:Iterator[(Seq[K], Repr)] = getSub    //current sub-iterator
+    protected[this] var done:Boolean = false                   //true when this item has been provided
+    @tailrec final def hasNext():Boolean = !done || i!=null && (i.hasNext || {i=getSub; hasNext})
+      //some clarifications: if this item has not been processed, there is a next
+      //if there is no sub-iterator available and this item has been processed, we are finished
+      //but if there is a sub-iterator with a next element, then there is a next
+      //otherwise fetch the next sub-iterator (which could be null) and then check if it has a next element
+    final def next(): (Seq[K], Repr) = {
+      if (!done && (topFirst || i==null || !i.hasNext)) {      //give current item immediately if topFirst or wait for no more items
+        done = true                                            //once processed, mark this
+        (cur,self)
+      } else                                                   //if the next is not the current item, then it is the current sub-iterator next element
+        i.next
+    }
+    final def getSub:Iterator[(Seq[K], Repr)] = {
+      if (iter.hasNext) {                                      //move to next element
+        val (k,t)=iter.next
+        new t.TreeIterator(cur.+:(k),topFirst)                 //fetch sub-iterator
+      } else
+        null                                                   //return null when finished
+    }
+  }
+  
+  /** The Tree can conveniently be viewed almost as a 'Map' with sequences of keys as key.
+   *  This is very convenient to iterate through it.
+   *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
+   *  a new canonical form and build a new tree from that.
+   */
+  protected class SeqView(topFirst:Boolean) extends Iterable[(Seq[K], V)] {
+    def iterator:Iterator[(Seq[K], V)] = new Iterator[(Seq[K], V)] {
+      val i = new TreeIterator(Nil,topFirst)
+      @tailrec def fetch:(Seq[K], Repr) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
+      var cur = fetch
+      def hasNext: Boolean = cur!=null
+      def next(): (Seq[K], V) = { val c=cur; cur=fetch; (c._1.reverse,c._2.value.get) }
+    }
+    /** Transforms this seqView by applying a function to every retrieved value and key.
+     *  @param  f the function used to transform the keys and values of this tree.
+     *  @return a tree which maps every element of this tree.
+     *          The resulting tree is a new tree.
+     */
+    def flatMap[W](f:V=>GenTraversable[(GenTraversable[K],W)]):GenTraversable[(GenTraversable[K],W)] =
+      for (x <- iterator.toTraversable; r <- f(x._2)) yield ((x._1 ++ r._1, r._2))
+  }
+  
+  /** Creates the canonical flat representation of the tree.
+   *  Working with this supposes that your tree doesn't use degenerate branches (with no children and no value,
+   *  i.e. with empty as a node somewhere in the tree)
+   *  @return the canonical view of the tree
+   */
+  def seqView(topFirst:Boolean=true) = new SeqView(topFirst)
+  
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
    *  The written text begins with the string `start` and ends with the string `end`.
    *  Inside, the string representations of all bindings of this tree.
