@@ -27,13 +27,49 @@ Tree{7}(d -> Tree{4}(a -> Tree{1}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}
 Some(Tree{4}(a -> Tree{1}(), b -> Tree{2}()))
 Tree{4}(a -> Tree{1}(), b -> Tree{2}())
 ----8--------
-Some(Tree{1}())
-Tree{1}()
-Tree{1}()
-None
-java.util.NoSuchElementException: key not found c
-----9--------
 Tree(x -> Tree{3}(y -> Tree{1}(z -> Tree{2}()), v -> Tree{4}()), z -> Tree{7}(a -> Tree(b -> Tree{6}())))
+----9--------
+(List(),6)
+(List(d),3)
+(List(d, a),7)
+(List(d, a, d),4)
+(List(d, a, d, a),1)
+(List(d, a, d, b),2)
+(List(d, a, e),5)
+(List(d, a, e, c),3)
+(List(d, a, f),6)
+(List(d, a, f, d),4)
+(List(d, a, f, d, a),1)
+(List(d, a, f, d, b),2)
+(List(d, a, f, x),5)
+(List(d, a, f, x, c),3)
+(List(d, b),1)
+(List(x),5)
+(List(x, c),3)
+(List(e),4)
+(List(e, a),1)
+(List(e, b),2)
+(List(e, c),2)
+(List(f),5)
+(List(f, c),3)
+(List(f, d),3)
+(List(f, d, a),7)
+(List(f, d, a, d),4)
+(List(f, d, a, d, a),1)
+(List(f, d, a, d, b),2)
+(List(f, d, a, e),5)
+(List(f, d, a, e, c),3)
+(List(f, d, a, f),6)
+(List(f, d, a, f, d),4)
+(List(f, d, a, f, d, a),1)
+(List(f, d, a, f, d, b),2)
+(List(f, d, a, f, x),5)
+(List(f, d, a, f, x, c),3)
+(List(f, d, b),1)
+(List(f, x),4)
+(List(f, x, a),1)
+(List(f, x, b),2)
+(List(f, x, c),2)
 ----10--------
 (List(),6)
 (List(d),3)
@@ -77,63 +113,21 @@ Tree(x -> Tree{3}(y -> Tree{1}(z -> Tree{2}()), v -> Tree{4}()), z -> Tree{7}(a 
 (List(f, x, b),2)
 (List(f, x, c),2)
 ----11--------
-(List(),6)
-(List(d),3)
-(List(d, a),7)
-(List(d, a, d),4)
-(List(d, a, d, a),1)
-(List(d, a, d, b),2)
-(List(d, a, e),5)
-(List(d, a, e, c),3)
-(List(d, a, f),6)
-(List(d, a, f, d),4)
-(List(d, a, f, d, a),1)
-(List(d, a, f, d, b),2)
-(List(d, a, f, x),5)
-(List(d, a, f, x, c),3)
-(List(d, b),1)
-(List(x),5)
-(List(x, c),3)
-(List(e),4)
-(List(e, a),1)
-(List(e, b),2)
-(List(e, c),2)
-(List(f),5)
-(List(f, c),3)
-(List(f, d),3)
-(List(f, d, a),7)
-(List(f, d, a, d),4)
-(List(f, d, a, d, a),1)
-(List(f, d, a, d, b),2)
-(List(f, d, a, e),5)
-(List(f, d, a, e, c),3)
-(List(f, d, a, f),6)
-(List(f, d, a, f, d),4)
-(List(f, d, a, f, d, a),1)
-(List(f, d, a, f, d, b),2)
-(List(f, d, a, f, x),5)
-(List(f, d, a, f, x, c),3)
-(List(f, d, b),1)
-(List(f, x),4)
-(List(f, x, a),1)
-(List(f, x, b),2)
-(List(f, x, c),2)
+Tree{3}()
+Tree{3}()
+Tree{3}()
+Tree{5.01}()
+Tree{5.01}()
+Tree{5.01}()
 ----12--------
 Tree{3}()
 Tree{3}()
 Tree{3}()
-Tree{5.01}()
-Tree{5.01}()
-Tree{5.01}()
 ----13--------
-Tree{3}()
-Tree{3}()
-Tree{3}()
-----14--------
 Some(5)
 Some(1)
 Some(7)
-----15--------
+----14--------
 Some(6)
 Some(5)
 Some(1)
@@ -149,7 +143,7 @@ Some(7)
 Some(1)
 Some(7)
 Some(6)
-----16--------
+----15--------
 Tree{7-7}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{2-2}()), e -> Tree{5-5}(c -> Tree{3-3}()), f -> Tree{6-6}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{2-2}()), x -> Tree{5-5}(c -> Tree{3-3}())))
 Tree{5-5}(c -> Tree{3-3}())
 Tree{6-6}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{2-2}()), x -> Tree{5-5}(c -> Tree{3-3}()))
@@ -158,7 +152,7 @@ Tree{5-5}(c -> Tree{3-3}())
 Tree{3-3}()
 Tree{1-1}()
 Tree{2-2}()
-----17--------
+----16--------
 Tree{7-7}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{2-2}()), e -> Tree{5-5}(c -> Tree{3-3}()), f -> Tree{6-6}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{2-2}()), x -> Tree{5-5}(c -> Tree{3-3}())))
 Tree{5-5}(c -> Tree{3-3}())
 java.util.NoSuchElementException: key not found u
@@ -171,13 +165,13 @@ Tree{5-5}(c -> Tree{3-3}())
 Tree{4-4}(a -> Tree{1-1}(), b -> Tree{2-2}())
 Tree{1-1}()
 Tree{2-2}()
-----18--------
+----17--------
 Tree{7-7}(d -> Tree{4-4}(a -> Tree{1-1}()), f -> Tree{6-6}(d -> Tree{4-4}(b -> Tree{2-2}())))
 java.util.NoSuchElementException: key not found e
 Tree{4-4}(a -> Tree{1-1}())
 Tree{1-1}()
 java.util.NoSuchElementException: key not found b
-----19--------
+----18--------
 Tree{7-7}(d -> Tree{4-4}(a -> Tree{1-1}(), b -> Tree{7-2}()), f -> Tree{6-6}(d -> Tree{4-4}(b -> Tree{2-2}())))
 java.util.NoSuchElementException: key not found e
 Tree{4-4}(a -> Tree{1-1}(), b -> Tree{7-2}())
@@ -187,22 +181,22 @@ Tree{4-4}(b -> Tree{2-2}())
 Tree{2-2}()
 Tree{7-1}()
 Tree{4-7}()
-----20--------
+----19--------
 Tree(d -> Tree{4+4}(a -> Tree{1*1}()), f -> Tree{12}(d -> Tree{4+4}(b -> Tree{4}())))
 Tree(d -> Tree{4+4}(a -> Tree{1*1}()), f -> Tree(d -> Tree{4+4}(b -> Tree{4}())))
-----21--------
+----20--------
 Tree(d -> Tree{4+4}(a -> Tree{1%1}(), b -> Tree{7%2}()), f -> Tree{12}(d -> Tree(b -> Tree{2*2}())))
 Tree(d -> Tree{4+4}(a -> Tree{1*1}(), b -> Tree{7%2}()), f -> Tree(d -> Tree{4+4}(b -> Tree{2%2}())))
-----22--------
+----21--------
 Tree{'7+7}(4 -> Tree{'d4+4}(1 -> Tree{'a1%1}(), 2 -> Tree{'b7%2}()), 6 -> Tree{'f12}())
 Tree{'7+7}(4 -> Tree{'d4+4}(1 -> Tree{'a1*1}(), 2 -> Tree{'b7%2}()))
-----23--------
+----22--------
 Tree{'7+7}(4 -> Tree{'d4+4}(1 -> Tree{'a1%1}(),2 -> Tree{'b7%2}()),6 -> Tree{'f12}())
 Tree{'7+7}(4 -> Tree{'d4+4}(1 -> Tree{'a1*1}(),2 -> Tree{'b7%2}()))
-----24--------
+----23--------
 (7)={d(4)={a(1)={}[X]b(2)={}[X]}[X]e(5)={c(3)={}[X]}[X]f(6)={d(4)={a(1)={}[Y]b(2)={}[Y]}[Y]x(5)={c(3)={}[Y]}[Y]}[Y]}[X]
 (7)={d(4)={a(1)={}[in 4]b(2)={}[in 4]}[in 7]e(5)={c(3)={}[in 5]}[in 7]f(6)={d(4)={a(1)={}[in 4]b(2)={}[in 4]}[in 6]x(5)={c(3)={}[in 5]}[in 6]}[in 7]}[in top]
 (7)={d(4)={a(1)={}b(2)={}}e(5)={c(3)={}}f(6)={d(4)={a(1)={}b(2)={}}x(5)={c(3)={}}}}
 (7)={d(4)={a(1)={}b(2)={}}e(5)={c(3)={}}f(6)={d(4)={a(1)={}b(2)={}}x(5)={c(3)={}}}}
-----25--------
+----24--------
 null={a={}()aa={}(1)ab={aab={d={}(5)}(3)aac={}(4)}(2)}()

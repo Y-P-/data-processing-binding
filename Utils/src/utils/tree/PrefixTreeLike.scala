@@ -19,6 +19,12 @@ import scala.runtime.AbstractPartialFunction
  *  any transformation be done by rebuilding it. This is even true of the withFilter operation : at this
  *  stage, there is yet no `view` for trees.
  *
+ *  PrefixTreeLike seems to share a lot of functionalities with MapLike.
+ *  However, it doesn't seem possible to derive from that trait because of the constraints put on This.
+ *  We end up with generic signatures that slightly differ from MapLike ones, such as
+ *  `[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]]` instead of a simple `[T>:Repr]`, and these are not compatible.
+ *  In any case, a PrefixTree may look like a map, but it is not a map!
+ *
  *  The `default` operation usually suggests that it can handle any other value not listed in the
  *  iterable part of the tree. It itself defaults on a generic (but user provided) method.
  *
@@ -31,17 +37,39 @@ import scala.runtime.AbstractPartialFunction
  *    In particular, these tree nodes always correctly point to the right parent. However, the building
  *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset to null.
  *
+ *  Implementing a concrete class involves defining the following methods:
+ *    Mandatory:
+ *    `def iterator: Iterator[(K, Repr)]`
+ *    def get(key: K): Option[Repr]
+ *    def value: Option[V]
+ *    def update1[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T
+ *    def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]`
+ *
+ *    Optional:
+ *    def default: K=>Repr = null   //used to get a default value for a key not in the (K,This) collection
+ *    def - (key: K): Repr          //can throw an exception as no internal method requires it
+ *
+ *    For classes that support upwards navigation (not recommended):
+ *    def isNavigable:Boolean       //if your class supports navigation upwards
+ *    def parent:Repr
+ *    def depth:Int
+ *
+ *    You may consider overriding these methods for efficiency:
+ *    def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixTreeLikeBuilder[K,W,T])
+ *    def size: Int
+ *    def isEmpty: Boolean
+ *    def foreach[U](f: ((K,Repr)) => U): Unit
+ *
  *    @tparam K the key type
  *    @tparam V the contained value type
  *    @tparam This the prefix tree type
  */
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
-  extends MapLike[K,This,This]
-  //extends PartialFunction[K, This]
+  extends PartialFunction[K, This]
      with PrefixTraversableOnce[K, V, This]
-     //with IterableLike[(K, This), This]
-     //with Subtractable[K, This]
-     with Equals { self:This =>
+     with IterableLike[(K, This), This]
+     with Subtractable[K, This]
+  { self:This =>
 
   import PrefixTraversableOnce._
   import PrefixTreeLike._
@@ -50,6 +78,20 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   type Params <: PrefixTreeLike.Params[K,V,Repr]
   def params:Params
+
+  /** A new instance of builder similar to the one used to build this tree element.
+   *  It can be used to build elements of the same tree kind.
+   */
+  protected[this] override def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
+
+  /** Optionally returns the value associated with a key.
+   *  The basic supposition is that keys found in the iterator yield a value, others yield a None.
+   *
+   *  @param  key    the key value
+   *  @return an option value containing the value associated with `key` in this tree,
+   *          or `None` if none exists.
+   */
+  def get(key: K): Option[Repr]
 
   /** The value for the current node */
   def value: Option[V]
@@ -62,6 +104,22 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def default: K=>Repr = null
 
+  /** Creates a new tree obtained by updating this tree with a given key/value pair.
+   *  @param    kv the key/value pair
+   *  @tparam   L the type of the new keys
+   *  @tparam   T the type of the added value
+   *  @return   A new tree with the new key/value mapping added to this map.
+   */
+  def update1[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T
+
+  /** tells if the two following method should work with no exception */
+  def isNavigable:Boolean = false
+  /** the parent of that PrefixTree ; this is not required and usually makes the implementation heavier */
+  def parent:Repr = throw new NotImplementedError(s"parent is not accessible in that implementation: $getClass")
+  /** the depth within the tree ; this is not required and usually makes the implementation heavier */
+  def depth:Int   = throw new NotImplementedError(s"depth is not accessible in that implementation: $getClass")
+
+
   //an internal utility to correctly rebuild default when necessary
   @inline final protected def asDefault[L,T](f:L=>T):L=>T = if (default==null) null else f
 
@@ -69,11 +127,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @return   an empty tree of type `This`.
    */
   def empty: Repr = self.newBuilder(None,Nil,null)
+  def seq: Repr = this
 
-  /** A new instance of builder similar to the one used to build this tree element.
-   *  It can be used to build elements of the same tree kind.
+  /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
-  protected[this] override def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
+  override def isNonSignificant = value.isEmpty && isEmpty && default==null
 
   /** rebuilds this tree with a specific default */
   final def withDefault[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](default:K=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withDefault(this, default)
@@ -93,50 +151,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     bf.result(value,default)
   }
 
-
-  /** tells if the two following method should work with no exception */
-  def isNavigable:Boolean = false
-  /** the parent of that PrefixTree ; this is not required and usually makes the implementation heavier */
-  def parent:Repr = throw new NotImplementedError(s"parent is not accessible in that implementation: $getClass")
-  /** the depth within the tree ; this is not required and usually makes the implementation heavier */
-  def depth:Int   = throw new NotImplementedError(s"depth is not accessible in that implementation: $getClass")
-
-  /** Removes a key from this tree, returning a new tree.
-   *  @param    key the key to be removed
-   *  @return   a new tree without a binding for `key`
-   *
-   *  @usecase  def - (key: K): Repr
-   *    @inheritdoc
-   */
-  def - (key: K): Repr
-
-  /** Adds a key/(value,tree) pair to this tree, returning a new tree.
-   *  Enlarge subtrees without losing information is usualy the expected operation on trees.
-   *  @param    kv the (key,subtree) pair
-   *  @tparam   W the type of the value in the result tree
-   *  @tparam   T the type of the result tree
-   *  @return   a new tree with the new binding added to this tree
-   *
-   *  @usecase  def +[W,T] (kv: (K, T): T
-   */
-  def + [W>:V,T>:Repr<:PrefixTreeLike[K,W,T]] (kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv)
-
-  /** Creates a new iterator over all key/value pairs of this tree.
-   *  This iterates only on the immediate children.
-   *
-   *  @return the new iterator
-   */
-  def iterator: Iterator[(K, Repr)]
-
-  /** Optionally returns the value associated with a key.
-   *  The basic supposition is that keys found in the iterator yield a value, others yield a None.
-   *
-   *  @param  key    the key value
-   *  @return an option value containing the value associated with `key` in this tree,
-   *          or `None` if none exists.
-   */
-  def get(key: K): Option[Repr]
-
   /** Retrieves the value which is associated with the given key. This
    *  method invokes the `default` method of the tree if there is no mapping
    *  from the given key to a value. Unless overridden, the `default` method throws a
@@ -152,14 +166,14 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     case Some(value) => value
   }
 
-  /** As apply above, but for a succession of keys.
+  /** As apply above, but for a succession of `keys`.
    */
   @throws(classOf[java.util.NoSuchElementException])
   def apply(keys: K*): This = { var r=this; keys.foreach(x=>r=r(x)); r}
 
-  /** true if this is a tree which contains no information (no value, no children, no significant default)
+  /** As get, but for a succession of `keys` (no default applied.)
    */
-  override def isNonSignificant = value.isEmpty && isEmpty && default==null
+  def get(keys:GenTraversableOnce[K]):Option[Repr] = keys.foldLeft[Option[Repr]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
 
   /** Filters this map by retaining only keys satisfying a predicate.
    *  @param  p   the predicate used to test keys
@@ -183,20 +197,40 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def filterView(p: ((K,Repr)) => Boolean): This = super.filter(null.asInstanceOf[K])(p,x => x._2.default)(newBuilder)
 
+  /** Returns a new tree obtained by removing all key/value pairs for which the predicate
+   *  `p` returns `true`.
+   *
+   *  '''Note:'''    This method works by successively removing elements for which the
+   *           predicate is true from this set.
+   *           If removal is slow, or you expect that most elements of the set
+   *           will be removed, you might consider using `filter`
+   *           with a negated predicate instead.
+   *  @param p    A predicate over key-value pairs
+   *  @return     A new tree containing elements not satisfying the predicate.
+   */
+  override def filterNot(p: ((K, Repr)) => Boolean): Repr = {
+    var res: Repr = repr
+    for (kv <- this)
+      if (p(kv)) res -= kv._1
+    res
+  }
+
   /** This class yields a filtered view of the current tree.
    *  Default apply and may be filtered : in that case they fall back on the noDefault method.
    *  Some operations will not work on views, in particular all methods that return Repr.
-   *  A call to 'force' will create a full blown new Tree.
+   *  A call to 'force' will create a full blown new Tree of `This` type..
    */
   protected class WithFilter(p: ((K,Repr)) => Boolean) extends PrefixTreeLike.Abstract[K,V,This#WithFilter] {
     type P = Nothing
+    //useless
     def -(key: K): This#WithFilter = ???
     def params: Nothing = ???
+    protected[this] def newBuilder: PrefixTreeLikeBuilder[K,V,This#WithFilter] = ???
+    def update1[W >: V, T >: This#WithFilter <: PrefixTreeLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTreeLikeBuilder[K,W,T]): T = ???
+    //implementation
     override def default:K=>Repr = self.asDefault(k => { val r=self(k); if (p(k,r)) new r.WithFilter(p) else { val r=self.params.noDefault(k); new r.WithFilter(p) } })
     def get(key: K): Option[This#WithFilter] = self.get(key).filter(t=>p(key,t)).map(x => new x.WithFilter(p))
     def iterator: Iterator[(K, This#WithFilter)] = self.iterator.filter(p).map(x => (x._1,new x._2.WithFilter(p)))
-    protected[this] def newBuilder: PrefixTreeLikeBuilder[K,V,This#WithFilter] = ???
-    def update1[W >: V, T >: This#WithFilter <: PrefixTreeLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTreeLikeBuilder[K,W,T]): T = ???
     def value: Option[V] = self.value
     def force:This = {
       val bf = self.newBuilder
@@ -207,20 +241,13 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the tree.
    *   @param   key      the key.
-   *   @param   default  a computation that yields a default value in case no binding for `key` is
-   *                     found in the tree.
+   *   @param   default  a computation that yields a default value in case no binding for `key` is found in the tree.
    *   @tparam  T        the result type of the default computation.
-   *   @return  the value associated with `key` if it exists,
-   *            otherwise the result of the `default` computation.
-   *
-   *   @usecase def getOrElse[T](key: K, default: => T): T
-   *     @inheritdoc
+   *   @return  the value associated with `key` if it exists, otherwise the result of the `default` computation.
    */
   def getOrElse[T>:Repr](key: K, default: => T): T = get(key).getOrElse(default)
 
-
   /** Tests whether this tree contains a binding for a key.
-   *
    *  @param key the key
    *  @return    `true` if there is a binding for `key` in this tree, `false` otherwise.
    */
@@ -228,17 +255,16 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Tests whether this tree contains a binding for a key. This method,
    *  which implements an abstract method of trait `PartialFunction`,
-   *  is equivalent to `contains`. Note that the default function doesn't
+   *  is equivalent to `contains`. The default function doesn't
    *  qualify for the success of `isDefinedAt` in the standard implementation.
    *  However it is possible to overload this method to account for the values
    *  covered by the default.
    *
    *  @param key the key
-   *  @return    `true` if there is a binding for `key` in this tree, `false` otherwise.
+   *  @return `true` if there is a binding for `key` in this tree, `false` otherwise.
    */
   def isDefinedAt(key: K): Boolean = contains(key)
 
-  def seq: Repr = this
 
   /** The implementation class of the set returned by `keySet`.
    */
@@ -407,14 +433,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     bf.result(e.value, asDefault(default(_:K).flatMap[W,T](f)))
   }
 
-  /** Creates a new tree obtained by updating this tree with a given key/value pair.
-   *  @param    kv the key/value pair
-   *  @tparam   L the type of the new keys
-   *  @tparam   T the type of the added value
-   *  @return   A new tree with the new key/value mapping added to this map.
-   */
-  def update1[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T
-
   /** Identical to the previous method, but more than one element is updated.
    */
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T)*)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv)
@@ -423,6 +441,17 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:GenTraversableOnce[(K,T)])(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
     kv.foldLeft[T](repr)(_.update[W,T](_))
+
+  /** Adds a key/(value,tree) pair to this tree, returning a new tree.
+   *  Enlarge subtrees without losing information is usualy the expected operation on trees.
+   *  @param    kv the (key,subtree) pair
+   *  @tparam   W the type of the value in the result tree
+   *  @tparam   T the type of the result tree
+   *  @return   a new tree with the new binding added to this tree
+   *
+   *  @usecase  def +[W,T] (kv: (K, T): T
+   */
+  def + [W>:V,T>:Repr<:PrefixTreeLike[K,W,T]] (kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv)
 
   /** Adds key/value pairs to this tree, returning a new tree.
    *
@@ -449,24 +478,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def ++[W>:V, T >: Repr <: PrefixTreeLike[K,W,T]](xs: GenTraversableOnce[(K, T)])(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T =
     ((repr: T) /: xs.seq) (_ + _)
 
-  /** Returns a new tree obtained by removing all key/value pairs for which the predicate
-   *  `p` returns `true`.
-   *
-   *  '''Note:'''    This method works by successively removing elements for which the
-   *           predicate is true from this set.
-   *           If removal is slow, or you expect that most elements of the set
-   *           will be removed, you might consider using `filter`
-   *           with a negated predicate instead.
-   *  @param p    A predicate over key-value pairs
-   *  @return     A new tree containing elements not satisfying the predicate.
-   */
-  override def filterNot(p: ((K, Repr)) => Boolean): Repr = {
-    var res: Repr = repr
-    for (kv <- this)
-      if (p(kv)) res -= kv._1
-    res
-  }
-
   /* Overridden for efficiency. */
   override def toSeq: Seq[(K, Repr)] = toBuffer[(K, Repr)]
   override def toBuffer[C >: (K, Repr)]: ArrayBuffer[C] = {
@@ -474,22 +485,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     copyToBuffer[C](result)
     result
   }
-
-  /** The Tree can conveniently be viewed almost as a 'Map' with sequences of keys as key.
-   *  This is very convenient to iterate through it.
-   *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
-   *  a new canonical form and build a new tree from that.
-   */
-  protected class SeqView(topFirst:Boolean) extends super.SeqView(topFirst) with PartialFunction[GenTraversableOnce[K], Repr] {
-    final def tree                                       = self
-    def apply(keys:GenTraversableOnce[K]):Repr           = keys.foldLeft(self)(_(_))
-    def isDefinedAt(keys: GenTraversableOnce[K]):Boolean = get(keys)!=None
-    def get(keys:GenTraversableOnce[K]):Option[Repr]     = keys.foldLeft[Option[Repr]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
-    def apply(keys:K*):Repr                              = apply(keys)
-    def get(keys:K*):Option[Repr]                        = get(keys)
-  }
-  
-  override def seqView(topFirst:Boolean=true) = new SeqView(topFirst)
 
   override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
 

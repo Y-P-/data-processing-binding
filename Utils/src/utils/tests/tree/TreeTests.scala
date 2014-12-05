@@ -110,16 +110,6 @@ object TreeTests {
     out.println(m("d"))
   }
 
-  //tests get/apply on SeqView
-  def testGetSeq(implicit out:PrintWriter) = {
-    val v = m.seqView()
-    out.println(v.get("d","a"))
-    out.println(v("d","a"))
-    out.println(v(Seq("d","a")))
-    out.println(v.get("d","a","c"))
-    out.printExc(v("d","a","c"))
-  }
-
   //tests seqView
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
 
@@ -475,7 +465,6 @@ object TreeTests {
       t(testFilter2)
       t(testSeqView)
       t(testGet)
-      t(testGetSeq)
       t(testBuildFromCanonical)
       t(testSeqFlatMap)
       t(testFlatMap)
