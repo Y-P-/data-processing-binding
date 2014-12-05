@@ -1,14 +1,13 @@
 package utils.tree
 
 import scala.collection.IterableLike
+import scala.collection.MapLike
 import scala.collection.AbstractSet
 import scala.collection.AbstractIterator
 import scala.collection.AbstractIterable
 import scala.collection.GenTraversableOnce
-import scala.collection.GenTraversable
 import scala.collection.generic.Subtractable
 import scala.collection.mutable.ArrayBuffer
-import scala.annotation.tailrec
 import scala.runtime.AbstractPartialFunction
 
 /** Describes a tree where data is reached through a succession of keys.
@@ -37,10 +36,11 @@ import scala.runtime.AbstractPartialFunction
  *    @tparam This the prefix tree type
  */
 trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
-  extends PartialFunction[K, This]
+  extends MapLike[K,This,This]
+  //extends PartialFunction[K, This]
      with PrefixTraversableOnce[K, V, This]
-     with IterableLike[(K, This), This]
-     with Subtractable[K, This]
+     //with IterableLike[(K, This), This]
+     //with Subtractable[K, This]
      with Equals { self:This =>
 
   import PrefixTraversableOnce._
@@ -68,12 +68,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   /** The empty tree of the same type as this tree
    *  @return   an empty tree of type `This`.
    */
-  def empty: Repr = newBuilder(None,Nil,null)
+  def empty: Repr = self.newBuilder(None,Nil,null)
 
   /** A new instance of builder similar to the one used to build this tree element.
    *  It can be used to build elements of the same tree kind.
    */
-  protected[this] def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
+  protected[this] override def newBuilder:PrefixTreeLikeBuilder[K,V,Repr]
 
   /** rebuilds this tree with a specific default */
   final def withDefault[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](default:K=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = bf.withDefault(this, default)
@@ -475,74 +475,21 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     result
   }
 
-  /** Creates the canonical flat representation of the tree.
-   *  Working with this supposes that your tree doesn't use degenerate branches (with no children and no value,
-   *  i.e. with empty as a node somewhere in the tree)
-   *  @return the canonical view of the tree
-   */
-  def seqView(topFirst:Boolean=true,trackDuplicate:Boolean=false) = new SeqView(topFirst,trackDuplicate)
-
-  /** This class is used to iterate deeply through the tree.
-   *  @param cur the current sequence of key for the current element (from bottom to top!)
-   *  @param topFirst is true if an element appears before its children, false otherwise
-   *  @param seen is a set that is updated to track internal cross references ; if null, no such tracking happens (performance gain, but infinite loops possible)
-   */
-  protected class TreeIterator(cur:Seq[K],topFirst:Boolean,seen:scala.collection.mutable.Set[Repr]) extends AbstractIterator[(Seq[K], Repr)] {
-    if (seen!=null) seen.add(repr)                             //remember that this tree is already being processed, to avoid loops in trees containing self-references
-    protected[this] val iter = iterator                        //iterator for this level
-    protected[this] var i:Iterator[(Seq[K], Repr)] = getSub    //current sub-iterator
-    protected[this] var done:Boolean = false                   //true when this item has been provided
-    @tailrec final def hasNext():Boolean = !done || i!=null && (i.hasNext || {i=getSub; hasNext})
-      //some clarifications: if this item has not been processed, there is a next
-      //if there is no sub-iterator available and this item has been processed, we are finished
-      //but if there is a sub-iterator with a next element, then there is a next
-      //otherwise fetch the next sub-iterator (which could be null) and then check if it has a next element
-    final def next(): (Seq[K], Repr) = {
-      if (!done && (topFirst || i==null || !i.hasNext)) {      //give current item immediately if topFirst or wait for no more items
-        done = true                                            //once processed, mark this
-        (cur,repr)
-      } else                                                   //if the next is not the current item, then it is the current sub-iterator next element
-        i.next
-    }
-    final def getSub:Iterator[(Seq[K], Repr)] = {
-      if (iter.hasNext) {                                      //move to next element
-        val (k,t)=iter.next
-        if (seen==null || !seen.contains(t))                   //if not already processed
-          new t.TreeIterator(cur.+:(k),topFirst,seen)          //fetch sub-iterator
-        else
-          Iterator((cur.+:(k),t))                              //iterate superficially on self-references (otherwise you might get an infinite loop)
-      } else
-        null                                                   //return null when finished
-    }
-  }
-
   /** The Tree can conveniently be viewed almost as a 'Map' with sequences of keys as key.
    *  This is very convenient to iterate through it.
    *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
    *  a new canonical form and build a new tree from that.
    */
-  protected class SeqView(topFirst:Boolean,trackDuplicate:Boolean) extends PartialFunction[GenTraversableOnce[K], Repr] with Iterable[(Seq[K], V)] {
-    def iterator:Iterator[(Seq[K], V)] = new Iterator[(Seq[K], V)] {
-      val i = new TreeIterator(Nil,topFirst,if (trackDuplicate) scala.collection.mutable.Set.empty else null)
-      @tailrec def fetch:(Seq[K], Repr) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
-      var cur = fetch
-      def hasNext: Boolean = cur!=null
-      def next(): (Seq[K], V) = { val c=cur; cur=fetch; (c._1.reverse,c._2.value.get) }
-    }
+  protected class SeqView(topFirst:Boolean) extends super.SeqView(topFirst) with PartialFunction[GenTraversableOnce[K], Repr] {
     final def tree                                       = self
     def apply(keys:GenTraversableOnce[K]):Repr           = keys.foldLeft(self)(_(_))
     def isDefinedAt(keys: GenTraversableOnce[K]):Boolean = get(keys)!=None
     def get(keys:GenTraversableOnce[K]):Option[Repr]     = keys.foldLeft[Option[Repr]](Some(self))((t,k)=>if (t==None) None else t.get.get(k))
     def apply(keys:K*):Repr                              = apply(keys)
     def get(keys:K*):Option[Repr]                        = get(keys)
-    /** Transforms this seqView by applying a function to every retrieved value and key.
-     *  @param  f the function used to transform the keys and values of this tree.
-     *  @return a tree which maps every element of this tree.
-     *          The resulting tree is a new tree.
-     */
-    def flatMap[W](f:V=>GenTraversable[(GenTraversable[K],W)]):GenTraversable[(GenTraversable[K],W)] =
-      for (x <- iterator.toTraversable; r <- f(x._2)) yield ((x._1 ++ r._1, r._2))
   }
+  
+  override def seqView(topFirst:Boolean=true) = new SeqView(topFirst)
 
   override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
 

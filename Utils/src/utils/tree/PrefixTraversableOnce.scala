@@ -233,7 +233,6 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
    *  @param topFirst is true if an element appears before its children, false otherwise
-   *  @param seen is a set that is updated to track internal cross references ; if null, no such tracking happens (performance gain, but infinite loops possible)
    */
   protected class TreeIterator(cur:Seq[K],topFirst:Boolean) extends AbstractIterator[(Seq[K], Repr)] {
     protected[this] val iter = self.toIterator                 //iterator for this level
@@ -283,8 +282,6 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
   
   /** Creates the canonical flat representation of the tree.
-   *  Working with this supposes that your tree doesn't use degenerate branches (with no children and no value,
-   *  i.e. with empty as a node somewhere in the tree)
    *  @return the canonical view of the tree
    */
   def seqView(topFirst:Boolean=true) = new SeqView(topFirst)
