@@ -229,7 +229,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X)                            = Deep.foreachRec(Seq((k0,this)), f)
   def deepForeachTree[X](k0:K)(op:PrefixTreeLike.Tree[K,((K,This),=>Unit)=>X])         = Deep.foreachTree((k0,this), op)
   def deepForeachTreeRec[X](k0:K)(op:PrefixTreeLike.Tree[K,(Seq[(K,This)],=>Unit)=>X]) = Deep.foreachTreeRec(Seq((k0,this)), op)
-  
+
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
    *  @param topFirst is true if an element appears before its children, false otherwise
@@ -258,7 +258,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
         null                                                   //return null when finished
     }
   }
-  
+
   /** The Tree can conveniently be viewed almost as a 'Map' with sequences of keys as key.
    *  This is very convenient to iterate through it.
    *  This also provides the best way to transform a Tree: it is much easier to transform the canonical form into
@@ -280,12 +280,12 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def flatMap[W](f:V=>GenTraversable[(GenTraversable[K],W)]):GenTraversable[(GenTraversable[K],W)] =
       for (x <- iterator.toTraversable; r <- f(x._2)) yield ((x._1 ++ r._1, r._2))
   }
-  
+
   /** Creates the canonical flat representation of the tree.
    *  @return the canonical view of the tree
    */
   def seqView(topFirst:Boolean=true) = new SeqView(topFirst)
-  
+
   /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
    *  The written text begins with the string `start` and ends with the string `end`.
    *  Inside, the string representations of all bindings of this tree.
@@ -1066,5 +1066,82 @@ object PrefixTraversableOnce {
       case r    => r
     }
   }
+
+  /** The most generic class that highlights the recursion algorithm on PrefixTraversableOnce.
+   *  Most methods will use it in derived form to achieve their own purpose.
+   *  It has the following properties:
+   *  - user methods mapValues and nextX can refer to the whole caller hierarchy,
+   *    up to the top of the tree if necessary
+   *  - user methods mapValues and nextX can both return null ; such a result indicates that
+   *    the currently processed node will be ignored (and its children too) ; either acts as
+   *    an embedded filter. If the top tree meets that filter condition, the final apply
+   *    method (which builds the transformed tree) will throw NoSuchElementException.
+   *  Because this recursion builds many intermediate objects (sequence of parents, pairs
+   *  of ((K,This),X), and calls methods that are useless in many cases (e.g. when K=L or U=V)
+   *  Other simpler and more efficient forms are provided.
+   */
+  abstract class RecurRecView0[X, K, V, L, W, This <: PrefixTraversableOnce[K, V, This]] {
+    type Data    = ((K, This), X)
+    type Context = Seq[Data]
+    type Values  = (L, Option[W])
+    type R       = Abstract[L,W]
+
+    def mapValues(ctx:Context):Values
+    def nextX(child:(K,This),ctx:Context):X
+
+    def children(ctx:Context):TraversableOnce[(K,This)]      = ctx.head._1._2
+    def childContext(child:((K,This),X),ctx:Context):Context = child +: ctx
+
+    def mapChild(child:(K,This),ctx:Context):(L,R) = nextX(child, ctx) match {
+      case null => null
+      case x1   => childContext((child,x1),ctx) match {
+        case null => null
+        case d    => recur(d)
+      }
+    }
+
+    final def childrenLoop[X](s:Context): (((L,R))=>X) => Unit = (g:((L,R))=>X) => for (z <- children(s)) {
+      val r=mapChild(z, s)
+      if (r!=null) g(r)
+    }
+    final def recur(ctx: Context):(L,R) = mapValues(ctx) match {
+      case null => null
+      case u    => buildResult(u,ctx)
+    }
+
+    def buildResult(v:Values,ctx:Context) = {  //View
+      val loop = childrenLoop(ctx)
+      (v._1,new R(v._2) { def foreach[X](g:((L,R))=>X):Unit = loop(g) })
+    }
+
+
+    def buildDefault(cur:Context,defa:K=>This,g:L=>K): L=>R = null
+    def buildTreeElement(v:Values,b:PrefixTreeLikeBuilder[L,W,R]) = (v._1,b.result(v._2,v._3))
+    def buildResult1(v:Values,ctx:Context)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = {  //Tree
+      val loop = childrenLoop(ctx)
+      val b    = bf.newEmpty
+      loop { b += _ }
+      buildTreeElement(v,b)
+    }
+
+    def recur1(ctx:Context)(implicit bf:PrefixTreeLikeBuilder[L,W,R]):(L,R) = mapValues(ctx) match {
+      case null => null
+      case u    => val b=bf.newEmpty
+                   childrenLoop(ctx) { b += _ }
+                   (u._1,b.result(u._2,u._3))
+    }
+
+    /** Running against the current tree.
+     */
+    @throws(classOf[NoSuchElementException])
+    final def apply(d0:Data): R = get(d0)._2
+
+    @throws(classOf[NoSuchElementException])
+    final def get(d0:Data): (L,R) = recur(Seq(d0)) match {
+      case null => throw new NoSuchElementException
+      case r    => r
+    }
+  }
+
 }
 
