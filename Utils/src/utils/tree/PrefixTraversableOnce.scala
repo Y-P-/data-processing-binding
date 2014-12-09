@@ -55,7 +55,7 @@ import scala.annotation.tailrec
  */
 trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   extends TraversableOnce[(K, This)] { self:This =>
-  import PrefixTraversableOnce._
+  import PrefixTraversableOnce.{Deep,FoldDeep}
   //an alias that concrete classes can use as shortcut to refer to themselves
   protected[this] type Repr = This
   type Key = K
@@ -225,8 +225,8 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *               - subtree with None value: don't compute that node, but go on with the children
    *               - subtree with a value: process normally
    */
-  def deepForeach[X](k0:K)(f:((K,Repr),=>Unit)=>X)                                    = Deep.foreach((k0,this), f)
-  def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X)                            = Deep.foreachRec(Seq((k0,this)), f)
+  def deepForeach[X](k0:K)(f:((K,Repr),=>Unit)=>X)                                     = Deep.foreach((k0,this), f)
+  def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X)                             = Deep.foreachRec(Seq((k0,this)), f)
   def deepForeachTree[X](k0:K)(op:PrefixTreeLike.Tree[K,((K,This),=>Unit)=>X])         = Deep.foreachTree((k0,this), op)
   def deepForeachTreeRec[X](k0:K)(op:PrefixTreeLike.Tree[K,(Seq[(K,This)],=>Unit)=>X]) = Deep.foreachTreeRec(Seq((k0,this)), op)
 
@@ -316,80 +316,81 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     b.toString
   }
 
+  import PrefixLoop._
   //generic transformations
   @throws(classOf[NoSuchElementException])
   def transformRec[X, L, W](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W]), x:((K, This),Seq[((K, This), X)])=> X) = (new RecurRecView[X,K,V,L,W,This] {
-    def mapValues(s: Data): (L, Option[W])   = v(s)
-    override def nextX(child: (K, This), s: Data): X  = x(child,s)
-  })(k0, x0, this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def transformRec[L, W](k0:K, v:Seq[(K, This)]=>(L, Option[W])) = (new RecurRecViewNoData[K,V,L,W,This] {
-    def mapValues(s: Data): (L, Option[W])   = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0, this)
   @throws(classOf[NoSuchElementException])
   def transform[X, L, W](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W]), x:((K, This),((K, This), X))=> X) = (new RecurView[X,K,V,L,W,This] {
-    def mapValues(s: Data): (L, Option[W])   = v(s)
-    override def nextX(child: (K, This), s: Data): X  = x(child,s)
-  })(k0, x0, this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def transform[L, W](k0:K, v:((K, This))=>(L, Option[W])) = (new RecurViewNoData[K,V,L,W,This] {
-    def mapValues(s: Data): (L, Option[W])   = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
   def transformRecSameKey[X, W](k0:K, x0:X, v:Seq[((K, This), X)]=>Option[W], x:((K, This),Seq[((K, This), X)])=> X) = (new RecurRecViewSameKey[X,K,V,W,This] {
-    def mapValues(s: Data): Option[W]   = v(s)
-    override def nextX(child: (K, This), s: Data): X  = x(child,s)
-  })(k0, x0, this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def transformRecSameKey[W](k0:K, v:Seq[(K, This)]=>Option[W]) = (new RecurRecViewNoDataSameKey[K,V,W,This] {
-    def mapValues(s: Data): Option[W]   = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
   def transformSameKey[X, W](k0:K, x0:X, v:(((K, This), X))=>Option[W], x:((K, This),((K, This), X))=> X) = (new RecurViewSameKey[X,K,V,W,This] {
-    def mapValues(s: Data): Option[W]   = v(s)
-    override def nextX(child: (K, This), s: Data): X  = x(child,s)
-  })(k0, x0, this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def transformSameKey[W](k0:K, v:((K, This))=>Option[W]) = (new RecurViewNoDataSameKey[K,V,W,This] {
-    def mapValues(s: Data): Option[W]   = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
 
   //generic conversions to some PrefixTree
   @throws(classOf[NoSuchElementException])
   def toTreeRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W], L=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRec[X,K,V,L,W,R,This] {
-    def mapValues(s: Data): (L, Option[W], L=>R) = v(s)
-    override def nextX(child: (K, This), s: Data): X      = x(child,s)
-  })(k0,x0,this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def toTreeRec[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:Seq[(K, This)]=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecNoData[K,V,L,W,R,This] {
-    def mapValues(s: Data): (L, Option[W], L=>R) = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
   def toTree[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W], L=>R), x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new Recur[X,K,V,L,W,R,This] {
-    def mapValues(s: Data): (L, Option[W], L=>R) = v(s)
-    override def nextX(child: (K, This), s: Data): X      = x(child,s)
-  })(k0,x0,this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def toTree[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:((K, This))=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurNoData[K,V,L,W,R,This] {
-    def mapValues(s: Data): (L, Option[W], L=>R) = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
   def toTreeRecSameKey[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(Option[W],K=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecSameKey[X,K,V,W,R,This] {
-    def mapValues(s: Data): (Option[W], K=>R)    = v(s)
-    override def nextX(child: (K, This), s: Data): X      = x(child,s)
-  })(k0,x0,this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def toTreeRecSameKey[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:Seq[(K, This)]=>(Option[W], K=>R))(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecNoDataSameKey[K,V,W,R,This] {
-    def mapValues(s: Data): (Option[W], K=>R)    = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
   def toTreeSameKey[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:(((K, This), X))=>(Option[W], K=>R), x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurSameKey[X,K,V,W,R,This] {
-    def mapValues(s: Data): (Option[W], K=>R)   = v(s)
-    override def nextX(child: (K, This), s: Data): X     = x(child,s)
-  })(k0,x0,this)
+    def mapValues(ctx: Context): Values   = v(ctx)
+    def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
+  })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def toTreeSameKey[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:((K, This))=>(Option[W], K=>R))(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurNoDataSameKey[K,V,W,R,This] {
-    def mapValues(s: Data): (Option[W], K=>R)   = v(s)
+    def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
 }
 
@@ -496,650 +497,6 @@ object PrefixTraversableOnce {
           foreachTreeRec(z+:s,o1)
         }
       if (o.value!=None) o.value.get(s, recur()) else recur()
-    }
-  }
-
-  //General note: the 16 following classes are increasingly complex versions of the last two classes.
-  //The 14 first classes can be fully duplicated by the last two, albeit at a higher processing cost (expected,
-  //not verified) and a very slightly higher memory footprint.
-  //The last class defines the algorithm for generic recursion ; other classes just adapt it slightly.
-  //For testing purposes, this means that the most important class to test is the last one.
-  //The class that comes just before introduces the handling of defaults and direct translation to
-  //PrefixTreeLike. That handling must also be thoroughly tested.
-  //All other classes should of course be tested, but their is a high priority on the last two, in the
-  //sense that there is a very strong reason to believe that once these two classes are bug-free, the other
-  //will too...
-
-  abstract class RecurBase[X,K,V,L,W,RR,This] {
-    type Data
-    type Values
-    type R = RR
-    /** Building the value for the child
-     *  @param data, the current data for the node in building
-     *  @return a node values, which can be null (child ignored)
-     */
-    def mapValues(cur:Data):Values
-    /** Building the data for the child
-     *  @param child, the child being built
-     *  @param cur, the parent's data
-     *  @return a data value, which can be null (child ignored)
-     */
-    def nextX(child:(K,This),cur:Data):X = throw new IllegalStateException
-    /** Building a recursive default from a K=>Repr default.
-     *  This is not directly used by the recursion, but it provides a way
-     *  to build the default value above from a K=>This default method.
-     *  It comes handy when handling prefix trees.
-     */
-    def buildDefault(cur:Data,defa:K=>This,g:L=>K): L=>R = null
-    /**The recursive call to walk the tree
-     * @param data, the current data for that node layer
-     * @return a node (key,value), which can be null (ignored)
-     */
-    def recur(s:Data):(L,R)
-  }
-
-
-  /** as Recur, simplified in cases where no external X data is involved and parents are not needed and the keys don't change
-   */
-  abstract class RecurNoDataSameKey[K,V,W,R<:PrefixTreeLike[K,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[K,W,R])
-    extends RecurBase[Nothing,K,V,K,W,R,This] {
-    type Data   = (K,This)
-    type Values = (Option[W],K=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:K=>K=null): K=>R = k => {
-      recur((k,defa(k))) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case r1   => r1._2
-      }
-    }
-    def recur(s:Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s._2) recur(z) match {
-          case null =>
-          case r1   => b += r1
-        }
-        (s._1,b.result(u._1,u._2))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,tree:This):R = recur((k0,tree)) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** as RecurView, simplified in cases where no external X data is involved and parent are not needed and the keys don't change
-   */
-  abstract class RecurViewNoDataSameKey[K, V, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[Nothing,K,V,K,W,Abstract[K,W],This] {
-    type Data   = (K, This)
-    type Values = Option[W]
-    def recur(s: Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => (s._1,new R(u) {
-        def foreach[X](g:((K,R))=>X):Unit = {
-          for (z <- s._2) recur(z) match {
-            case null =>
-            case r1   => g(r1)
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, tree: This): R = recur((k0, tree)) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** As RecurRec simplified when no parents are needed and the keys don't change
-   */
-  abstract class RecurSameKey[X,K,V,W,R<:PrefixTreeLike[K,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[K,W,R])
-    extends RecurBase[X,K,V,K,W,R,This] {
-    type Data   = ((K,This),X)
-    type Values = (Option[W],K=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:K=>K=null): K=>R = k => {
-      val chld = (k,defa(k))
-      nextX(chld,s) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case x1   => recur((chld,x1)) match {
-          case null => throw new PrefixTreeLike.NoDefault(k)
-          case r1   => r1._2
-        }
-      }
-    }
-    def recur(s:Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s._1._2) nextX(z,s) match {
-          case null =>
-          case x1   => recur((z,x1)) match {
-            case null =>
-            case r1   => b += r1
-          }
-        }
-        (s._1._1,b.result(u._1,u._2))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,x:X,tree:This):R = recur(((k0,tree),x)) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** As RecurRecView simplified when parents are not needed and the keys don't change
-   */
-  abstract class RecurViewSameKey[X, K, V, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[X,K,V,K,W,Abstract[K,W],This] {
-    type Data   = ((K, This), X)
-    type Values = Option[W]
-    def recur(s: Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => (s._1._1,new R(u) {
-        def foreach[X](g:((K,R))=>X):Unit = {
-          for (z <- s._1._2) nextX(z, s) match {
-            case null =>
-            case x1 => recur((z, x1)) match {
-              case null =>
-              case r1   => g(r1)
-            }
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, x: X, tree: This): R = recur(((k0, tree), x)) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** as RecurRec, simplified in cases where no external X data is involved and the keys don't change
-   */
-  abstract class RecurRecNoDataSameKey[K,V,W,R<:PrefixTreeLike[K,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[K,W,R])
-    extends RecurBase[Nothing,K,V,K,W,R,This] {
-    type Data   = Seq[(K,This)]
-    type Values = (Option[W],K=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:K=>K=null): K=>R = k => {
-      recur((k,defa(k)) +: s) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case r1   => r1._2
-      }
-    }
-    def recur(s:Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s.head._2) recur(z+:s) match {
-          case null =>
-          case r1   => b += r1
-        }
-        (s.head._1,b.result(u._1,u._2))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,tree:This):R = recur(Seq((k0,tree))) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** as RecurRecView, simplified in cases where no external X data is involved and the keys don't change
-   */
-  abstract class RecurRecViewNoDataSameKey[K, V, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[Nothing,K,V,K,W,Abstract[K,W],This] {
-    type Data = Seq[(K, This)]
-    type Values = Option[W]
-    def recur(s: Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => (s.head._1,new R(u) {
-        def foreach[X](g:((K,R))=>X):Unit = {
-          for (z <- s.head._2) recur(z +: s) match {
-            case null =>
-            case r1   => g(r1)
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, tree: This): R = recur(Seq((k0, tree))) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** As RecurRec when the keys don't change
-   */
-  abstract class RecurRecSameKey[X,K,V,W,R<:PrefixTreeLike[K,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[K,W,R])
-    extends RecurBase[X,K,V,K,W,R,This] {
-    type Data = Seq[((K,This),X)]
-    type Values = (Option[W],K=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:K=>K=null): K=>R = k => {
-      val chld = (k,defa(k))
-      nextX(chld,s) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case x1   => recur((chld,x1)+:s) match {
-          case null => throw new PrefixTreeLike.NoDefault(k)
-          case r1   => r1._2
-        }
-      }
-    }
-    def recur(s:Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s.head._1._2) nextX(z,s) match {
-          case null =>
-          case x1   => recur((z,x1)+:s) match {
-            case null =>
-            case r1   => b += r1
-          }
-        }
-        (s.head._1._1,b.result(u._1,u._2))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,x:X,tree:This):R = recur(Seq(((k0,tree),x))) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** As RecurRecView when the keys don't change
-   */
-  abstract class RecurRecViewSameKey[X, K, V, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[X,K,V,K,W,Abstract[K,W],This]{
-    type Data = Seq[((K, This), X)]
-    type Values = Option[W]
-    def recur(s: Data):(K,R) = mapValues(s) match {
-      case null => null
-      case u    => (s.head._1._1,new R(u) {
-        def foreach[X](g:((K,R))=>X):Unit = {
-          for (z <- s.head._1._2) nextX(z, s) match {
-            case null =>
-            case x1 => recur((z, x1) +: s) match {
-              case null =>
-              case r1   => g(r1)
-            }
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, x: X, tree: This): R = recur(Seq(((k0, tree), x))) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** as Recur, simplified in cases where no external X data is involved and parents are not needed
-   */
-  abstract class RecurNoData[K,V,L,W,R<:PrefixTreeLike[L,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[L,W,R])
-    extends RecurBase[Nothing,K,V,L,W,R,This] {
-    type Data   = (K,This)
-    type Values = (L,Option[W],L=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:L=>K): L=>R = if (g==null) null else l => {
-      val k = g(l)
-      recur((k,defa(k))) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case r1   => r1._2
-      }
-    }
-    def recur(s:Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s._2) recur(z) match {
-          case null =>
-          case r1   => b += r1
-        }
-        (u._1,b.result(u._2,u._3))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,tree:This):R = get(k0,tree)._2
-
-    @throws(classOf[NoSuchElementException])
-    def get(k0:K,tree:This):(L,R) = recur((k0,tree)) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
-  }
-
-  /** as RecurView, simplified in cases where no external X data is involved and parent are not needed
-   */
-  abstract class RecurViewNoData[K, V, L, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[Nothing,K,V,L,W,Abstract[L,W],This] {
-    type Data = (K, This)
-    type Values = (L, Option[W])
-    def recur(s: Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => (u._1,new R(u._2) {
-        def foreach[X](g:((L,R))=>X):Unit = {
-          for (z <- s._2) recur(z) match {
-            case null =>
-            case r1   => g(r1)
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, tree: This): R = get(k0,tree)._2
-
-    @throws(classOf[NoSuchElementException])
-    def get(k0: K, tree: This): (L,R) = recur((k0, tree)) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
-  }
-
-  /** As RecurRec simplified when no parents are needed
-   */
-  abstract class Recur[X,K,V,L,W,R<:PrefixTreeLike[L,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[L,W,R])
-    extends RecurBase[X,K,V,L,W,R,This] {
-    type Data = ((K,This),X)
-    type Values = (L,Option[W],L=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:L=>K): L=>R = if (g==null) null else l => {
-      val k = g(l)
-      val chld = (k,defa(k))
-      nextX(chld,s) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case x1   => recur((chld,x1)) match {
-          case null => throw new PrefixTreeLike.NoDefault(k)
-          case r1   => r1._2
-        }
-      }
-    }
-    def recur(s:Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s._1._2) nextX(z,s) match {
-          case null =>
-          case x1   => recur((z,x1)) match {
-            case null =>
-            case r1   => b += r1
-          }
-        }
-        (u._1,b.result(u._2,u._3))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,x:X,tree:This):R = get(k0,x,tree)._2
-
-    @throws(classOf[NoSuchElementException])
-    def get(k0:K,x:X,tree:This):(L,R) = recur(((k0,tree),x)) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
-  }
-
-  /** As RecurRecView simplified when parents are not needed
-   */
-  abstract class RecurView[X, K, V, L, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[X,K,V,L,W,Abstract[L,W],This] {
-    type Data = ((K, This), X)
-    type Values = (L, Option[W])
-    def recur(s: Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => (u._1,new R(u._2) {
-        def foreach[X](g:((L,R))=>X):Unit = {
-          for (z <- s._1._2) nextX(z, s) match {
-            case null =>
-            case x1 => recur((z, x1)) match {
-              case null =>
-              case r1   => g(r1)
-            }
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, x: X, tree: This): R = recur(((k0, tree), x)) match {
-      case null => throw new NoSuchElementException
-      case r    => r._2
-    }
-  }
-
-  /** as RecurRec, simplified in cases where no external X data is involved
-   */
-  abstract class RecurRecNoData[K,V,L,W,R<:PrefixTreeLike[L,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[L,W,R])
-    extends RecurBase[Nothing,K,V,L,W,R,This] {
-    type Data = Seq[(K,This)]
-    type Values = (L,Option[W],L=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:L=>K): L=>R = if (g==null) null else l => {
-      val k = g(l)
-      recur((k,defa(k))+:s) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case r1   => r1._2
-      }
-    }
-    def recur(s:Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s.head._2) recur(z+:s) match {
-          case null =>
-          case r1   => b += r1
-        }
-        (u._1,b.result(u._2,u._3))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,tree:This):R = get(k0,tree)._2
-
-    @throws(classOf[NoSuchElementException])
-    def get(k0:K,tree:This):(L,R) = recur(Seq((k0,tree))) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
-  }
-
-  /** as RecurRecView, simplified in cases where no external X data is involved
-   */
-  abstract class RecurRecViewNoData[K, V, L, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[Nothing,K,V,L,W,Abstract[L,W],This] {
-    type Data = Seq[(K, This)]
-    type Values = (L, Option[W])
-    def recur(s: Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => (u._1,new R(u._2) {
-        def foreach[X](g:((L,R))=>X):Unit = {
-          for (z <- s.head._2) recur(z +: s) match {
-            case null =>
-            case r1   => g(r1)
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, tree: This): R = get(k0, tree)._2
-
-    @throws(classOf[NoSuchElementException])
-    def get(k0: K, tree: This): (L,R) = recur(Seq((k0, tree))) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
-  }
-
-  /** The most generic class that highlights the recursion algorithm on PrefixTraversableOnce.
-   *  Like RecurRecView, but the purpose is to build an actual PrefixTreeLike tree, not just
-   *  a PrefixTraversableOnce (a view) ; it is as complex as its sibling, has most of the same
-   *  properties, and adds the possibility to handle a default function.
-   *  Not using RecurRecView also removes one layer of intermediate object (Abstract.)
-   */
-  abstract class RecurRec[X,K,V,L,W,R<:PrefixTreeLike[L,W,R],This<:PrefixTraversableOnce[K,V,This]](implicit bf:PrefixTreeLikeBuilder[L,W,R])
-    extends RecurBase[X,K,V,L,W,R,This] {
-    type Data = Seq[((K,This),X)]
-    type Values = (L,Option[W],L=>R)
-    override def buildDefault(s:Data,defa:K=>This,g:L=>K): L=>R = if (g==null) null else l => {
-      val k = g(l)
-      val chld = (k,defa(k))
-      nextX(chld,s) match {
-        case null => throw new PrefixTreeLike.NoDefault(k)
-        case x1   => recur((chld,x1)+:s) match {
-          case null => throw new PrefixTreeLike.NoDefault(k)
-          case r1   => r1._2
-        }
-      }
-    }
-    def recur(s:Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-        for (z <- s.head._1._2) nextX(z,s) match {
-          case null =>
-          case x1   => recur((z,x1)+:s) match {
-            case null =>
-            case r1   => b += r1
-          }
-        }
-        (u._1,b.result(u._2,u._3))
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0:K,x:X,tree:This):R = get(k0,x,tree)._2
-
-    @throws(classOf[NoSuchElementException])
-    def get(k0:K,x:X,tree:This):(L,R) = recur(Seq(((k0,tree),x))) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
-  }
-
-  /** The most generic class that highlights the recursion algorithm on PrefixTraversableOnce.
-   *  Most methods will use it in derived form to achieve their own purpose.
-   *  It has the following properties:
-   *  - user methods mapValues and nextX can refer to the whole caller hierarchy,
-   *    up to the top of the tree if necessary
-   *  - user methods mapValues and nextX can both return null ; such a result indicates that
-   *    the currently processed node will be ignored (and its children too) ; either acts as
-   *    an embedded filter. If the top tree meets that filter condition, the final apply
-   *    method (which builds the transformed tree) will throw NoSuchElementException.
-   *  Because this recursion builds many intermediate objects (sequence of parents, pairs
-   *  of ((K,This),X), and calls methods that are useless in many cases (e.g. when K=L or U=V)
-   *  Other simpler and more efficient forms are provided.
-   */
-  abstract class RecurRecView[X, K, V, L, W, This <: PrefixTraversableOnce[K, V, This]]
-    extends RecurBase[X,K,V,L,W,Abstract[L,W],This] {
-    type Data = Seq[((K, This), X)]
-    type Values = (L, Option[W])
-    def recur(s: Data):(L,R) = mapValues(s) match {
-      case null => null
-      case u    => (u._1,new R(u._2) {
-        def foreach[X](g:((L,R))=>X):Unit = {
-          for (z <- s.head._1._2) nextX(z, s) match {
-            case null =>
-            case x1   => recur((z, x1) +: s) match {
-              case null =>
-              case r1   => g(r1)
-            }
-          }
-        }
-      })
-    }
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    def apply(k0: K, x: X, tree: This): R = get(k0, x, tree)._2
-
-    @throws(classOf[NoSuchElementException])
-    def get(k0: K, x: X, tree: This): (L,R) = recur(Seq(((k0, tree), x))) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
-  }
-
-  /** The most generic class that highlights the recursion algorithm on PrefixTraversableOnce.
-   *  Most methods will use it in derived form to achieve their own purpose.
-   *  It has the following properties:
-   *  - user methods mapValues and nextX can refer to the whole caller hierarchy,
-   *    up to the top of the tree if necessary
-   *  - user methods mapValues and nextX can both return null ; such a result indicates that
-   *    the currently processed node will be ignored (and its children too) ; either acts as
-   *    an embedded filter. If the top tree meets that filter condition, the final apply
-   *    method (which builds the transformed tree) will throw NoSuchElementException.
-   *  Because this recursion builds many intermediate objects (sequence of parents, pairs
-   *  of ((K,This),X), and calls methods that are useless in many cases (e.g. when K=L or U=V)
-   *  Other simpler and more efficient forms are provided.
-   */
-  abstract class RecurRecView0[X, K, V, L, W, This <: PrefixTraversableOnce[K, V, This]] {
-    type Data    = ((K, This), X)
-    type Context = Seq[Data]
-    type Values  = (L, Option[W])
-    type R       = Abstract[L,W]
-
-    def mapValues(ctx:Context):Values
-    def nextX(child:(K,This),ctx:Context):X
-
-    def children(ctx:Context):TraversableOnce[(K,This)]      = ctx.head._1._2
-    def childContext(child:((K,This),X),ctx:Context):Context = child +: ctx
-
-    def mapChild(child:(K,This),ctx:Context):(L,R) = nextX(child, ctx) match {
-      case null => null
-      case x1   => childContext((child,x1),ctx) match {
-        case null => null
-        case d    => recur(d)
-      }
-    }
-
-    final def childrenLoop[X](s:Context): (((L,R))=>X) => Unit = (g:((L,R))=>X) => for (z <- children(s)) {
-      val r=mapChild(z, s)
-      if (r!=null) g(r)
-    }
-    final def recur(ctx: Context):(L,R) = mapValues(ctx) match {
-      case null => null
-      case u    => buildResult(u,ctx)
-    }
-
-    def buildResult(v:Values,ctx:Context) = {  //View
-      val loop = childrenLoop(ctx)
-      (v._1,new R(v._2) { def foreach[X](g:((L,R))=>X):Unit = loop(g) })
-    }
-
-
-    def buildDefault(cur:Context,defa:K=>This,g:L=>K): L=>R = null
-    def buildTreeElement(v:Values,b:PrefixTreeLikeBuilder[L,W,R]) = (v._1,b.result(v._2,v._3))
-    def buildResult1(v:Values,ctx:Context)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = {  //Tree
-      val loop = childrenLoop(ctx)
-      val b    = bf.newEmpty
-      loop { b += _ }
-      buildTreeElement(v,b)
-    }
-
-    def recur1(ctx:Context)(implicit bf:PrefixTreeLikeBuilder[L,W,R]):(L,R) = mapValues(ctx) match {
-      case null => null
-      case u    => val b=bf.newEmpty
-                   childrenLoop(ctx) { b += _ }
-                   (u._1,b.result(u._2,u._3))
-    }
-
-    /** Running against the current tree.
-     */
-    @throws(classOf[NoSuchElementException])
-    final def apply(d0:Data): R = get(d0)._2
-
-    @throws(classOf[NoSuchElementException])
-    final def get(d0:Data): (L,R) = recur(Seq(d0)) match {
-      case null => throw new NoSuchElementException
-      case r    => r
     }
   }
 
