@@ -385,8 +385,8 @@ object TreeTests {
 
   def testForeach(implicit out:PrintWriter) = {
     import out.print
-    type O = (Seq[(String,StringTree[Int])],=>Unit)=>Unit
-    val op:(String) => O = (info) => (p,recur)=> {
+    type F = (Seq[(String,StringTree[Int])],=>Unit)=>Unit
+    val op:(String) => F = (info) => (p,recur) => {
       val t = p.head
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       recur
@@ -395,10 +395,10 @@ object TreeTests {
     val op1 = op("X")
     val op2 = op("Y")
     val opX = PrefixTree.fromFlat2(Seq(
-        (Seq(),(op1,PrefixTree.constant[String,O](op1))),
-        (Seq("f"),(op2,PrefixTree.constant[String,O](op2)))
+        (Seq(),(op1,PrefixTree.constant[String,F](op1))),
+        (Seq("f"),(op2,PrefixTree.constant[String,F](op2)))
       ))
-    m.deepForeachTreeRec("")(opX)
+    m.deepForeachTreeRec[F,PrefixTree[String,F]]("")(opX)
     out.println
     m.deepForeachRec(""){(p,recur)=>
       val t = p.head
