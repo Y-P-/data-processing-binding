@@ -43,18 +43,18 @@ object PrefixLoop {
     type W
     type R
 
-    type Data           //Some basic information pertaining to the current layer
-    type Context        //usually either Data (we don't need parents info) or Seq[Data] (we need parents info)
-    type Values         //some kind of data required to build the result
+    type Data>:Null     //Some basic information pertaining to the current layer
+    type Context>:Null  //usually either Data (we don't need parents info) or Seq[Data] (we need parents info)
+    type Values>:Null   //some kind of data required to build the result
     type Result>:Null   //Result produced by the recursion : null value must be possible but is reserved
 
-    /** this builds the converted values from a given context; very user dependent */
+    /** this builds the `values` from a given context; very user dependent */
     def mapValues(ctx:Context):Values
     /** this builds the user data for a given context and child; very user dependent */
     def nextX(child:(K,This),ctx:Context):X
     
     /** given some Values and a Context, builds the converted result and associated key */
-    def buildResult(ctx:Context,v:Values,loop:(Result⇒Any) ⇒ Unit):Result
+    def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result
 
     //usually provided by a rather generic trait (`RecWithDataRB` etc)
     /** this is used to start the recursion from the top layer : it builds the initial context */
@@ -68,20 +68,20 @@ object PrefixLoop {
     
 
     /** This builds a loop on the children in Context on which a given method are applied */
-    @inline final def childrenLoop(ctx:Context): (Result⇒Any) ⇒ Unit = (g:Result⇒Any) ⇒ for (z <- getCurrent(ctx)._2) {
+    @inline final def childrenLoop(ctx:Context): (Result=>Any) => Unit = (g:Result=>Any) => for (z <- getCurrent(ctx)._2) {
       val r=mapChild(z, ctx)
       if (r!=null) g(r)
     }
     /** Applies the recursion on all the tree layers */
     final def recur(ctx: Context):Result = mapValues(ctx) match {
-      case null ⇒ null
-      case u    ⇒ buildResult(ctx,u,childrenLoop(ctx))
+      case null => null
+      case u    => buildResult(ctx,u,childrenLoop(ctx))
     }
     /** Apply the transformation */
     @throws(classOf[NoSuchElementException])
     final def get(d0:Data): Result = recur(initialize(d0)) match {
-      case null ⇒ throw new NoSuchElementException
-      case r    ⇒ r
+      case null => throw new NoSuchElementException
+      case r    => r
     }
   }
 
@@ -91,17 +91,17 @@ object PrefixLoop {
     type Data = (K,This)
     final def nextX(child:(K,This),ctx:Context):Nothing = ???
     @inline final def mapChild(child:(K,This),ctx:Context):Result = childContext(child,ctx) match {
-      case null ⇒ null
-      case d    ⇒ recur(d)
+      case null => null
+      case d    => recur(d)
     }
   }
   trait WithDataRB extends RecurBase {
     type Data = ((K,This),X)
     @inline final def mapChild(child:(K,This),ctx:Context):Result = nextX(child, ctx) match {
-      case null ⇒ null
-      case x1   ⇒ childContext((child,x1),ctx) match {
-        case null ⇒ null
-        case d    ⇒ recur(d)
+      case null => null
+      case x1   => childContext((child,x1),ctx) match {
+        case null => null
+        case d    => recur(d)
       }
     }
   }
@@ -159,23 +159,23 @@ object PrefixLoop {
   //traits for building either View or Tree
   trait ViewRB[X,K,V,L,W,T<:PrefixTraversableOnce[K,V,T]] extends MapLikeRB[X,K,V,L,W,T] {
     type R = PrefixTraversableOnce.Abstract[L,W]
-    def buildResult(ctx:Context,v:Values,loop:((Result)⇒Any) ⇒ Unit):Result =
-      (getResultKey(v,ctx),new R(getValue(v)) { def foreach[X](g:(Result)⇒X):Unit = loop(g) })
+    def buildResult(ctx:Context,v:Values,loop:((Result)=>Any) => Unit):Result =
+      (getResultKey(v,ctx),new R(getValue(v)) { def foreach[X](g:(Result)=>X):Unit = loop(g) })
   }
   trait TreeRB[X,K,V,L,W,R0<:PrefixTreeLike[L,W,R0],T<:PrefixTraversableOnce[K,V,T]] extends MapLikeRB[X,K,V,L,W,T] {
     type R=R0
     def bf:PrefixTreeLikeBuilder[L,W,R]
-    def getDefault(v:Values):L⇒R
-    def buildDefault(ctx:Context,defa:K⇒This,g:L⇒K): L⇒R
+    def getDefault(v:Values):L=>R
+    def buildDefault(ctx:Context,defa:K=>This,g:L=>K): L=>R
 
     final def stdDefault(ctx:Context,child:(K,This)) = mapChild(child,ctx) match {
-      case null ⇒ throw new PrefixTreeLike.NoDefault(child._1)
-      case r    ⇒ r._2
+      case null => throw new PrefixTreeLike.NoDefault(child._1)
+      case r    => r._2
     }
 
     @inline final def buildTreeElement(l:L,w:Option[W],v:Values,b:PrefixTreeLikeBuilder[L,W,R]) =
       (l,b.result(w,getDefault(v)))
-    def buildResult(ctx:Context,v:Values,loop:((Result)⇒Any) ⇒ Unit):Result = {
+    def buildResult(ctx:Context,v:Values,loop:((Result)=>Any) => Unit):Result = {
       val b = bf.newEmpty
       loop { b += _ }
       buildTreeElement(getResultKey(v,ctx),getValue(v),v,b)
@@ -189,10 +189,10 @@ object PrefixLoop {
    */
   trait SameKeyDefault[X,K,V,W,R<:PrefixTreeLike[K,W,R],T<:PrefixTraversableOnce[K,V,T]] extends TreeRB[X,K,V,K,W,R,T] {
     override type L=K
-    def buildDefault(ctx:Context,defa:K⇒This,g:L⇒K): L⇒R = l ⇒ stdDefault(ctx,(l,defa(l)))
+    def buildDefault(ctx:Context,defa:K=>This,g:L=>K): L=>R = l => stdDefault(ctx,(l,defa(l)))
   }
   trait OtherKeyDefault[X,K,V,L,W,R<:PrefixTreeLike[L,W,R],T<:PrefixTraversableOnce[K,V,T]] extends TreeRB[X,K,V,L,W,R,T] {
-    def buildDefault(ctx:Context,defa:K⇒This,g:L⇒K): L⇒R = if (g==null) null else l ⇒ {
+    def buildDefault(ctx:Context,defa:K=>This,g:L=>K): L=>R = if (g==null) null else l => {
       val k = g(l)
       stdDefault(ctx,(k,defa(k)))
     }
@@ -208,9 +208,9 @@ object PrefixLoop {
   }
   trait ValueWD extends RecurBase {
     override type L=K
-    type Values = (Option[W], L⇒R)
+    type Values = (Option[W], L=>R)
     @inline final def getValue(v:Values):Option[W] = v._1
-    @inline final def getDefault(v:Values):L⇒R = v._2
+    @inline final def getDefault(v:Values):L=>R = v._2
     @inline def getResultKey(v:Values,ctx:Context):L = getCurrent(ctx)._1
   }
   trait ValueLW extends RecurBase {
@@ -219,9 +219,9 @@ object PrefixLoop {
     @inline def getResultKey(v:Values,ctx:Context):L = v._1
   }
   trait ValueLWD extends RecurBase {
-    type Values = (L, Option[W], L⇒R)
+    type Values = (L, Option[W], L=>R)
     @inline final def getValue(v:Values):Option[W] = v._2
-    @inline final def getDefault(v:Values):L⇒R = v._3
+    @inline final def getDefault(v:Values):L=>R = v._3
     @inline def getResultKey(v:Values,ctx:Context):L = v._1
   }
   
@@ -235,21 +235,20 @@ object PrefixLoop {
     type V=VV
     type This=TT
     type Result=R0
+    type Values = Context
+    @inline def deepLoop(ctx:Context,loop:(Result=>Any) => Unit):Result
+    //no conversions ; do nothing but don't return null (ignored in the loop)
+    def mapValues(ctx:Context):Values = ctx
+    def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result = deepLoop(ctx,loop)
     /** Running against the current tree. */
     @throws(classOf[NoSuchElementException])
     final def apply(d0:Data): Result = get(d0)    
   }
   
-  class UU[X,R0>:Null,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[X,R0,K,V,T] with RecWithDataRB {
-    type Values = Null
-    /** this builds the converted values from a given context; very user dependent */
-    def mapValues(ctx:Context):Values = null
-    /** this builds the user data for a given context and child; very user dependent */
-    def nextX(child:(K,This),ctx:Context):X = null.asInstanceOf[X]
-    /** given some Values and a Context, builds the converted result and associated key */
-    def buildResult(ctx:Context,v:Values,loop:(Result⇒Any) ⇒ Unit):Result = null.asInstanceOf[Result]
-  }
-
+  abstract class LoopRecWithData[X,R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[X,R0,K,V,T] with RecWithDataRB
+  abstract class LoopWithData[X,R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[X,R0,K,V,T] with BasicWithDataRB
+  abstract class LoopRecNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with RecNoDataRB
+  abstract class LoopNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with BasicNoDataRB
 
   /** Actual classes for all possible combinations.
    *  - with or without an X user data

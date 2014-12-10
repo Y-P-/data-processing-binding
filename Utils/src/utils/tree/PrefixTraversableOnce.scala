@@ -225,10 +225,14 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *               - subtree with None value: don't compute that node, but go on with the children
    *               - subtree with a value: process normally
    */
-  def deepForeach[X](k0:K)(f:((K,Repr),=>Unit)=>X)                                     = Deep.foreach((k0,this), f)
+  def deepForeach0[X](k0:K)(f:((K,Repr),=>Unit)=>X)                                     = Deep.foreach((k0,this), f)
   def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X)                             = Deep.foreachRec(Seq((k0,this)), f)
   def deepForeachTree[X](k0:K)(op:PrefixTreeLike.Tree[K,((K,This),=>Unit)=>X])         = Deep.foreachTree((k0,this), op)
   def deepForeachTreeRec[X](k0:K)(op:PrefixTreeLike.Tree[K,(Seq[(K,This)],=>Unit)=>X]) = Deep.foreachTreeRec(Seq((k0,this)), op)
+
+ def deepForeach[X](k0:K)(f:((K,Repr),=>Unit)=>X) = (new PrefixLoop.LoopNoData[Null,K,V,This] {
+   def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = { f(ctx,loop(null)); null }
+ }).apply((k0,this))
 
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
