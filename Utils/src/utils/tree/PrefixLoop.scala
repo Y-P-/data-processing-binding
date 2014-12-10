@@ -269,6 +269,16 @@ object PrefixLoop {
   abstract class LoopRecNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with RecNoDataRB
   abstract class LoopNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with BasicNoDataRB
 
+  //Useful for fold operations
+  class Fold[U](u0:U) {
+    var u = u0
+    def apply[K,This,Context](topFirst:Boolean,f: (U, Context) => U):(Context, =>Unit) => Unit =
+      if (topFirst) (ctx,recur) => { u=f(u,ctx); recur } else (ctx,recur) => { recur; u=f(u,ctx) }
+    def apply[K,This,Context,F<:(U, Context)=>U,O<:PrefixTreeLike[K,F,O]](topFirst:Boolean):(F, Context, =>Unit) => Unit =
+      if (topFirst) (f, ctx, recur) => { u=f(u,ctx); recur } else (f, ctx, recur) => { recur; u=f(u,ctx) }
+  }
+  
+  
   /** Actual classes for all possible combinations.
    *  - with or without an X user data
    *  - with or without access to the parents

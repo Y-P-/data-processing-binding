@@ -199,12 +199,6 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  Children are evaluated before their parent.
    *  The top tree is evaluated last with k0 as key.
    */
-  def deepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,Repr)) => U): U =
-    new FoldDeep(u0).left(k0,this,topFirst,null)
-  def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,Repr)]) => U): U =
-    new FoldDeep(u0).leftRec(k0,this,topFirst,f)
-  def deepFoldLeftTreeRec[U](u0:U,k0:K,topFirst:Boolean)(op: PrefixTreeLike.Tree[K,(U,(K,This)) => U]): U =
-    new FoldDeep(u0).leftTreeRec(k0,this,topFirst,op)
   def deepFoldRight[U](u0:U,k0:K,topFirst:Boolean)(f: ((K,Repr),U) => U): U =
     new FoldDeep(u0).right(k0,this,topFirst,f)
   def deepFoldRightRec[U](u0:U,k0:K,topFirst:Boolean)(f: (Seq[(K,Repr)],U) => U): U =
@@ -212,11 +206,30 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def deepFoldRightTreeRec[U](u0:U,k0:K,topFirst:Boolean)(op: PrefixTreeLike.Tree[K,((K,This),U) => U]): U =
     new FoldDeep(u0).rightTreeRec(k0,this,topFirst,op)
 
-  def deepFoldLeft0[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,Repr)) => U): U = {
+  def deepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,Repr)) => U): U = {
+    val x = new PrefixLoop.Fold[U](u0)
+    deepForeach(k0)(x(topFirst,f))
+    x.u
+  }
+  def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,Repr)]) => U): U = {
+    val x = new PrefixLoop.Fold[U](u0)
+    deepForeachRec(k0)(x(topFirst,f))
+    x.u
+  }
+  def deepFoldLeftTreeRec[U,F<:(U, Seq[((K,Repr))])=>U,O<:PrefixTreeLike[K,F,O]](u0:U,k0:K,topFirst:Boolean)(op: O): U = {
+    val x = new PrefixLoop.Fold[U](u0)
+    x(topFirst)
     var u = u0
-    (new PrefixLoop.LoopNoData[U,K,V,This] {
-      def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = { if (topFirst) { u=f(u,ctx); loop(null) } else { loop(null); u=f(u,ctx) }; u }
-    })((k0,this))
+    def f(o:F,ctx:Seq[((K,Repr),Any)],recur: =>Unit) = { u=o(u,ctx.view.map(_._1)); recur }
+    
+    (new PrefixLoop.LoopRecWithData[O,Unit,K,V,This] {
+      def nextX(child:(K,This), ctx:Context) = try { ctx.head._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
+      def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = ctx.head._2.value match {
+        case None    =>
+        case Some(o) => f(o,ctx,loop(null))
+      }
+    })(((k0,this),op))
+    u
   }
 
 
@@ -235,24 +248,24 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    */
   def deepForeach[X](k0:K)(f:((K,Repr),=>Unit)=>X) = (new PrefixLoop.LoopNoData[Unit,K,V,This] {
     def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
-  }).apply((k0,this))
+  })((k0,this))
   def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X) = (new PrefixLoop.LoopRecNoData[Unit,K,V,This] {
     def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
-  }).apply((k0,this))
+  })((k0,this))
   def deepForeachTree[X,O<:PrefixTreeLike[K,(((K,Repr),O),=>Unit)=>X,O]](k0:K)(op:O) = (new PrefixLoop.LoopWithData[O,Unit,K,V,This] {
     def nextX(child:(K,This), ctx:Context) = try { ctx._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
     def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = ctx._2.value match {
       case None    =>
       case Some(o) => o(ctx,loop(null))
     }
-  }).apply(((k0,this),op))
-  def deepForeachTreeRec[F<:(Seq[((K,Repr))],=>Unit)=>Any,O<:PrefixTreeLike[K,F,O]](k0:K)(op:O) = (new PrefixLoop.LoopRecWithData[O,Unit,K,V,This] {
+  })(((k0,this),op))
+  def deepForeachTreeRec[X,F<:(Seq[((K,Repr))],=>Unit)=>X,O<:PrefixTreeLike[K,F,O]](k0:K)(op:O) = (new PrefixLoop.LoopRecWithData[O,Unit,K,V,This] {
     def nextX(child:(K,This), ctx:Context) = try { ctx.head._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
     def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = ctx.head._2.value match {
       case None    =>
-      case Some(o) => o(ctx.map(_._1),loop(null))
+      case Some(o) => o(ctx.view.map(_._1),loop(null))
     }
-  }).apply(((k0,this),op))
+  })(((k0,this),op))
 
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
