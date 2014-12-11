@@ -199,4 +199,8 @@ Tree{'7+7}(4 -> Tree{'d4+4}(1 -> Tree{'a1*1}(),2 -> Tree{'b7%2}()))
 (7)={d(4)={a(1)={}b(2)={}}e(5)={c(3)={}}f(6)={d(4)={a(1)={}b(2)={}}x(5)={c(3)={}}}}
 (7)={d(4)={a(1)={}b(2)={}}e(5)={c(3)={}}f(6)={d(4)={a(1)={}b(2)={}}x(5)={c(3)={}}}}
 ----24--------
+->aSome(1)XbSome(2)XdSome(4)XcSome(3)XeSome(5)XaSome(1)YbSome(2)YdSome(4)YcSome(3)YxSome(5)YfSome(6)YSome(7)X
+->aSome(1)ZbSome(2)ZdSome(4)ZcSome(3)ZeSome(5)ZaSome(1)ZbSome(2)ZdSome(4)ZcSome(3)ZxSome(5)ZfSome(6)ZSome(7)Z
+->aSome(1)WbSome(2)WdSome(4)WcSome(3)WeSome(5)WaSome(1)WbSome(2)WdSome(4)WcSome(3)WxSome(5)WfSome(6)WSome(7)W
+----25--------
 null={a={}()aa={}(1)ab={aab={d={}(5)}(3)aac={}(4)}(2)}()

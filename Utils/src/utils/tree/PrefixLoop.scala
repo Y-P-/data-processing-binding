@@ -264,21 +264,51 @@ object PrefixLoop {
     final def apply(d0:Data): Result = get(d0)
   }
 
+  /** Actual classes for deep iteration in the tree.
+   */
   abstract class LoopRecWithData[X,R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[X,R0,K,V,T] with RecWithDataRB
   abstract class LoopWithData[X,R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[X,R0,K,V,T] with BasicWithDataRB
   abstract class LoopRecNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with RecNoDataRB
   abstract class LoopNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with BasicNoDataRB
+  //This iterates through the tree while unwinding O in parallel and applying f to all elements
+  class ZipRec[K,V,O<:PrefixTreeLike[K,_,O],T<:PrefixTraversableOnce[K,V,T]](f:(Seq[((K,T),O)],=>Unit)=>Any) extends LoopRecWithData[O,Unit,K,V,T] {
+    def nextX(child:(K,This), ctx:Context) = try { ctx.head._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
+    def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
+  }
+  //builds a tuned up version of ZipRec by providing a functor and a tree of something ; the functor is applied to the functions before use.
+  def zipRec[K,V,F,O<:PrefixTreeLike[K,F,O],This<:PrefixTraversableOnce[K,V,This]](h:F=>(Seq[((K,This),O)],=>Unit)=>Unit) = {
+    val f:(Seq[((K,This),O)],=>Unit)=>Unit = (ctx,recur)=>ctx.head._2.value match {
+      case None    => recur
+      case Some(g) => if (g!=null) h(g)(ctx,recur)
+    }
+    new ZipRec[K,V,O,This](f)
+  }
+  //Same as above, but f doesn't reach to the parents
+  class Zip[K,V,O<:PrefixTreeLike[K,_,O],T<:PrefixTraversableOnce[K,V,T]](f:(((K,T),O),=>Unit)=>Any) extends LoopWithData[O,Unit,K,V,T] {
+    def nextX(child:(K,This), ctx:Context) = try { ctx._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
+    def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
+  }
+  //builds a tuned up version of Zip by providing a functor and a tree of something ; the functor is applied to the functions before use.
+  def zip[K,V,F,O<:PrefixTreeLike[K,F,O],This<:PrefixTraversableOnce[K,V,This]](h:F=>(((K,This),O),=>Unit)=>Unit) = {
+    val f:(((K,This),O),=>Unit)=>Unit = (ctx,recur)=>ctx._2.value match {
+      case None    => recur
+      case Some(g) => if (g!=null) h(g)(ctx,recur)
+    }
+    new Zip[K,V,O,This](f)
+  }
 
   //Useful for fold operations
   class Fold[U](u0:U) {
     var u = u0
-    def apply[K,This,Context](topFirst:Boolean,f: (U, Context) => U):(Context, =>Unit) => Unit =
-      if (topFirst) (ctx,recur) => { u=f(u,ctx); recur } else (ctx,recur) => { recur; u=f(u,ctx) }
-    def apply[K,This,Context,F<:(U, Context)=>U,O<:PrefixTreeLike[K,F,O]](topFirst:Boolean):(F, Context, =>Unit) => Unit =
-      if (topFirst) (f, ctx, recur) => { u=f(u,ctx); recur } else (f, ctx, recur) => { recur; u=f(u,ctx) }
+    def apply[K,This,Context](g:((Context, =>Unit) => Unit) => Unit)(topFirst:Boolean,f: (U, Context) => U):U = {
+      g(if (topFirst) (ctx,recur) => { u=f(u,ctx); recur } else (ctx,recur) => { recur; u=f(u,ctx) })
+      u
+    }
   }
-  
-  
+  def fold[U,K,This,Context](u0:U)(g:((Context, =>Unit) => Unit) => Unit)(topFirst:Boolean,f: (U, Context) => U):U =
+    new Fold(u0)(g)(topFirst,f)
+
+
   /** Actual classes for all possible combinations.
    *  - with or without an X user data
    *  - with or without access to the parents

@@ -386,7 +386,7 @@ object TreeTests {
   def testForeach(implicit out:PrintWriter) = {
     import out.print
     type F = (Seq[(String,StringTree[Int])],=>Unit)=>Unit
-    val op:(String) => F = (info) => (p,recur) => {
+    val op:String=>F = (info) => (p,recur) => {
       val t = p.head
       print(s"${t._1}(${if(t._2.value!=None) t._2.value.get else ""})={")
       recur
@@ -394,11 +394,11 @@ object TreeTests {
     }
     val op1 = op("X")
     val op2 = op("Y")
-    val opX = PrefixTree.fromFlat2(Seq(
+    val opX:PrefixTree[String,F] = PrefixTree.fromFlat2(Seq(
         (Seq(),(op1,PrefixTree.constant[String,F](op1))),
         (Seq("f"),(op2,PrefixTree.constant[String,F](op2)))
       ))
-    m.deepForeachTreeRec[F,PrefixTree[String,F]]("")(opX)
+    m.deepForeachZipRec("")(opX)
     out.println
     m.deepForeachRec(""){(p,recur)=>
       val t = p.head
@@ -419,6 +419,24 @@ object TreeTests {
       print(s"}")
     }
     out.println
+  }
+
+  def testFold(implicit out:PrintWriter) = {
+    import out.print
+    type F = (String,Seq[(String,StringTree[Int])])=>String
+    val op:String=>F = (info) => (u,ctx) => {
+      val t = ctx.head
+      u+t._1+t._2.value+info
+    }
+    val op1 = op("X")
+    val op2 = op("Y")
+    val opX:PrefixTree[String,F] = PrefixTree.fromFlat2(Seq(
+        (Seq(),(op1,PrefixTree.constant[String,F](op1))),
+        (Seq("f"),(op2,PrefixTree.constant[String,F](op2)))
+      ))
+    out.println(m.deepFoldZipRec("->","")(opX))
+    out.println(m.deepFoldLeftRec("->","",false)(op("Z")))
+    out.println(m.deepFoldLeft("->","",false)((u,ctx)=>op("W")(u,Seq(ctx))))
   }
 
   def testPushPull(implicit out:PrintWriter) = {
@@ -481,6 +499,7 @@ object TreeTests {
       t(testZipFull)
       t(testZipFullView)
       t(testForeach)
+      t(testFold)
       t(testPushPull)
       //navigable
       //navigables in zip/other operations
