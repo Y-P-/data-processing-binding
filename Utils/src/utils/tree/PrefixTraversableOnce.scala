@@ -195,45 +195,19 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
 
   /** Fold left operations that descends through the subtrees.
-   *  Children are evaluated before their parent.
-   *  The top tree is evaluated last with k0 as key.
-   *//*
-  def deepFoldRight[U](u0:U,k0:K,topFirst:Boolean)(f: ((K,Repr),U) => U): U =
-    new FoldDeep(u0).right(k0,this,topFirst,f)
-  def deepFoldRightRec[U](u0:U,k0:K,topFirst:Boolean)(f: (Seq[(K,Repr)],U) => U): U =
-    new FoldDeep(u0).rightRec(k0,this,topFirst,f)
-  def deepFoldRightTreeRec[U](u0:U,k0:K,topFirst:Boolean)(op: PrefixTreeLike.Tree[K,((K,This),U) => U]): U =
-    new FoldDeep(u0).rightTreeRec(k0,this,topFirst,op)*/
-
+   *  Children are evaluated before their parent if topFirst is false.
+   *  The top tree is evaluated with k0 as key.
+   */
   def deepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,Repr)) => U): U =
-    PrefixLoop.fold(u0)(deepForeach(k0))(topFirst,f)
+    PrefixLoop.fold(u0,topFirst,f)(deepForeach(k0) _)
   def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,Repr)]) => U): U =
-    PrefixLoop.fold(u0)(deepForeachRec(k0))(topFirst,f)
+    PrefixLoop.fold(u0,topFirst,f)(deepForeachRec(k0) _)
   //same, but the function used can change for each node and is handled through a companion tree
-  def deepFoldZip[U,O<:PrefixTreeLike[K,(U,(K,Repr))=>U,O]](u0:U,k0:K)(op:O with PrefixTreeLike[K,(U,(K,Repr))=>U,O]) = {
-    /*
-    var u = u0
-    val h1:((U, (K, Repr)) => U) => ((((K, Repr), Any), => Unit) => Unit) = 
-            x => if (x==null) null else (ctx,recur) => { recur; u=x(u,ctx._1) }
-    PrefixLoop.zip[K,V,(U,(K,Repr))=>U,O,This](h1)(((k0,this),op))
-    u
-    */
-    val z1:((((K, This), O), => Unit) => Any) => Unit =
-      kk=>new PrefixLoop.Zip[K,V,O,This](kk).apply(((k0,this),op))
-    def v = PrefixLoop.fold[U,K,This,(((K, Repr), Any))](u0)(z1)(true,null)
-  }
+  def deepFoldZip[U,O<:PrefixTreeLike[K,(U,(K,This))=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,(K,This))=>U,O]) =
+    PrefixLoop.fold(u0,topFirst,(ctx:((K,This),O))=>ctx._1)(PrefixLoop.zip[K,V,(U,(K,This))=>U,O,This](_)(((k0,this),op)))
   //same, but in addition the function used can refer to the node's parents
-  def deepFoldZipRec[U,O<:PrefixTreeLike[K,(U,Seq[((K,Repr))])=>U,O]](u0:U,k0:K)(op:O with PrefixTreeLike[K,(U,Seq[((K,Repr))])=>U,O]) = {
-    /*
-    var u = u0
-    def h(x:(U,Seq[((K,Repr))])=>U):(Seq[((K,Repr),Any)],=>Unit)=>Unit = if (x==null) null else (ctx,recur) => { recur; u=x(u,ctx.view.map(_._1)) }
-    PrefixLoop.zipRec[K,V,(U,Seq[((K,Repr))])=>U,O,This](h)(((k0,this),op))
-    u
-    */
-    val z1:((Seq[((K, This), O)], => Unit) => Any) => Unit =
-      kk=>new PrefixLoop.ZipRec[K,V,O,This](kk).apply(((k0,this),op))
-    def v = PrefixLoop.fold[U,K,This,Seq[((K, Repr), Any)]](u0)(z1)(true,null)
-  }
+  def deepFoldZipRec[U,O<:PrefixTreeLike[K,(U,Seq[((K,This))])=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,Seq[((K,This))])=>U,O]) =
+    PrefixLoop.fold(u0,topFirst,(ctx:Seq[((K,This),O)])=>ctx.view.map(_._1))(PrefixLoop.zipRec[K,V,(U,Seq[(K,This)])=>U,O,This](_)(((k0,this),op)))
 
 
   /** A foreach that descends through the subtrees.
@@ -248,28 +222,18 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *               - subtree with None value: don't compute that node, but go on with the children
    *               - subtree with a value: process normally
    */
-  def deepForeach[X](k0:K)(f:((K,Repr),=>Unit)=>X) = (new PrefixLoop.LoopNoData[Unit,K,V,This] {
+  def deepForeach[X](k0:K)(f:((K,This),=>Unit)=>X) = (new PrefixLoop.LoopNoData[Unit,K,V,This] {
     def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
   })((k0,this))
-  def deepForeachRec[X](k0:K)(f:(Seq[(K,Repr)],=>Unit)=>X) = (new PrefixLoop.LoopRecNoData[Unit,K,V,This] {
+  def deepForeachRec[X](k0:K)(f:(Seq[(K,This)],=>Unit)=>X) = (new PrefixLoop.LoopRecNoData[Unit,K,V,This] {
     def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
   })((k0,this))
   //same, but the function used can change for each node and is handled through a companion tree
-  def deepForeachZip[X,O<:PrefixTreeLike[K,((K,Repr),=>Unit)=>X,O]](k0:K)(op:O with PrefixTreeLike[K,((K,Repr),=>Unit)=>X,O]) = {
-    val f:(((K,This),O),=>Unit)=>Unit = (ctx,recur)=>ctx._2.value match {
-      case None    => recur
-      case Some(g) => if (g!=null) g(ctx._1,recur)
-    }
-    new PrefixLoop.Zip[K,V,O,This](f)(((k0,this),op))
-  }
+  def deepForeachZip[X,O<:PrefixTreeLike[K,((K,This),=>Unit)=>X,O]](k0:K)(op:O with PrefixTreeLike[K,((K,This),=>Unit)=>X,O]) =
+    PrefixLoop.loop[((K,This),O),(K,This)](_._1)(PrefixLoop.zip[K,V,((K,This),=>Unit)=>Any,O,This](_)(((k0,this),op)))
   //same, but in addition the function used can refer to the node's parents
-  def deepForeachZipRec[X,O<:PrefixTreeLike[K,(Seq[((K,Repr))],=>Unit)=>X,O]](k0:K)(op:O with PrefixTreeLike[K,(Seq[((K,Repr))],=>Unit)=>X,O]) = {
-    val f:(Seq[((K,This),O)],=>Unit)=>Unit = (ctx,recur)=>ctx.head._2.value match {
-      case None    => recur
-      case Some(g) => if (g!=null) g(ctx.view.map(_._1),recur)
-    }
-    new PrefixLoop.ZipRec[K,V,O,This](f)(((k0,this),op))
-  }
+  def deepForeachZipRec[O<:PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]](k0:K)(op:O with PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]) =
+    PrefixLoop.loop[Seq[((K,This),O)],Seq[(K,This)]](_.view.map(_._1))(PrefixLoop.zipRec[K,V,(Seq[(K,This)],=>Unit)=>Any,O,This](_)(((k0,this),op)))
 
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
@@ -448,6 +412,6 @@ object PrefixTraversableOnce {
     override def isEmpty = true
     override def size = 0
   }
-  
+
 }
 

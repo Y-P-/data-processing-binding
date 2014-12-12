@@ -1,15 +1,41 @@
 package utils.tree
 
+/** This object provides methods that are used in the package to iterate through trees.
+ *
+ *  There are 2 classe of iterations:
+ *  - these that use a global function to apply on all nodes
+ *  - these that use a companion tree that provides for each node a companion function to apply on that node
+ *  There are also two sub-classes:
+ *  - these that require being able to reach into the parents (e.g. if you are writing the global key for each node)
+ *  - these that only use the current node information
+ *  Iterating into a tree also brings problem of its own; when reaching a node, you may want to (not exclusive):
+ *  - do something before iterating on the chidren
+ *  - do something after having iterated on the children
+ *
+ *  In addition, in a tree, usual filtering operations have to be adapted: filtering can depend on the position
+ *  of an element in the tree, not only its value. This is unlike usual collections where most often position is
+ *  not significant : the place of an object in the tree carries semantic. We assume that the easiest way to carry
+ *  such semantic is through 'zip like' operations, where a companion tree is unwound in parallel with the current
+ *  tree : each companion node can bear relevant information to apply to the current node. In general, the following
+ *  rule is assumed:
+ *  - if a companion value is None, then that node is 'skipped', but not its children
+ *  - if it is Some(null), then that node and children are skipped
+ *  - if it is Some(x), then iteration proceeds normally on that node
+ *  Note that not invoking the child recursion (which is usually provided as a =>Unit parameter) is the way for a
+ *  node to process itself but not its children.
+ *
+ *  All of these cases have to be handled, which account in a large measure to the apparent complexity of this object.
+ */
 object PrefixLoop {
 
   /** Top trait for defining the generic recursion framework on PrefixIterableOnce.
    *
-   *  It lets do most recursive calls that build new trees, including map-like or
+   *  It lets do most recursive calls that apply to trees, including map-like or
    *  even flatMap-like transformations. The sheer number of possible combinations
    *  will not make it possible to give a variant of each possible uses, which are
    *  almost limitless.
    *
-   *  It is configurable but mixing in the appropriate subtraits.
+   *  It is configurable by mixing in the appropriate subtraits.
    *  Most 'internal' methods are made final on mixin to ensure that only compatible
    *  are mixed together. The traits are 'orthogonal', in that they each define a set
    *  of the required methods : in the end, a number of traits must be mixed together
@@ -38,7 +64,7 @@ object PrefixLoop {
     type K
     type V
     type This <: PrefixTraversableOnce[K, V, This]
-    //advance declaration to prevent lots of override : may be used for anything, but prepared to accept a Tree declaration
+    //advance declaration to prevent lots of override : may be used for anything, but usually to accept a Tree declaration
     type L
     type W
     type R
@@ -270,12 +296,31 @@ object PrefixLoop {
   abstract class LoopWithData[X,R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[X,R0,K,V,T] with BasicWithDataRB
   abstract class LoopRecNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with RecNoDataRB
   abstract class LoopNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends IterLikeRB[Nothing,R0,K,V,T] with BasicNoDataRB
-  //This iterates through the tree while unwinding O in parallel and applying f to all elements
+  /**
+   * This class provides a way iterates through the tree while unwinding O in parallel and applying f to all elements
+   */
   class ZipRec[K,V,O<:PrefixTreeLike[K,_,O],T<:PrefixTraversableOnce[K,V,T]](f:(Seq[((K,T),O)],=>Unit)=>Any) extends LoopRecWithData[O,Unit,K,V,T] {
     def nextX(child:(K,This), ctx:Context) = try { ctx.head._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
     def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
   }
-  //builds a tuned up version of ZipRec by providing a functor and a tree of something ; the functor is applied to the functions before use.
+  /**
+   * builds a tuned up version of ZipRec.
+   * @param h a method to transform F (often a function) into the function of two arguments expected by ZipRec:
+   *          - Seq[((K,This),O)], the Context that is built while unwinding the trees
+   *          - =>Unit, the Recursion call that is built while unwinding the trees
+   *          And which returns Unit
+   *          It is assumed that:
+   *          - if a node in O contains None, then the recursion proceeds, but (obviously), the current node is skipped
+   *          - if a node in O contains Some(null), then the current node and its children are skipped
+   *          - otherwise, the recursion proceeds normally
+   * @tparam K the key type
+   * @tparam V the value type
+   * @tparam This the tree type
+   * @tparam F some data to work on
+   * @tparam O the tree type for F
+   *
+   * @return a ZipRec that satisfies all the previous conditions
+   */
   def zipRec[K,V,F,O<:PrefixTreeLike[K,F,O],This<:PrefixTraversableOnce[K,V,This]](h:F=>(Seq[((K,This),O)],=>Unit)=>Unit) = {
     val f:(Seq[((K,This),O)],=>Unit)=>Unit = (ctx,recur)=>ctx.head._2.value match {
       case None    => recur
@@ -297,17 +342,21 @@ object PrefixLoop {
     new Zip[K,V,O,This](f)
   }
 
-  //Useful for fold operations
-  class Fold[U](u0:U) {
+  //Useful for recursive iterative operations
+  def fold[U,Context](u0:U,topFirst:Boolean,f: (U, Context) => U)(g:((Context, =>Unit) => Unit) => Unit):U = {
     var u = u0
-    def apply[K,This,Context](g:((Context, =>Unit) => Unit) => Unit)(topFirst:Boolean,f: (U, Context) => U):U = {
-      g(if (topFirst) (ctx,recur) => { u=f(u,ctx); recur } else (ctx,recur) => { recur; u=f(u,ctx) })
-      u
-    }
+    g(if (topFirst) (ctx,recur) => { u=f(u,ctx); recur } else (ctx,recur) => { recur; u=f(u,ctx) })
+    u
   }
-  def fold[U,K,This,Context](u0:U)(g:((Context, =>Unit) => Unit) => Unit)(topFirst:Boolean,f: (U, Context) => U):U =
-    new Fold(u0)(g)(topFirst,f)
-
+  def fold[U,Context,X](u0:U,topFirst:Boolean,extract:Context=>X)(g:(((U, X) => U) => ((Context, => Unit) => Unit)) => Unit) = {
+    var u = u0
+    g(x => if (x==null) null else if (topFirst) (ctx,recur) => { u=x(u,extract(ctx)); recur } else (ctx,recur) => { recur; u=x(u,extract(ctx)) })
+    u
+  }
+  /** Generalizes the method to loop through a tree.
+   */
+  def loop[Context,X](extract:Context=>X)(g:(((X , => Unit) => Any) => ((Context, => Unit) => Unit)) => Unit):Unit =
+    g(x => if (x==null) null else (ctx,recur) => x(extract(ctx),recur))
 
   /** Actual classes for all possible combinations.
    *  - with or without an X user data

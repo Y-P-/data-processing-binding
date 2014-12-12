@@ -394,7 +394,7 @@ object TreeTests {
     }
     val op1 = op("X")
     val op2 = op("Y")
-    val opX:PrefixTree[String,F] = PrefixTree.fromFlat2(Seq(
+    val opX = PrefixTree.fromFlat2(Seq(
         (Seq(),(op1,PrefixTree.constant[String,F](op1))),
         (Seq("f"),(op2,PrefixTree.constant[String,F](op2)))
       ))
@@ -434,7 +434,7 @@ object TreeTests {
         (Seq(),(op1,PrefixTree.constant[String,F](op1))),
         (Seq("f"),(op2,PrefixTree.constant[String,F](op2)))
       ))
-    out.println(m.deepFoldZipRec("->","")(opX))
+    out.println(m.deepFoldZipRec("->","",false)(opX))
     out.println(m.deepFoldLeftRec("->","",false)(op("Z")))
     out.println(m.deepFoldLeft("->","",false)((u,ctx)=>op("W")(u,Seq(ctx))))
   }
