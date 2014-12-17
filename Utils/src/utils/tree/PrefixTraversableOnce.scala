@@ -109,7 +109,9 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
   /** Transform this tree with another tree.
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
-   *  corresponding sub-node of the transformer tree using the provided `op`.
+   *  corresponding sub-node of the transformer tree using the provided `op`. The resulting tree is
+   *  a subtree of the original tree (as far as keys are concerned) in that the operation only provides
+   *  result values (no result nodes), and some nodes may be skipped (so less nodes is possible)
    *  Default values for the second tree are used but exceptions will end the transformation ungracefully.
    *  The resulting tree contains an appropriate zipped default.
    *  @param t      the transformer tree
@@ -235,6 +237,20 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def deepForeachZipRec[O<:PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]](k0:K)(op:O with PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]) =
     PrefixLoop.loop[Seq[((K,This),O)],Seq[(K,This)]](_.view.map(_._1))(PrefixLoop.zipRec[K,V,(Seq[(K,This)],=>Unit)=>Any,O,This](_)(((k0,this),op)))
 
+  /** Merging trees.
+   *  For PrefixTraversableOnce, merging implies merging the underlying (K,V) iterables.
+   */
+  def merge[L>:K,W>:V,R<:PrefixTraversableOnce[L,W,R]](r:R):R = {
+    null.asInstanceOf[R]
+  }
+  
+  def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    type Data = ((K,This),T)
+    val values = (cur:Data)              => (op(cur._2,cur._1._2), null)
+    val next   = (child:(K,This),s:Data) => if (!strict || s._2.isDefinedAt(child._1)) try { s._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[T] } else null.asInstanceOf[T]
+    toTreeSameKey(null.asInstanceOf[K],t,values,next)
+  }
+    
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
    *  @param topFirst is true if an element appears before its children, false otherwise
