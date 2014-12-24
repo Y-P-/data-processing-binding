@@ -142,16 +142,6 @@ object PrefixLoop {
       }
     }
   }
-  trait WithDisjointDataRB extends RecurBase {
-    type Data = (K,This)
-    @inline final protected def mapChild(child:(K,This),ctx:Context):Result = nextX(child, ctx) match {
-      case null => null.asInstanceOf[Result]
-      case x1   => childContext(child,ctx) match {
-        case null => null.asInstanceOf[Result]
-        case d    => recur(d)
-      }
-    }
-  }
 
   //traits for accessing (or not) parents
   trait BasicRB extends RecurBase {
@@ -235,7 +225,9 @@ object PrefixLoop {
   ////////////////////////////////////////////////////////////////////////////////////
 
   trait ExpandLikeRB[X,K,V,L,W,T<:PrefixTraversableOnce[K,V,T]] extends MapLikeRB[X,K,V,L,W,T] {
+    /** true if the new children overwrite existing ones */
     protected def overwrite:Boolean
+    /** additional children */
     protected def getAdditionalChildren(v:Values,ctx:Context):Iterable[(L,R)]
   }
 
@@ -303,6 +295,13 @@ object PrefixLoop {
     @inline final protected def getValue(v:Values):Option[W] = v._2
     @inline final protected def getDefault(v:Values):L=>R = v._3
     @inline final protected def getResultKey(v:Values,ctx:Context):L = v._1
+  }
+  trait ValueLWDE extends RecurBase {
+    type Values = (L, Option[W], L=>R, Iterable[(L,R)])
+    @inline final protected def getValue(v:Values):Option[W] = v._2
+    @inline final protected def getDefault(v:Values):L=>R = v._3
+    @inline final protected def getResultKey(v:Values,ctx:Context):L = v._1
+    @inline final protected def getAdditionalChildren(v:Values,ctx:Context):Iterable[(L,R)] = v._4
   }
 
   ////////////////////////////////////////////////////////////////////////////////////

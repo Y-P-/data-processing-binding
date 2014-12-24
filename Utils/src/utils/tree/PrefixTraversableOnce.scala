@@ -237,21 +237,6 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   def deepForeachZipRec[O<:PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]](k0:K)(op:O with PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]) =
     PrefixLoop.loop[Seq[((K,This),O)],Seq[(K,This)]](_.view.map(_._1))(PrefixLoop.zipRec[K,V,(Seq[(K,This)],=>Unit)=>Any,O,This](_)(((k0,this),op)))
 
-  /** Merging trees.
-   *  For PrefixTraversableOnce, merging implies recursively merging the underlying (K,V) iterables:
-   *  Merging two iterables means concatening them.
-   */
-  def merge[L>:K,W>:V,R<:PrefixTraversableOnce[L,W,R]](r:R):R = {
-    null.asInstanceOf[R]
-  }
-
-  def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
-    type Data = ((K,This),T)
-    val values = (cur:Data)              => (op(cur._2,cur._1._2), null)
-    val next   = (child:(K,This),s:Data) => if (!strict || s._2.isDefinedAt(child._1)) try { s._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[T] } else null.asInstanceOf[T]
-    toTreeSameKey(null.asInstanceOf[K],t,values,next)
-  }
-
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
    *  @param topFirst is true if an element appears before its children, false otherwise
