@@ -189,7 +189,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     val next   = (child:(K,This),s:Data) => strict(child._1,s.head._2._1,s.head._2._2)
     toTreeRec(k0,(t,op),values,next)
   }
-  def zipFullRecView[L,W,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[((K,This),(T,O))])=>(L,Option[W]),O],R<:PrefixTreeLike[L,W,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,Seq[((K,This),(T,O))]=>(L,Option[W]),O]):PrefixTraversableOnce[L,W,PrefixTraversableOnce.Abstract[L,W]] = {
+  def zipFullRecView[L,W,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(Seq[((K,This),(T,O))])=>(L,Option[W]),O],R<:PrefixTreeLike[L,W,R]](k0:K,strict:Strictness,t:T,op:O with PrefixTreeLike[K,Seq[((K,This),(T,O))]=>(L,Option[W]),O]):PrefixTraversableOnce[L,W,_] = {
     type Data = Seq[((K,This),(T,O))]
     val values = (cur:Data)              => cur.head._2._2.value.map(_(cur)).orNull
     val next   = (child:(K,This),s:Data) => strict(child._1,s.head._2._1,s.head._2._2)
@@ -364,39 +364,39 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
   //generic conversions to some PrefixTree
   @throws(classOf[NoSuchElementException])
-  def toTreeRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W], L=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRec[X,K,V,L,W,R,This] {
+  def toTreeRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W], L=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecTree[X,K,V,L,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
     def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
   })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
-  def toTreeRec[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:Seq[(K, This)]=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecNoData[K,V,L,W,R,This] {
+  def toTreeRec[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:Seq[(K, This)]=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecTreeNoData[K,V,L,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
-  def toTree[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W], L=>R), x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new Recur[X,K,V,L,W,R,This] {
+  def toTree[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W], L=>R), x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurTree[X,K,V,L,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
     def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
   })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
-  def toTree[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:((K, This))=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurNoData[K,V,L,W,R,This] {
+  def toTree[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:((K, This))=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurTreeNoData[K,V,L,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
-  def toTreeRecSameKey[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(Option[W],K=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecSameKey[X,K,V,W,R,This] {
+  def toTreeRecSameKey[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(Option[W],K=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecTreeSameKey[X,K,V,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
     def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
   })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
-  def toTreeRecSameKey[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:Seq[(K, This)]=>(Option[W], K=>R))(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecNoDataSameKey[K,V,W,R,This] {
+  def toTreeRecSameKey[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:Seq[(K, This)]=>(Option[W], K=>R))(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecTreeNoDataSameKey[K,V,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
-  def toTreeSameKey[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:(((K, This), X))=>(Option[W], K=>R), x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurSameKey[X,K,V,W,R,This] {
+  def toTreeSameKey[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:(((K, This), X))=>(Option[W], K=>R), x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurTreeSameKey[X,K,V,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
     def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
   })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
-  def toTreeSameKey[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:((K, This))=>(Option[W], K=>R))(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurNoDataSameKey[K,V,W,R,This] {
+  def toTreeSameKey[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:((K, This))=>(Option[W], K=>R))(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurTreeNoDataSameKey[K,V,W,R,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
 }

@@ -13,11 +13,11 @@ package object tree {
   val FULL_STRICT  = new Strictness(true,true)
   val NOT_STRICT   = new Strictness(false,false)
 
-  sealed class MergeMode
-  val KEEP                    = new MergeMode
-  val REPLACE                 = new MergeMode
-  val MERGE                   = new MergeMode
-  val MERGE_OVERWRITE         = new MergeMode
-  val MERGE_REVERSE           = new MergeMode
-  val MERGE_REVERSE_OVERWRITE = new MergeMode
+  sealed class MergeMode(val id:Int)
+  val KEEP                    = new MergeMode(0)
+  val REPLACE                 = new MergeMode(1)
+  val MERGE                   = new MergeMode(2)
+  val MERGE_OVERWRITE         = new MergeMode(3)
+  val MERGE_REVERSE           = new MergeMode(4)
+  val MERGE_REVERSE_OVERWRITE = new MergeMode(5)
 }
