@@ -51,9 +51,6 @@ object PrefixLoop {
    *
    *  @tparam K the key type for the tree we are working on
    *  @tparam V the value type for the tree we are working on
-   *  @tparam L the key type for the tree we are converting to
-   *  @tparam W the value type for the tree we are converting to
-   *  @tparam R the type of the tree we are converting to
    *  @tparam This the type of the tree we are working on
    */
   protected abstract class Recur {
@@ -73,7 +70,7 @@ object PrefixLoop {
     /** given some Values and a Context, builds the converted result and associated key.
      * @param ctx the current context
      */
-    protected def buildResult(ctx:Context,u:Values,loop:(Result=>Any) => Unit):Option[Result]
+    protected def buildResult(ctx:Context,u:Values,loop:(Result=>Any) => Unit):Result
 
     //usually provided by a generic trait/subclass (`RecWithDataRB` etc)
     /** this is used to start the recursion from the top layer : it builds the initial context */
@@ -89,23 +86,18 @@ object PrefixLoop {
      *  @param ctx the context on which children we are looping
      *  @return the Result for that ctx
      */
-    final private def recur(ctx: Context):Option[Result] = mapValues(ctx) match {
-      case null => None
-      case u    => buildResult(ctx, u, (loop:(Result=>Any)) => for (child <- getCurrent(ctx)._2) {
-                                                                 val r = doChild(child,ctx)
-                                                                 if (loop!=null && r!=None) loop(r.get)
-                                                               }
-                              )
-    }
-    /** Builds the recursion for a child in a given context.
-     *  Separating `doChild` from `recur` is useful when dealing with default functions in trees.
-     */
-    final protected def doChild(child:(K,This),ctx:Context):Option[Result] = nextData(child, ctx) match {
-      case null => None
-      case d    => childContext(d,ctx) match {
-        case null => None
-        case c    => recur(c)
-      }
+    final protected def recur(ctx: Context):Result = mapValues(ctx) match {
+      case null => null.asInstanceOf[Result]
+      case u    => buildResult(ctx, u,(loop:(Result=>Any)) =>
+                     for (child <- getCurrent(ctx)._2)
+                       nextData(child, ctx) match {
+                         case null =>
+                         case d    => childContext(d,ctx) match {
+                           case null => 
+                           case c    => val r=recur(c); if (loop!=null && r!=null) loop(r)
+                         }
+                       }
+                     )
     }
 
     /** Applies the transformation
@@ -114,8 +106,8 @@ object PrefixLoop {
      */
     @throws(classOf[NoSuchElementException])
     final def get(d0:Data): Result = recur(initialize(d0)) match {
-      case None    => throw new NoSuchElementException
-      case Some(r) => r
+      case null => throw new NoSuchElementException
+      case r    => r
     }
   }
 
@@ -166,6 +158,8 @@ object PrefixLoop {
   ////////////////////////////////////////////////////////////////////////////////////
   ///                     Useful in mapLike transformations                        ///
   ////////////////////////////////////////////////////////////////////////////////////
+  /** Used to bind generic parameters to abstract types
+   */
   protected[this] trait Binder[X0,K0,V0,L0,W0,T0<:PrefixTraversableOnce[K0,V0,T0],R0<:PrefixTraversableOnce[L0,W0,R0]] extends RecurBuilder {
     type X = X0
     override type K = K0
@@ -195,66 +189,98 @@ object PrefixLoop {
     final def apply(d0:Data): R = get(d0)._2
   }
 
-  //traits for building either View or Tree
+  //traits for building View
   trait ViewRB extends RecurBuilder {
     type R = PrefixTraversableOnce.Abstract[L,W]
-    protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Option[Result] =
-      Some((getResultKey(v,ctx),new R(getValue(v)) { def foreach[X](g:Result=>X):Unit = loop(g) }))
+    protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result =
+      (getResultKey(v,ctx),new R(getValue(v)) { def foreach[X](g:Result=>X):Unit = loop(g) })
   }
+  //traits for building Tree
   trait TreeRB extends RecurBuilder {
     type R<:PrefixTreeLike[L,W,R]
+    /** the builder for the result tree */
     protected def bf:PrefixTreeLikeBuilder[L,W,R]
+    /** the method that provides the default function for a given Value. Often, it is built using the next two methods.*/
     protected def getDefault(v:Values):L=>R
-    protected def buildDefault(ctx:Context,defa:K=>This,g:L=>K): L=>R
+    /** The method that creates the L=>R default function from the initial K=>This default function. */
+    protected def buildDefault(ctx:Context,default:K=>This,g:L=>K): L=>R
 
-    protected def stdDefault(ctx:Context,child:(K,This)):R = doChild(child,ctx) match {
-      case None    => throw new PrefixTreeLike.NoDefault(child._1)
-      case Some(r) => r._2
-    }
+    /** a method that is useful for building default functions. */
+    protected def stdDefault(ctx:Context,child:(K,This)):R = (nextData(child, ctx) match {
+      case null => throw new PrefixTreeLike.NoDefault(child._1)
+      case d    => childContext(d,ctx) match {
+        case null => throw new PrefixTreeLike.NoDefault(child._1)
+        case c    => recur(c)
+      }
+    })._2
 
-    protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Option[Result] = {
+    protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result = {
       val b = bf.newEmpty
       loop { b += _ }
-      Some(((getResultKey(v,ctx),b.result(getValue(v),getDefault(v)))))
+      (getResultKey(v,ctx),b.result(getValue(v),getDefault(v)))
     }
   }
 
   ////////////////////////////////////////////////////////////////////////////////////
-  ///             Useful in transformations with children expansion                ///
+  ///               Useful in transformations with tree expansion                  ///
   ////////////////////////////////////////////////////////////////////////////////////
 
   trait ExpandRecurBuilder extends RecurBuilder {
-    /** additional children */
-    protected def getAdditionalChildren(v:Values,ctx:Context):Iterable[(L,R)]
+    /** fetches additional children for the current node result */
+    protected def getAdditionalChildren(ctx:Context,v:Values):Iterable[Result]
+    /** defines how to handle key conflict
+     *  @param ctx is the parent context
+     *  @param r1 is the 'local' child
+     *  @param r2 is the 'additional' child
+     */
+    protected def merge(ctx:Context,r1:Result,r2:Result):R
+    /** defines how to handle the addition of new children that do not conflict.
+     *  e.g. they could be added before, or after the already existing children.
+     *  @param ctx is the parent context
+     *  @param current are the 'local' children, possibly merged with conflicting new children
+     *  @param additional are the 'additional' children which do not conflict
+     */
+    protected def mergeNewChildren(ctx:Context,current:Iterable[Result],additional:Iterable[Result]):Iterable[Result]
+    
+    /** This actually merges the children for the given context 
+     */
+    protected def doMerge(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Iterable[Result] = {
+      val buf  = scala.collection.mutable.ArrayBuffer.empty[Result]
+      val add  = getAdditionalChildren(ctx,v).toBuffer
+      var done = 0
+      if (add.size>0) {
+        loop { x=>
+          buf += ((x._1, add.indexWhere(y=>y._1==x._1) match {
+            case -1 => x._2
+            case  i => val y=add(i); add(i)=null; done+=1; merge(ctx,x,y)
+          }))
+        }
+        (if (done!=add.size) mergeNewChildren(ctx,buf,add.filterNot(_==null)) else buf)
+      } else {
+        loop { buf += _ }
+        buf
+      }      
+    }
   }
 
-  //traits for building either View or Tree
+  //trait for building a View
   trait ExpandViewRB extends ExpandRecurBuilder with ViewRB {
-    override protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Option[Result] =
-      Some((getResultKey(v,ctx),new R(getValue(v)) {
-        def foreach[X](g:Result=>X):Unit = {
-          val x = getAdditionalChildren(v,ctx)
-          //if (!overwrite) x.foreach(g)
-          loop(g)
-          //if (overwrite) x.foreach(g)
-        }
-      }))
+    override protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result =
+      (getResultKey(v,ctx),new R(getValue(v)) { def foreach[X](g:Result=>X):Unit = doMerge(ctx,v,loop).foreach(g) })
   }
+  //trait for building a Tree
   trait ExpandTreeRB extends ExpandRecurBuilder with TreeRB {
-    override protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Option[Result] = {
-      val x = getAdditionalChildren(v,ctx)
+    override protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result = {
       val b = bf.newEmpty
-      //if (!overwrite) b++=x
-      loop { b += _ }
-      //if (overwrite) b++=x
-      Some((getResultKey(v,ctx),b.result(getValue(v),getDefault(v))))
+      doMerge(ctx,v,loop).foreach { b += _ }
+      (getResultKey(v,ctx),b.result(getValue(v),getDefault(v)))
     }
   }
 
   /** Handling defaults when building trees: we want to provide a way to fall back on the original
-   *  tree defaults. If the original is only traversable, overriding getDefault will likely be
-   *  more usefull. Falling back on the original default requires to be able to navigate back
-   *  to the original keys (i.e. K <-> L must be bijective)
+   *  tree defaults. If the original is only PrefixTraversableOnce, overriding getDefault will be
+   *  more useful. Falling back on the original default requires to be able to navigate back
+   *  from an L to an appropriate K key ; this is particularly easy when K <-> L is bijective.
    */
   trait SameKeyDefault extends TreeRB {
     override type L=K
@@ -272,26 +298,26 @@ object PrefixLoop {
   trait ValueW extends RecurBuilder {
     override type L=K
     type Values = Option[W]
-    @inline final protected def getValue(v:Values):Option[W] = v
-    @inline final protected def getResultKey(v:Values,ctx:Context):L = getCurrent(ctx)._1
+    final protected def getValue(v:Values):Option[W] = v
+    final protected def getResultKey(v:Values,ctx:Context):L = getCurrent(ctx)._1
   }
   trait ValueWD extends RecurBuilder {
     override type L=K
     type Values = (Option[W], L=>R)
-    @inline final protected def getValue(v:Values):Option[W] = v._1
-    @inline final protected def getDefault(v:Values):L=>R = v._2
-    @inline final protected def getResultKey(v:Values,ctx:Context):L = getCurrent(ctx)._1
+    final protected def getValue(v:Values):Option[W] = v._1
+    final protected def getDefault(v:Values):L=>R = v._2
+    final protected def getResultKey(v:Values,ctx:Context):L = getCurrent(ctx)._1
   }
   trait ValueLW extends RecurBuilder {
     type Values = (L, Option[W])
-    @inline final protected def getValue(v:Values):Option[W] = v._2
-    @inline final protected def getResultKey(v:Values,ctx:Context):L = v._1
+    final protected def getValue(v:Values):Option[W] = v._2
+    final protected def getResultKey(v:Values,ctx:Context):L = v._1
   }
   trait ValueLWD extends RecurBuilder {
     type Values = (L, Option[W], L=>R)
-    @inline final protected def getValue(v:Values):Option[W] = v._2
-    @inline final protected def getDefault(v:Values):L=>R = v._3
-    @inline final protected def getResultKey(v:Values,ctx:Context):L = v._1
+    final protected def getValue(v:Values):Option[W] = v._2
+    final protected def getDefault(v:Values):L=>R = v._3
+    final protected def getResultKey(v:Values,ctx:Context):L = v._1
   }
   trait ValueLWDE extends RecurBuilder {
     type Values = (L, Option[W], L=>R, Iterable[(L,R)])
@@ -314,7 +340,7 @@ object PrefixLoop {
     type Values = Context
     protected def deepLoop(ctx:Context,loop:(Result=>Any) => Unit):Result
     final protected def mapValues(ctx:Context):Values = ctx
-    def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Option[Result] = Some(deepLoop(ctx,loop))
+    def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result = deepLoop(ctx,loop)
     /** Running against the current tree. */
     @throws(classOf[NoSuchElementException])
     final def apply(d0:Data): Result = get(d0)

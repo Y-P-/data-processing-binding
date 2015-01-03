@@ -17,9 +17,11 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    */
   protected var elems: ArrayBuffer[(K, Tree)] = ArrayBuffer.empty
   def +=(x: (K, Tree)): this.type = { elems += x; this }
+  def ++=(x: (K, Tree)*): this.type = { elems ++= x; this }
   def clear():Unit = elems.clear
   def result: Tree = result(None,null)
   def result(v:Option[V],default:K=>Tree):Tree = { val r=apply(v,elems,default); clear; r }
+  def buffer:Iterable[(K, Tree)] = elems
 
   /** This is the generic builder method for trees.
    *  Any Tree Builder class must implement this.
