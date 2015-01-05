@@ -160,7 +160,7 @@ object PrefixLoop {
   ////////////////////////////////////////////////////////////////////////////////////
   /** Used to bind generic parameters to abstract types
    */
-  protected[this] trait Binder[X0,K0,V0,L0,W0,T0<:PrefixTraversableOnce[K0,V0,T0],R0<:PrefixTraversableOnce[L0,W0,R0]] extends RecurBuilder {
+  trait Binder[X0,K0,V0,L0,W0,T0<:PrefixTraversableOnce[K0,V0,T0],R0<:PrefixTraversableOnce[L0,W0,R0]] extends RecurBuilder {
     type X = X0
     override type K = K0
     override type V = V0
@@ -250,12 +250,15 @@ object PrefixLoop {
       var done = 0
       if (add.size>0) {
         loop { x=>
-          buf += ((x._1, add.indexWhere(y=>y._1==x._1) match {
+          println("searching key "+x._1+"\n  found:"+add.indexWhere(y=>y!=null && y._1==x._1))
+          buf += ((x._1, add.indexWhere(y=>y!=null && y._1==x._1) match {
             case -1 => x._2
             case  i => val y=add(i); add(i)=null; done+=1; merge(ctx,x,y)
           }))
         }
-        (if (done!=add.size) mergeNewChildren(ctx,buf,add.filterNot(_==null)) else buf)
+        val b1 = (if (done!=add.size) mergeNewChildren(ctx,buf,add.filter(_!=null)) else buf)
+        println("buffer1: "+b1)
+        b1
       } else {
         loop { buf += _ }
         buf

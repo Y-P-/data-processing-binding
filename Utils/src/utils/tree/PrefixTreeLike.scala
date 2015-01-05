@@ -128,6 +128,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def empty: Repr = self.newBuilder(None,Nil,null)
   def seq: Repr = this
+  override def toIterable = iterator.toIterable  //scala library does a wrong cast here
 
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
@@ -429,7 +430,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  @tparam W the value kind for the merged tree
    *  @tparam R the tree kind for the merged tree
    */
-  def merge[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean)(implicit bf: PrefixTreeLikeBuilder[L,W,R]):R = {
+  def merge0[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean)(implicit bf: PrefixTreeLikeBuilder[L,W,R]):R = {
     if (r.isNonSignificant)
       this
     else {
@@ -437,7 +438,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       val done = scala.collection.mutable.Set.empty[L]
       for (x <- this) {
         b += ((x._1, r.get(x._1) match {
-          case Some(y) => if (overwrite) y else x._2.merge[L,W,R](y,overwrite)
+          case Some(y) => if (overwrite) y else x._2.merge0[L,W,R](y,overwrite)
           case None    => x._2
         }))
         done += x._1
@@ -446,6 +447,25 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
         b += x
       b.result(r.value,r.default)
     }
+  }
+  
+  def merge[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean)(implicit bf0: PrefixTreeLikeBuilder[L,W,R]):R = {
+    import PrefixLoop._
+    println("merging "+this+"\n  with "+r)
+    if      (r.isNonSignificant) this
+    else if (isNonSignificant)   r
+    else (new BasicWithDataRB with ValueLWDE with ExpandTreeRB with Binder[R,K,V,L,W,This,R] {
+      protected def bf: utils.tree.PrefixTreeLikeBuilder[L,W,R] = bf0
+      protected def buildDefault(ctx:Context,default:K => This,g: L => K): L => R = ???  //unused
+      protected def getAdditionalChildren(ctx:Context,v:Values): Iterable[(L, R)] = ctx._2.toIterable
+      protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = if (overwrite) r2._2 else r1._2.merge[L,W,R](r2._2,overwrite)
+      protected def mergeNewChildren(ctx:Context,current:Iterable[(L, R)],additional:Iterable[(L, R)]):Iterable[(L, R)] = current ++ additional
+      protected def mapValues(ctx:Context): Values = (ctx._1._1, ctx._2.value, ctx._2.default, ctx._2.toIterable)
+      protected def nextX(child:(K,This),ctx:Context): R = ctx._2.get(child._1) match {
+        case None     => r.empty
+        case Some(r1) => r1
+      }
+    })(((null.asInstanceOf[K],this),r))
   }
 
   /** Transforms this tree by applying a function on all values contained in a tree, which returns
