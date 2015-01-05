@@ -117,7 +117,7 @@ object TreeTests {
   def testSeqFlatMap(implicit out:PrintWriter) = StringTree.fromFlat(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
 
   //tests FlatMap for SeqView
-  def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](mapper1 _,MERGE).seqView().foreach(out.println)
+  def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](MERGE,false)(mapper1 _).seqView().foreach(out.println)
 
   //tests FlatMap for map with default
   def testBasicDefault(implicit out:PrintWriter) = {
@@ -130,7 +130,7 @@ object TreeTests {
   def testDefFlatMap(implicit out:PrintWriter) = {
     //we have to take a looks at the flat development of the tree with no default first
     //we remember that flatMap enriches the existing tree, and replaces the current value with the value of the mapped tree
-    val m2 = m1.flatMap[Int,StringTree[Int]]((i:Int)=>amap1(i-1),MERGE)
+    val m2 = m1.flatMap[Int,StringTree[Int]](MERGE,false)((i:Int)=>amap1(i-1))
     //the value of the map for 7 will replace m1 value => 6
     out.println(m2.value)
     //"x" is not a key for m1, but it is for c13 which was expended straight into m1 : m2("x") = c13("x") = c12
@@ -172,7 +172,7 @@ object TreeTests {
     out.println(c("a")("b")("c"))
     //tests that constant works on flatmap as expected
     val c2 = StringTree.constant(5.01)
-    val c1 = c.flatMap[Double,StringTree[Double]]((i:Int)=> if (i==3) c2 else null,MERGE)
+    val c1 = c.flatMap[Double,StringTree[Double]](MERGE,false)((i:Int)=> if (i==3) c2 else null)
     out.println(c1)
     out.println(c1("a"))
     out.println(c1("a")("b")("c"))

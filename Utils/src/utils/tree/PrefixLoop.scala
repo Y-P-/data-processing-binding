@@ -81,7 +81,7 @@ object PrefixLoop {
     protected def childContext(child:Data,ctx:Context):Context
     /** the data info for the child in the given context */
     protected def nextData(child:(K,This),ctx:Context):Data
-    
+
     /** Applies the recursion on all the tree layers below ctx
      *  @param ctx the context on which children we are looping
      *  @return the Result for that ctx
@@ -93,11 +93,11 @@ object PrefixLoop {
                        nextData(child, ctx) match {
                          case null =>
                          case d    => childContext(d,ctx) match {
-                           case null => 
+                           case null =>
                            case c    => val r=recur(c); if (loop!=null && r!=null) loop(r)
                          }
                        }
-                     )
+                   )
     }
 
     /** Applies the transformation
@@ -112,11 +112,11 @@ object PrefixLoop {
   }
 
   //traits for cases with (or without) specific X data
-  abstract class RecurNoData extends Recur {
+  trait RecurNoData extends Recur {
     type Data = (K,This)
     final protected def nextData(child:(K,This),ctx:Context) = child
   }
-  abstract class RecurWithData extends Recur {
+  trait RecurWithData extends Recur {
     type X  //user type
     type Data = ((K,This),X)
     /** this builds the user data for a given context and child; very user dependent */
@@ -130,13 +130,13 @@ object PrefixLoop {
   //traits for accessing (or not) parents
   trait Standalone extends Recur {
     type Context = Data
-    @inline final protected def childContext(child:Data,ctx:Context):Context = child
-    @inline final protected def initialize(d0:Data):Context = d0
+    final protected def childContext(child:Data,ctx:Context):Context = child
+    final protected def initialize(d0:Data):Context = d0
   }
   trait Layered extends Recur {
     type Context = Seq[Data]
-    @inline final protected def childContext(child:Data,ctx:Context):Context = child +: ctx
-    @inline final protected def initialize(d0:Data):Context = Seq(d0)
+    final protected def childContext(child:Data,ctx:Context):Context = child +: ctx
+    final protected def initialize(d0:Data):Context = Seq(d0)
   }
 
   /** These trait define how the current element is retrieved: this depends on the presence of X and
@@ -169,7 +169,7 @@ object PrefixLoop {
     override type R = R0
     override type This = T0
   }
-   
+
   /** Defines a tree result type
    * @tparam L the key
    * @tparam W the value
@@ -184,7 +184,7 @@ object PrefixLoop {
     protected def getValue(v:Values):Option[W]
     /** fetches the L key for the current node result */
     protected def getResultKey(v:Values,ctx:Context):L
-    /** Running against the current tree. */
+    /** Running against the current tree */
     @throws(classOf[NoSuchElementException])
     final def apply(d0:Data): R = get(d0)._2
   }
@@ -225,61 +225,66 @@ object PrefixLoop {
   ///               Useful in transformations with tree expansion                  ///
   ////////////////////////////////////////////////////////////////////////////////////
 
-  trait ExpandRecurBuilder extends RecurBuilder {
-    /** fetches additional children for the current node result */
-    protected def getAdditionalChildren(ctx:Context,v:Values):Iterable[Result]
+  //we want to maximize code sharing
+  //Expanding is a complex matter, and we may give up on some optimizations
+  abstract class ExpandRecurBuilder extends RecurBuilder with ValueLWDE {
     /** defines how to handle key conflict
      *  @param ctx is the parent context
      *  @param r1 is the 'local' child
      *  @param r2 is the 'additional' child
      */
     protected def merge(ctx:Context,r1:Result,r2:Result):R
-    /** defines how to handle the addition of new children that do not conflict.
-     *  e.g. they could be added before, or after the already existing children.
-     *  @param ctx is the parent context
-     *  @param current are the 'local' children, possibly merged with conflicting new children
-     *  @param additional are the 'additional' children which do not conflict
+
+    /** This actually merges the children for the given context
      */
-    protected def mergeNewChildren(ctx:Context,current:Iterable[Result],additional:Iterable[Result]):Iterable[Result]
-    
-    /** This actually merges the children for the given context 
-     */
-    protected def doMerge(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Iterable[Result] = {
-      val buf  = scala.collection.mutable.ArrayBuffer.empty[Result]
-      val add  = getAdditionalChildren(ctx,v).toBuffer
+    protected def doMerge(ctx:Context,additional:Iterable[Result],loop:(Result=>Any) => Unit)(g:Result=>Any):Unit = {
+      val add  = additional.toBuffer
       var done = 0
       if (add.size>0) {
         loop { x=>
-          println("searching key "+x._1+"\n  found:"+add.indexWhere(y=>y!=null && y._1==x._1))
-          buf += ((x._1, add.indexWhere(y=>y!=null && y._1==x._1) match {
+          g((x._1, add.indexWhere(y=>y!=null && y._1==x._1) match {
             case -1 => x._2
             case  i => val y=add(i); add(i)=null; done+=1; merge(ctx,x,y)
           }))
         }
-        val b1 = (if (done!=add.size) mergeNewChildren(ctx,buf,add.filter(_!=null)) else buf)
-        println("buffer1: "+b1)
-        b1
+        if (done!=add.size) add.filter(_!=null).map(g)
       } else {
-        loop { buf += _ }
-        buf
-      }      
+        loop(g)
+      }
     }
+  }
+
+  abstract class ExpandRecWithDataRB extends ExpandRecurBuilder with RecurWithData with Layered {
+    final def getCurrent(ctx:Context):(K,This) = ctx.head._1
+  }
+  abstract class ExpandRecNoDataRB extends ExpandRecurBuilder with RecurNoData with Layered {
+    final protected def getCurrent(ctx:Context):(K,This) = ctx.head
+  }
+  abstract class ExpandBasicWithDataRB extends ExpandRecurBuilder with RecurWithData with Standalone {
+    final protected def getCurrent(ctx:Context):(K,This) = ctx._1
+  }
+  abstract class ExpandBasicNoDataRB extends ExpandRecurBuilder with RecurNoData with Standalone {
+    final protected def getCurrent(ctx:Context):(K,This) = ctx
   }
 
   //trait for building a View
   trait ExpandViewRB extends ExpandRecurBuilder with ViewRB {
     override protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result =
-      (getResultKey(v,ctx),new R(getValue(v)) { def foreach[X](g:Result=>X):Unit = doMerge(ctx,v,loop).foreach(g) })
+      (getResultKey(v,ctx),new R(getValue(v)) { def foreach[X](g:Result=>X):Unit = doMerge(ctx,getAdditionalChildren(v),loop)(g) })
   }
   //trait for building a Tree
   trait ExpandTreeRB extends ExpandRecurBuilder with TreeRB {
     override protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result = {
       val b = bf.newEmpty
-      doMerge(ctx,v,loop).foreach { b += _ }
-      (getResultKey(v,ctx),b.result(getValue(v),getDefault(v)))
+      doMerge(ctx,getAdditionalChildren(v),loop){ b += _ }
+      val r = (getResultKey(v,ctx),b.result(getValue(v),getDefault(v)))
+      r
     }
   }
 
+  ////////////////////////////////////////////////////////////////////////////////////
+  ///                      Additional traits to plug holes                         ///
+  ////////////////////////////////////////////////////////////////////////////////////
   /** Handling defaults when building trees: we want to provide a way to fall back on the original
    *  tree defaults. If the original is only PrefixTraversableOnce, overriding getDefault will be
    *  more useful. Falling back on the original default requires to be able to navigate back
@@ -324,10 +329,10 @@ object PrefixLoop {
   }
   trait ValueLWDE extends RecurBuilder {
     type Values = (L, Option[W], L=>R, Iterable[(L,R)])
-    @inline final protected def getValue(v:Values):Option[W] = v._2
-    @inline final protected def getDefault(v:Values):L=>R = v._3
-    @inline final protected def getResultKey(v:Values,ctx:Context):L = v._1
-    @inline final protected def getAdditionalChildren(v:Values,ctx:Context):Iterable[(L,R)] = v._4
+    final protected def getValue(v:Values):Option[W] = v._2
+    final protected def getDefault(v:Values):L=>R = v._3
+    final protected def getResultKey(v:Values,ctx:Context):L = v._1
+    final protected def getAdditionalChildren(v:Values):Iterable[(L,R)] = v._4
   }
 
   ////////////////////////////////////////////////////////////////////////////////////
@@ -468,4 +473,12 @@ object PrefixLoop {
   abstract class RecurViewNoDataSameKey[K,V,W,T<:PrefixTraversableOnce[K,V,T]] extends BasicNoDataRB with ViewRB with ValueW with Binder[Nothing,K,V,K,W,T,PrefixTraversableOnce.Abstract[K,W]]
   abstract class RecurTreeNoDataSameKey[K,V,W,R<:PrefixTreeLike[K,W,R],T<:PrefixTraversableOnce[K,V,T]](implicit val bf:PrefixTreeLikeBuilder[K,W,R])  extends BasicNoDataRB with SameKeyDefault with ValueWD with Binder[Nothing,K,V,K,W,T,R]
 
+  abstract class ExpandRecView[X,K,V,L,W,T<:PrefixTraversableOnce[K,V,T]] extends ExpandRecWithDataRB with ExpandViewRB with Binder[X,K,V,L,W,T,PrefixTraversableOnce.Abstract[L,W]]
+  abstract class ExpandRecTree[X,K,V,L,W,R<:PrefixTreeLike[L,W,R],T<:PrefixTreeLike[K,V,T]](implicit val bf:PrefixTreeLikeBuilder[L,W,R]) extends ExpandRecWithDataRB with ExpandTreeRB with Binder[X,K,V,L,W,T,R]
+  abstract class ExpandRecViewNoData[K,V,L,W,T<:PrefixTraversableOnce[K,V,T]] extends ExpandRecNoDataRB with ExpandViewRB with Binder[Nothing,K,V,L,W,T,PrefixTraversableOnce.Abstract[L,W]]
+  abstract class ExpandRecTreeNoData[K,V,L,W,R<:PrefixTreeLike[L,W,R],T<:PrefixTreeLike[K,V,T]](implicit val bf:PrefixTreeLikeBuilder[L,W,R]) extends ExpandRecNoDataRB with ExpandTreeRB with Binder[Nothing,K,V,L,W,T,R]
+  abstract class ExpandView[X,K,V,L,W,T<:PrefixTraversableOnce[K,V,T]] extends ExpandBasicWithDataRB with ExpandViewRB with Binder[X,K,V,L,W,T,PrefixTraversableOnce.Abstract[L,W]]
+  abstract class ExpandTree[X,K,V,L,W,R<:PrefixTreeLike[L,W,R],T<:PrefixTreeLike[K,V,T]](implicit val bf:PrefixTreeLikeBuilder[L,W,R]) extends ExpandBasicWithDataRB with ExpandTreeRB with Binder[X,K,V,L,W,T,R]
+  abstract class ExpandViewNoData[K,V,L,W,T<:PrefixTraversableOnce[K,V,T]] extends ExpandBasicNoDataRB with ExpandViewRB with Binder[Nothing,K,V,L,W,T,PrefixTraversableOnce.Abstract[L,W]]
+  abstract class ExpandTreeNoData[K,V,L,W,R<:PrefixTreeLike[L,W,R],T<:PrefixTreeLike[K,V,T]](implicit val bf:PrefixTreeLikeBuilder[L,W,R]) extends ExpandBasicNoDataRB with ExpandTreeRB with Binder[Nothing,K,V,L,W,T,R]
 }

@@ -17,8 +17,12 @@ import scala.annotation.switch
  *  on that property (they will omit to output such degenerate branches, and will not build them.)
  *
  *  Operations on trees are not to take lightly ; the recursive nature of trees usually involves that
- *  any transformation be done by rebuilding it. This is even true of the withFilter operation : at this
- *  stage, there is yet no `view` for trees.
+ *  any transformation be done by rebuilding it. This is always done by using the generic recursive
+ *  algorithm in PrefixLoop, derived as an appropriate class. The methods provided in this class, while
+ *  useful, are mere uses of this algorithm. In many cases, achieving a specific transformation will imply
+ *  rewriting a given method in a slightly different way (e.g. in flatMap you might want mergeMode to
+ *  depend on the context, or be handled by a parallel tree) ; this is usually easy by picking up the
+ *  right abstract class/traits from PrefixLoop and filling up the few missing methods.
  *
  *  PrefixTreeLike seems to share a lot of functionalities with MapLike.
  *  However, it doesn't seem possible to derive from that trait because of the constraints put on This.
@@ -410,7 +414,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def mapKeys[L,W>:V,T<:PrefixTreeLike[L,W,T]](k0:K,fk:K=>L,g:L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,T]):T =
     genMap[L,W,T](k0,(x:(K,This))=>(fk(x._1),x._2.value),g)
-    
+
   /** Merging with another tree.
    *  merge does the following to build the children:
    *  - if the merged tree is not significant, the result is this tree ; otherwise
@@ -418,52 +422,29 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *    * if the current key is not present in the merged tree, copy (the child is the child from this tree)
    *    * if it is present and overwrite is true, copy from the merged tree (the child is the child from the merged tree)
    *    * if it is present and overwrite is false, merge both children
-   *  - pour all the children from the merged tree that have no corresponding key in this tree (children from the merged tree)
+   *  - pour all the children from the merged tree that have no corresponding key in this tree (additional children from the merged tree)
    *  In order to build the merged node value and default (which doesn't apply for children that were copied!) :
    *  - use the value and default from the merged tree
-   *  The result is a mix between both trees, as can be expected. The process is obviously recursive.
-   *  Note that this algorithm doesn't enter any standard algorithm because we also have to run through all the element of
-   *  the merged tree (those that have no match in the current tree), which zip like operations don't do.
+   *  The result is a mix between both trees, as can be expected.
+   *  Defaults are not merged : the most appropriate default from either tree is used!
    *  @param r the tree which is merged onto this tree
    *  @param overwrite whose effect is described above
+   *  @param useDefault is true if the merge also uses the default values of the merged tree when a key in this
+   *                    tree has no correspondence in the merged tree
    *  @tparam L the key kind for the merged tree
    *  @tparam W the value kind for the merged tree
    *  @tparam R the tree kind for the merged tree
    */
-  def merge0[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean)(implicit bf: PrefixTreeLikeBuilder[L,W,R]):R = {
-    if (r.isNonSignificant)
-      this
-    else {
-      val b = bf.newEmpty
-      val done = scala.collection.mutable.Set.empty[L]
-      for (x <- this) {
-        b += ((x._1, r.get(x._1) match {
-          case Some(y) => if (overwrite) y else x._2.merge0[L,W,R](y,overwrite)
-          case None    => x._2
-        }))
-        done += x._1
-      }
-      for (x <- r if !done.contains(x._1))
-        b += x
-      b.result(r.value,r.default)
-    }
-  }
-  
-  def merge[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean)(implicit bf0: PrefixTreeLikeBuilder[L,W,R]):R = {
-    import PrefixLoop._
-    println("merging "+this+"\n  with "+r)
-    if      (r.isNonSignificant) this
-    else if (isNonSignificant)   r
-    else (new BasicWithDataRB with ValueLWDE with ExpandTreeRB with Binder[R,K,V,L,W,This,R] {
-      protected def bf: utils.tree.PrefixTreeLikeBuilder[L,W,R] = bf0
+  def merge[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean,useDefault:Boolean)(implicit bf: PrefixTreeLikeBuilder[L,W,R]):R = {
+    if      (r eq this)          this  //if merging with oneself (comparing references), return self
+    else if (isNonSignificant)   r     //if this is empty, the merge is r
+    else (new PrefixLoop.ExpandTree[R,K,V,L,W,R,This] {
       protected def buildDefault(ctx:Context,default:K => This,g: L => K): L => R = ???  //unused
-      protected def getAdditionalChildren(ctx:Context,v:Values): Iterable[(L, R)] = ctx._2.toIterable
-      protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = if (overwrite) r2._2 else r1._2.merge[L,W,R](r2._2,overwrite)
-      protected def mergeNewChildren(ctx:Context,current:Iterable[(L, R)],additional:Iterable[(L, R)]):Iterable[(L, R)] = current ++ additional
+      protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = if (overwrite) r2._2 else r1._2.merge(r2._2,overwrite,useDefault)
       protected def mapValues(ctx:Context): Values = (ctx._1._1, ctx._2.value, ctx._2.default, ctx._2.toIterable)
       protected def nextX(child:(K,This),ctx:Context): R = ctx._2.get(child._1) match {
-        case None     => r.empty
-        case Some(r1) => r1
+        case None     => if (useDefault) try { ctx._2(child._1) } catch { case _:NoSuchElementException=>child._2 } else child._2 //if nothing to merge with : merge with self
+        case Some(r1) => r1            //merge with found branch
       }
     })(((null.asInstanceOf[K],this),r))
   }
@@ -487,61 +468,39 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *          - MERGE_REVERSE does as MERGE, but reverses the roles of the tress
    *          - MERGE_REVERSE_OVERWRITE does as MERGE_OVERWRITE, but reverses the roles of the tress
    *          This parameter can be null if no conflict is expected.
+   *  @param useDefault indicates whether one should use the default when a merge is involved
    *  @return a tree which maps every value of this tree to a new tree with same key type
    *            The resulting tree is a new tree with the same key type, the new value type,
    *            which expands this tree values to new subtrees.
    */
-  def flatMap[W,T<:PrefixTreeLike[K,W,T]](f:V=>T, mode:MergeMode)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
-    val e = (if (value.isDefined) f(value.get) else bf.empty)
-    if (!isEmpty) {
-      val bf1 = bf.newEmpty
-      for (x:(K,This) <- this) {
-        val t = x._2.flatMap[W,T](f,mode)(bf1)
-        bf += ((x._1,e.get(x._1) match {
-          case None    => t
-          case Some(y) => if (mode==null) throw new IllegalStateException("merge required: MergeMode cannot be null")
-            (mode.id: @switch) match {
-              case 0 => t
-              case 1 => y
-              case 2 => t.merge(y,false)
-              case 3 => t.merge(y,true)
-              case 4 => y.merge(t,false)
-              case 5 => y.merge(t,true)
-            }
-        }))
+  def flatMap[W,T<:PrefixTreeLike[K,W,T]](mode:MergeMode, useDefault:Boolean)(f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
+    (new PrefixLoop.ExpandTreeNoData[K,V,K,W,T,This] with PrefixLoop.SameKeyDefault {
+      protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = {
+        if (mode==null) throw new IllegalStateException("merge required: MergeMode cannot be null")
+        mode[L,W,T](r1._2,r2._2,useDefault)
       }
-    }
-    for (x<-e if !isDefinedAt(x._1))
-      bf += x
-    bf.result(e.value, asDefault(default(_:K).flatMap[W,T](f,mode)))
+      protected def mapValues(ctx:Context): Values = {
+        val e = (if (ctx._2.value.isDefined) f(ctx._2.value.get) else bf.empty)
+        (ctx._1, e.value, buildDefault(ctx,ctx._2.default,null), e.toIterable)
+      }
+    })((null.asInstanceOf[K],this))
   }
-  /*
-  def flatMap[L,W,T<:PrefixTreeLike[L,W,T]](k0:K,cur:Seq[(K,This)])(f:Seq[(K,This)]=>(L,T), mode:MergeMode)(implicit bf:PrefixTreeLikeBuilder[L,W,T]):(L,T) = {
-    val next = (k0,this)+:cur
-    val e = f(next)
-    if (!isEmpty) {
-      val bf1 = bf.newEmpty
-      for (x:(K,This) <- this) {
-        val t = x._2.flatMap[L,W,T](x._1,next)(f,mode)(bf1)
-        bf += (e._2.get(t._1) match {
-          case None    => t
-          case Some(y) => if (mode==null) throw new IllegalStateException("merge required: MergeMode cannot be null")
-            (mode.id: @switch) match {
-              case 0 => t
-              case 1 => (t._1,y)
-              case 2 => (t._1,t._2.merge(y,false))
-              case 3 => (t._1,t._2.merge(y,true))
-              case 4 => (t._1,y.merge(t._2,false))
-              case 5 => (t._1,y.merge(t._2,true))
-            }
-        })
+
+  /** Same as above, but the transformation works on a recursive context rather than simply on the node value.
+   */
+  def flatMap[L,W,T<:PrefixTreeLike[L,W,T]](k0:K,mode:MergeMode,useDefault:Boolean,g:L=>K)(f:Seq[(K,This)]=>(L,T))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):(L,T) = {
+    (new PrefixLoop.ExpandRecTreeNoData[K,V,L,W,T,This] with PrefixLoop.OtherKeyDefault {
+      protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = {
+        if (mode==null) throw new IllegalStateException("merge required: MergeMode cannot be null")
+        mode[L,W,T](r1._2,r2._2,useDefault)
       }
-    }
-    for (x<-e._2 if !isDefinedAt(x._1))
-      bf += x
-    (e._1,bf.result(e._2.value, null))
-  }*/
-  
+      protected def mapValues(ctx:Context): Values = {
+        val e = f(ctx)
+        (e._1, e._2.value, buildDefault(ctx,ctx.head._2.default,g), e._2.toIterable)
+      }
+    }).get((k0,this))
+  }
+
   /** Identical to the previous method, but more than one element is updated.
    */
   def update[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T)*)(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T = update[W,T](kv)
