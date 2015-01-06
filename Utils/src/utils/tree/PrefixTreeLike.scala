@@ -132,7 +132,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def empty: Repr = self.newBuilder(None,Nil,null)
   def seq: Repr = this
-  override def toIterable = iterator.toIterable  //scala library does a wrong cast here
+  //scala library does a wrong cast here when the collection is not an Iterable
+  //for some reason, we cannot be Iterable : our builder is not correctly recognized in the code
+  override def toIterable = iterator.toIterable
+  override protected[this] def toCollection(repr: Repr): Iterable[(K,This)] = repr.toIterable
+  override protected[this] def thisCollection: Iterable[(K,This)] = toIterable
 
   /** true if this is a tree which contains no information (no value, no children, no significant default)
    */
