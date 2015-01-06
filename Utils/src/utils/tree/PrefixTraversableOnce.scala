@@ -55,7 +55,7 @@ import scala.annotation.tailrec
  */
 trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   extends TraversableOnce[(K, This)] { self:This =>
-  //an alias that concrete classes can use as shortcut to refer to themselves
+  //aliases that concrete classes can use as shortcut to refer to themselves or their component
   protected[this] type Repr = This
   type Key = K
   type Value <: V
@@ -79,61 +79,73 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     toTreeSameKey[O,U,R](null.asInstanceOf[K],default,values,next)
   }
 
-  /** Forces this PrefixTraversableOnce into a default PrefixTree
+  /** Forces this PrefixTraversableOnce into a default PrefixTree.
+   *  The method differ on how they generate the default: nodefault, constant default, default provided through a tree
    */
   def toPrefixTree:PrefixTree[K,V] = toTreeSameKey[V,PrefixTree[K,V]](null.asInstanceOf[K],x=>(x._2.value,null))
   def toPrefixTree[U>:V](default:K=>PrefixTree[K,U]):PrefixTree[K,U] = toTreeSameKey[U,PrefixTree[K,U]](null.asInstanceOf[K],x=>(x._2.value,default))
   def toPrefixTree[U>:V,O<:PrefixTreeLike[K,K=>PrefixTree[K,U],O]](default:O with PrefixTreeLike[K,K=>PrefixTree[K,U],O]):PrefixTree[K,U] = toTree[U,PrefixTree[K,U],O](default)
 
   /** filter this tree according to some criteria.
+   *  When returning a PrefixTreeLike, `default` must be provided and cannot be null (but can return null if you want no default)
    */
   def filter[U>:V,R<:PrefixTreeLike[K,U,R]](k0:K)(f:((K,This))=> Boolean, default:((K,This))=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R =
     toTreeSameKey[U,R](k0,(x:(K,This))=>{if (f(x)) (x._2.value,default(x)) else null})
-  def filterRec[U>:V,R<:PrefixTreeLike[K,U,R]](k0:K)(f:(Seq[(K,Repr)])=>Boolean, default:(Seq[(K,This)])=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]) =
+  def filterRec[U>:V,R<:PrefixTreeLike[K,U,R]](k0:K)(f:(Seq[(K,This)])=>Boolean, default:(Seq[(K,This)])=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]) =
     toTreeRecSameKey[U,R](k0,(x:Seq[(K,This)])=>{if (f(x)) (x.head._2.value,default(x)) else null})
   def filterView(k0:K)(f:((K,This))=> Boolean):PrefixTraversableOnce.Abstract[K, V] =
     transformSameKey(k0,(x:(K,This))=>{if (f(x)) x._2.value else null})
-  def filterViewRec(k0:K)(f:(Seq[(K,Repr)])=>Boolean):PrefixTraversableOnce.Abstract[K, V] =
+  def filterViewRec(k0:K)(f:(Seq[(K,This)])=>Boolean):PrefixTraversableOnce.Abstract[K, V] =
     transformRecSameKey(k0,(x:Seq[(K,This)])=>{if (f(x)) x.head._2.value else null})
 
   /** map on this tree.
+   *  Default are handled as above where necessary.
    */
   def map[U,R<:PrefixTreeLike[K,U,R]](k0:K)(f:V=>U,default:((K,This))=> K=>R)(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R =
     toTreeSameKey(k0,(x:(K,This))=>(x._2.value.flatMap(z=>Some(f(z))),default(x)))
-  def mapRec[L,U,R<:PrefixTreeLike[L,U,R]](k0:K)(f:(Seq[(K,Repr)])=>(L,Option[U],L=>R))(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R =
+  def mapRec[L,U,R<:PrefixTreeLike[L,U,R]](k0:K)(f:(Seq[(K,This)])=>(L,Option[U],L=>R))(implicit bf:PrefixTreeLikeBuilder[L,U,R]):R =
     toTreeRec(k0,(x:Seq[(K,This)])=>f(x))
   def mapView[U](k0:K)(f:V=>U):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] =
     transformSameKey(k0,(x:(K,This))=>x._2.value.flatMap(z=>Some(f(z))))
-  def mapViewRec[L,U](k0:K)(f:(Seq[(K,Repr)])=>(L,Option[U])):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] =
+  def mapViewRec[L,U](k0:K)(f:(Seq[(K,This)])=>(L,Option[U])):PrefixTraversableOnce[L,U,PrefixTraversableOnce.Abstract[L,U]] =
     transformRec(k0,(x:Seq[(K,This)])=>f(x))
 
   /** Transform this tree with another tree.
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
    *  corresponding sub-node of the transformer tree using the provided `op`. The resulting tree is
    *  a subtree of the original tree (as far as keys are concerned) in that the operation only provides
-   *  result values (no result nodes), and some nodes may be skipped (so less nodes is possible)
-   *  Default values for the second tree are used but exceptions will end the transformation ungracefully.
-   *  The resulting tree contains an appropriate zipped default.
-   *  @param t      the transformer tree
+   *  result values (no result nodes), and some nodes may be skipped (so less nodes is possible) when op
+   *  returns null, the second tree contains a null for the current node, or the default from the second
+   *  second tree exits with a NoSuchElementException.
+   *  When the result is a PrefixLikeTree, it contains a default matching the input default.
+   *  @param t      the transformer tree ; a node value that is null will skip the corresponding input node.
    *  @param strict is true if we don't accept the use of default values for the second tree for defined
-   *                values in the first tree : in that case we fall back on the zipped default : this
-   *                usually only makes sense if the T.noDefault is an error or similar answer (e.g. empty)
-   *  @param op     an operator that transforms a T node with a This node giving the expected U result
+   *                values in the first tree. If we use the default, a null value or NoSuchElementException
+   *                error will skip the corresponding input node.
+   *  @param op     an operator that transforms a T node with the matching current node to give the
+   *                expected Option[U] value of the result node. If it instead returns null, the current
+   *                node is skipped.
    *  @return the resulting transformed tree
    */
-  def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,Repr)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  def zip[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:(T,This)=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     type Data = ((K,This),T)
-    val values = (cur:Data)              => (op(cur._2,cur._1._2), null)
+    val values = (cur:Data)              => { val r=op(cur._2,cur._1._2); if (r==null) null else (r, null) }
     val next   = (child:(K,This),s:Data) => if (!strict || s._2.isDefinedAt(child._1)) try { s._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[T] } else null.asInstanceOf[T]
     toTreeSameKey(null.asInstanceOf[K],t,values,next)
   }
-  def zipView[U,T<:PrefixTreeLike[K,_,T]](t:T,strict:Boolean,op:(T,Repr)=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
+  def zipRec[U,T<:PrefixTreeLike[K,_,T],R<:PrefixTreeLike[K,U,R]](t:T,strict:Boolean,op:Seq[((K,This),T)]=>Option[U])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+    type Data = Seq[((K,This),T)]
+    val values = (cur:Data)              => { val r=op(cur); if (r==null) null else (r, null) }
+    val next   = (child:(K,This),s:Data) => if (!strict || s.head._2.isDefinedAt(child._1)) try { s.head._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[T] } else null.asInstanceOf[T]
+    toTreeRecSameKey(null.asInstanceOf[K],t,values,next)
+  }
+  def zipView[U,T<:PrefixTreeLike[K,_,T]](t:T,strict:Boolean,op:(T,This)=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
     type Data = ((K,This),T)
     val values = (cur:Data)              => op(cur._2,cur._1._2)
     val next   = (child:(K,This),s:Data) => if (!strict || s._2.isDefinedAt(child._1)) try { s._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[T] } else null.asInstanceOf[T]
     transformSameKey(null.asInstanceOf[K],t,values,next)
   }
-  def zipViewRec[U,T<:PrefixTreeLike[K,_,T]](t:T,strict:Boolean,op:Seq[((K,Repr),T)]=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
+  def zipViewRec[U,T<:PrefixTreeLike[K,_,T]](t:T,strict:Boolean,op:Seq[((K,This),T)]=>Option[U]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
     type Data = Seq[((K,This),T)]
     val values = (cur:Data)              => op(cur)
     val next   = (child:(K,This),s:Data) => if (!strict || s.head._2.isDefinedAt(child._1)) try { s.head._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[T] } else null.asInstanceOf[T]
@@ -154,13 +166,13 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
-  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
+  def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,This)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,This)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     type Data = ((K,This),(T,O))
     val values = (cur:Data)              => (cur._2._2.value.flatMap(_(cur._2._1,cur._1._2)), null)
     val next   = (child:(K,This),s:Data) => strict(child._1,s._2._1,s._2._2)
     toTreeSameKey(null.asInstanceOf[K],(t,op),values,next)
   }
-  def zip2View[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,Repr)=>Option[U],O]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,Repr)=>Option[U],O]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
+  def zip2View[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,This)=>Option[U],O]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,This)=>Option[U],O]):PrefixTraversableOnce[K,U,PrefixTraversableOnce.Abstract[K,U]] = {
     type Data = ((K,This),(T,O))
     val values = (cur:Data)              => cur._2._2.value.flatMap(_(cur._2._1,cur._1._2))
     val next   = (child:(K,This),s:Data) => strict(child._1,s._2._1,s._2._2)
@@ -200,9 +212,9 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  Children are evaluated before their parent if topFirst is false.
    *  The top tree is evaluated with k0 as key.
    */
-  def deepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,Repr)) => U): U =
+  def deepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,This)) => U): U =
     PrefixLoop.fold(u0,topFirst,f)(deepForeach(k0) _)
-  def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,Repr)]) => U): U =
+  def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,This)]) => U): U =
     PrefixLoop.fold(u0,topFirst,f)(deepForeachRec(k0) _)
   //same, but the function used can change for each node and is handled through a companion tree
   def deepFoldZip[U,O<:PrefixTreeLike[K,(U,(K,This))=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,(K,This))=>U,O]) =
@@ -241,23 +253,23 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  @param cur the current sequence of key for the current element (from bottom to top!)
    *  @param topFirst is true if an element appears before its children, false otherwise
    */
-  protected class TreeIterator(cur:Seq[K],topFirst:Boolean) extends AbstractIterator[(Seq[K], Repr)] {
+  protected class TreeIterator(cur:Seq[K],topFirst:Boolean) extends AbstractIterator[(Seq[K], This)] {
     protected[this] val iter = self.toIterator                 //iterator for this level
-    protected[this] var i:Iterator[(Seq[K], Repr)] = getSub    //current sub-iterator
+    protected[this] var i:Iterator[(Seq[K], This)] = getSub    //current sub-iterator
     protected[this] var done:Boolean = false                   //true when this item has been provided
     @tailrec final def hasNext():Boolean = !done || i!=null && (i.hasNext || {i=getSub; hasNext})
       //some clarifications: if this item has not been processed, there is a next
       //if there is no sub-iterator available and this item has been processed, we are finished
       //but if there is a sub-iterator with a next element, then there is a next
       //otherwise fetch the next sub-iterator (which could be null) and then check if it has a next element
-    final def next(): (Seq[K], Repr) = {
+    final def next(): (Seq[K], This) = {
       if (!done && (topFirst || i==null || !i.hasNext)) {      //give current item immediately if topFirst or wait for no more items
         done = true                                            //once processed, mark this
         (cur,self)
       } else                                                   //if the next is not the current item, then it is the current sub-iterator next element
         i.next
     }
-    final def getSub:Iterator[(Seq[K], Repr)] = {
+    final def getSub:Iterator[(Seq[K], This)] = {
       if (iter.hasNext) {                                      //move to next element
         val (k,t)=iter.next
         new t.TreeIterator(cur.+:(k),topFirst)                 //fetch sub-iterator
@@ -274,7 +286,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   protected class SeqView(topFirst:Boolean) extends Iterable[(Seq[K], V)] {
     def iterator:Iterator[(Seq[K], V)] = new Iterator[(Seq[K], V)] {
       val i = new TreeIterator(Nil,topFirst)
-      @tailrec def fetch:(Seq[K], Repr) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
+      @tailrec def fetch:(Seq[K], This) = { if (!i.hasNext) null else { var x=i.next(); if (x._2.value.isDefined) x else fetch } }
       var cur = fetch
       def hasNext: Boolean = cur!=null
       def next(): (Seq[K], V) = { val c=cur; cur=fetch; (c._1.reverse,c._2.value.get) }
@@ -365,20 +377,24 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   //generic conversions to some PrefixTree
   @throws(classOf[NoSuchElementException])
   def toTreeRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W], L=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecTree[X,K,V,L,W,R,This] {
+    def reverseKey = null
     def mapValues(ctx: Context): Values   = v(ctx)
     def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
   })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def toTreeRec[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:Seq[(K, This)]=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecTreeNoData[K,V,L,W,R,This] {
+    def reverseKey = null
     def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])
   def toTree[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W], L=>R), x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurTree[X,K,V,L,W,R,This] {
+    def reverseKey = null
     def mapValues(ctx: Context): Values   = v(ctx)
     def nextX(child: (K, This), ctx: Context): X  = x(child,ctx)
   })(((k0, this), x0))
   @throws(classOf[NoSuchElementException])
   def toTree[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:((K, This))=>(L, Option[W], L=>R))(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurTreeNoData[K,V,L,W,R,This] {
+    def reverseKey = null
     def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
   @throws(classOf[NoSuchElementException])

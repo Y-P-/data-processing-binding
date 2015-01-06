@@ -203,7 +203,7 @@ object PrefixLoop {
     /** the method that provides the default function for a given Value. Often, it is built using the next two methods.*/
     protected def getDefault(v:Values):L=>R
     /** The method that creates the L=>R default function from the initial K=>This default function. */
-    protected def buildDefault(ctx:Context,default:K=>This,g:L=>K): L=>R
+    protected def buildDefault(ctx:Context,default:K=>This): L=>R
 
     /** a method that is useful for building default functions. */
     protected def stdDefault(ctx:Context,child:(K,This)):R = (nextData(child, ctx) match {
@@ -292,11 +292,12 @@ object PrefixLoop {
    */
   trait SameKeyDefault extends TreeRB {
     override type L=K
-    final protected def buildDefault(ctx:Context,defa:K=>This,g:L=>K): L=>R = l => stdDefault(ctx,(l,defa(l)))
+    final protected def buildDefault(ctx:Context,defa:K=>This): L=>R = l => stdDefault(ctx,(l,defa(l)))
   }
   trait OtherKeyDefault extends TreeRB {
-    final protected def buildDefault(ctx:Context,defa:K=>This,g:L=>K): L=>R = if (g==null) null else l => {
-      val k = g(l)
+    def reverseKey: L=>K
+    final protected def buildDefault(ctx:Context,defa:K=>This): L=>R = if (reverseKey==null) null else l => {
+      val k = reverseKey(l)
       stdDefault(ctx,(k,defa(k)))
     }
   }

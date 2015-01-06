@@ -439,7 +439,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     if      (r eq this)          this  //if merging with oneself (comparing references), return self
     else if (isNonSignificant)   r     //if this is empty, the merge is r
     else (new PrefixLoop.ExpandTree[R,K,V,L,W,R,This] {
-      protected def buildDefault(ctx:Context,default:K => This,g: L => K): L => R = ???  //unused
+      protected def buildDefault(ctx:Context,default:K => This): L => R = ???  //unused
       protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = if (overwrite) r2._2 else r1._2.merge(r2._2,overwrite,useDefault)
       protected def mapValues(ctx:Context): Values = (ctx._1._1, ctx._2.value, ctx._2.default, ctx._2.toIterable)
       protected def nextX(child:(K,This),ctx:Context): R = ctx._2.get(child._1) match {
@@ -481,7 +481,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       }
       protected def mapValues(ctx:Context): Values = {
         val e = (if (ctx._2.value.isDefined) f(ctx._2.value.get) else bf.empty)
-        (ctx._1, e.value, buildDefault(ctx,ctx._2.default,null), e.toIterable)
+        (ctx._1, e.value, buildDefault(ctx,ctx._2.default), e.toIterable)
       }
     })((null.asInstanceOf[K],this))
   }
@@ -490,13 +490,14 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def flatMap[L,W,T<:PrefixTreeLike[L,W,T]](k0:K,mode:MergeMode,useDefault:Boolean,g:L=>K)(f:Seq[(K,This)]=>(L,T))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):(L,T) = {
     (new PrefixLoop.ExpandRecTreeNoData[K,V,L,W,T,This] with PrefixLoop.OtherKeyDefault {
+      def reverseKey = g
       protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = {
         if (mode==null) throw new IllegalStateException("merge required: MergeMode cannot be null")
         mode[L,W,T](r1._2,r2._2,useDefault)
       }
       protected def mapValues(ctx:Context): Values = {
         val e = f(ctx)
-        (e._1, e._2.value, buildDefault(ctx,ctx.head._2.default,g), e._2.toIterable)
+        (e._1, e._2.value, buildDefault(ctx,ctx.head._2.default), e._2.toIterable)
       }
     }).get((k0,this))
   }
@@ -562,45 +563,49 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   @throws(classOf[NoSuchElementException])
   def genMap[W, R<:PrefixTreeLike[K,W,R]](k0:K,v:((K, Repr))=>Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurTreeNoDataSameKey[K,V,W,R,This] {
-    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default,null))
+    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default))
   })(k0,this)
 
   @throws(classOf[NoSuchElementException])
   def genMap[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:(((K, Repr), X))=>Option[W], x:((K, Repr),((K, Repr), X))=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurTreeSameKey[X,K,V,W,R,This] {
-    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default,null))
+    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default))
     def nextX(child: (K, This), ctx: Context): X = x(child,ctx)
   })(((k0,this),x0))
 
   @throws(classOf[NoSuchElementException])
   def genMapRec[W, R<:PrefixTreeLike[K,W,R]](k0:K, v:Seq[(K, Repr)]=>Option[W])(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecTreeNoDataSameKey[K,V,W,R,This] {
-    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default,null))
+    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default))
   })(k0,this)
 
   @throws(classOf[NoSuchElementException])
   def genMapRec[X, W, R<:PrefixTreeLike[K,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>Option[W], x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[K,W,R]) = (new RecurRecTreeSameKey[X,K,V,W,R,This] {
-    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default,null))
+    def mapValues(ctx: Context): Values = (v(ctx), buildDefault(ctx,getCurrent(ctx)._2.default))
     def nextX(child: (K, This), ctx: Context): X = x(child,ctx)
   })(((k0,this),x0))
 
   @throws(classOf[NoSuchElementException])
   def genMap[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:((K, This))=>(L, Option[W]), g : L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurTreeNoData[K,V,L,W,R,This] {
-    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default,g)) }
+    def reverseKey = g
+    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default)) }
   })(k0,this)
 
   @throws(classOf[NoSuchElementException])
   def genMap[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:(((K, This), X))=>(L, Option[W]), g: L=>K, x:((K, This),((K, This), X))=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurTree[X,K,V,L,W,R,This] {
-    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default,g)) }
+    def reverseKey = g
+    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default)) }
     def nextX(child: (K, This), ctx: Context): X = x(child,ctx)
   })(((k0,this),x0))
 
   @throws(classOf[NoSuchElementException])
   def genMapRec[L, W, R<:PrefixTreeLike[L,W,R]](k0:K, v:Seq[(K, This)]=>(L, Option[W]), g : L=>K)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecTreeNoData[K,V,L,W,R,This] {
-    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default,g)) }
+    def reverseKey = g
+    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default)) }
   })(k0,this)
 
   @throws(classOf[NoSuchElementException])
   def genMapRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W]), g : L=>K, x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecTree[X,K,V,L,W,R,This] {
-    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default,g)) }
+    def reverseKey = g
+    def mapValues(ctx: Context): (L, Option[W], L=>R) = { val z=v(ctx); (z._1,z._2,buildDefault(ctx,getCurrent(ctx)._2.default)) }
     def nextX(child: (K, This), ctx: Context): X = x(child,ctx)
   })(((k0,this),x0))
 
