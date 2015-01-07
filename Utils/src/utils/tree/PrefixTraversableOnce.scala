@@ -119,9 +119,9 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  second tree exits with a NoSuchElementException.
    *  When the result is a PrefixLikeTree, it contains a default matching the input default.
    *  @param t      the transformer tree ; a node value that is null will skip the corresponding input node.
-   *  @param strict is true if we don't accept the use of default values for the second tree for defined
-   *                values in the first tree. If we use the default, a null value or NoSuchElementException
-   *                error will skip the corresponding input node.
+   *  @param strict if `true`, default values for the second tree are not used and nodes for which the key
+   *                doesn't match are ignored. If `false`, a `null` result or NoSuchElementException
+   *                error will also ignore the corresponding input node.
    *  @param op     an operator that transforms a T node with the matching current node to give the
    *                expected Option[U] value of the result node. If it instead returns null, the current
    *                node is skipped.
@@ -153,22 +153,20 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
 
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
-   *  'in parallel' too.
-   *  Default values for both trees are used but exceptions will end the transformation ungracefully.
-   *  Note that this operation is one of the most complex for trees, and it could be used to define most other
-   *  tree transformations that are defined here, albeit in a more costly way (performance wise.) ; for example
-   *  zip above can be expressed here by using a constant op tree ; various map operations can be expressed by
-   *  zipping a tree with itself etc...
+   *  'in parallel' too so that it can change at each imput node.
+   *  Input nodes are skipped when:
+   *  - the transformer tree corresponding node is `null` or doesn't exist in strict mode. If not strict,
+   *    it may still be skipped if the default returns null or throws a NoSuchElementException.
+   *  - or the same conditions for the operation tree
+   *  - or the operation applied on the source and transformer tree yields `null`.
    *  @param t   the transformer tree
-   *  @param strict is true if we don't accept the use of default values for the second tree or op tree for
-   *                defined values in the first tree : in that case we fall back on the zipped default : this
-   *                usually only makes sense if the T.noDefault or O.noDefault is an error or similar answer (e.g. empty)
+   *  @param strict acts similarly to the `zip` behaviour, but it can act on none, one or both T and O trees.
    *  @param op  a tree of operators operator that transform the current node using the corresponding transformer node
    *  @return the resulting transformed tree
    */
   def zip2[U,T<:PrefixTreeLike[K,_,T],O<:PrefixTreeLike[K,(T,This)=>Option[U],O],R<:PrefixTreeLike[K,U,R]](t:T,strict:Strictness,op:O with PrefixTreeLike[K,(T,This)=>Option[U],O])(implicit bf:PrefixTreeLikeBuilder[K,U,R]):R = {
     type Data = ((K,This),(T,O))
-    val values = (cur:Data)              => (cur._2._2.value.flatMap(_(cur._2._1,cur._1._2)), null)
+    val values = (cur:Data)              => { val r=cur._2._2.value.flatMap(_(cur._2._1,cur._1._2)); if (r==null) null else (r,null) }
     val next   = (child:(K,This),s:Data) => strict(child._1,s._2._1,s._2._2)
     toTreeSameKey(null.asInstanceOf[K],(t,op),values,next)
   }
@@ -186,7 +184,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
 
   /** Similar to the previous method, but now we can build a tree of a fully different nature (different keys.)
-   *  Note that this operation is the most complex for trees and it allows extensive tree transformations.
+   *  The conditions for skipping nodes are the same as above.
    *  @param t   the transformer tree
    *  @param strict is true if we don't accept the use of default values for the second tree or op tree for
    *                defined values in the first tree : in that case we fall back on the zipped default : this
@@ -216,11 +214,16 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     PrefixLoop.fold(u0,topFirst,f)(deepForeach(k0) _)
   def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,This)]) => U): U =
     PrefixLoop.fold(u0,topFirst,f)(deepForeachRec(k0) _)
-  //same, but the function used can change for each node and is handled through a companion tree
+
+  /** Fold left operations that descends through the subtrees.
+   *  Children are evaluated before their parent if topFirst is false.
+   *  The top tree is evaluated with k0 as key.
+   *  The operation is now handled through a companion tree and can change at each input node.
+   *  Input nodes that have no matching operation or whose matching operation is null are skipped.
+   */
   def deepFoldZip[U,O<:PrefixTreeLike[K,(U,(K,This))=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,(K,This))=>U,O]) =
     PrefixLoop.fold(u0,topFirst,(ctx:((K,This),O))=>ctx._1)(PrefixLoop.zip[K,V,(U,(K,This))=>U,O,This](_)(((k0,this),op)))
-  //same, but in addition the function used can refer to the node's parents
-  def deepFoldZipRec[U,O<:PrefixTreeLike[K,(U,Seq[((K,This))])=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,Seq[((K,This))])=>U,O]) =
+  def deepFoldZipRec[U,O<:PrefixTreeLike[K,(U,Seq[(K,This)])=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,Seq[(K,This)])=>U,O]) =
     PrefixLoop.fold(u0,topFirst,(ctx:Seq[((K,This),O)])=>ctx.view.map(_._1))(PrefixLoop.zipRec[K,V,(U,Seq[(K,This)])=>U,O,This](_)(((k0,this),op)))
 
 
@@ -244,10 +247,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   })((k0,this))
   //same, but the function used can change for each node and is handled through a companion tree
   def deepForeachZip[X,O<:PrefixTreeLike[K,((K,This),=>Unit)=>X,O]](k0:K)(op:O with PrefixTreeLike[K,((K,This),=>Unit)=>X,O]) =
-    PrefixLoop.loop[((K,This),O),(K,This)](_._1)(PrefixLoop.zip[K,V,((K,This),=>Unit)=>Any,O,This](_)(((k0,this),op)))
+    PrefixLoop.foreach[((K,This),O),(K,This)](_._1)(PrefixLoop.zip[K,V,((K,This),=>Unit)=>Any,O,This](_)(((k0,this),op)))
   //same, but in addition the function used can refer to the node's parents
   def deepForeachZipRec[O<:PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]](k0:K)(op:O with PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]) =
-    PrefixLoop.loop[Seq[((K,This),O)],Seq[(K,This)]](_.view.map(_._1))(PrefixLoop.zipRec[K,V,(Seq[(K,This)],=>Unit)=>Any,O,This](_)(((k0,this),op)))
+    PrefixLoop.foreach[Seq[((K,This),O)],Seq[(K,This)]](_.view.map(_._1))(PrefixLoop.zipRec[K,V,(Seq[(K,This)],=>Unit)=>Any,O,This](_)(((k0,this),op)))
 
   /** This class is used to iterate deeply through the tree.
    *  @param cur the current sequence of key for the current element (from bottom to top!)
@@ -337,6 +340,8 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
   import PrefixLoop._
   //generic transformations
+  //in all cases, v builds the values required to build the current node (null ignores that node)
+  //and x builds the next data for a child (null ignores that child)
   @throws(classOf[NoSuchElementException])
   def transformRec[X, L, W](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W]), x:((K, This),Seq[((K, This), X)])=> X) = (new RecurRecView[X,K,V,L,W,This] {
     def mapValues(ctx: Context): Values   = v(ctx)

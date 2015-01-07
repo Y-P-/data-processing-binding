@@ -1,30 +1,55 @@
 package utils.tree
 
-/** This object provides methods that are used in the package to iterate through trees.
+/** This object provides methods that are used to iterate through trees.
  *
- *  There are 2 classe of iterations:
- *  - these that use a global function to apply on all nodes
- *  - these that use a companion tree that provides for each node a companion function to apply on that node
- *  There are also two sub-classes:
- *  - these that require being able to reach into the parents (e.g. if you are writing the global key for each node)
- *  - these that only use the current node information
- *  Iterating into a tree also brings problem of its own; when reaching a node, you may want to (not exclusive):
- *  - do something before iterating on the chidren
- *  - do something after having iterated on the children
+ *  This algorithm is rather general, and many flavors can be derived from it.
+ *  This generality is handled through the Context abstract type, which comes
+ *  in four flavors:
+ *  - (K,This) : the processing is basic, and the methods used can only access
+ *               the current child key/value pair. This is usually the most
+ *               efficient iteration process.
+ *               the trait for this are:
+ *               - `RecurNoData`
+ *               - `Standalone`
+ *  - Seq[(K,This)] : the processing is deep, and the methods used can access
+ *               the current child key/value pair, but also that of any of its
+ *               parents.
+ *               - `RecurNoData`
+ *               - `Standalone`
+ *  - ((K,This),X) : the processing is complex, and the methods used can access
+ *               some additional, user provided, data of type X. This data may
+ *               change for each node and is provided through a nextX method.
+ *               - `RecurWithData`
+ *               - `Layered`
+ *  - Seq[((K,This),X)] : the processing is both deep and complex. This is of
+ *               course the least efficient processing.
+ *               - `RecurWithData`
+ *               - `Layered`
  *
- *  In addition, in a tree, usual filtering operations have to be adapted: filtering can depend on the position
- *  of an element in the tree, not only its value. This is unlike usual collections where most often position is
- *  not significant : the place of an object in the tree carries semantic. We assume that the easiest way to carry
- *  such semantic is through 'zip like' operations, where a companion tree is unwound in parallel with the current
- *  tree : each companion node can bear relevant information to apply to the current node. In general, the following
- *  rule is assumed:
- *  - if a companion value is None, then that node is 'skipped', but not its children
- *  - if it is Some(null), then that node and children are skipped
- *  - if it is Some(x), then iteration proceeds normally on that node
- *  Note that not invoking the child recursion (which is usually provided as a =>Unit parameter) is the way for a
- *  node to process itself but not its children.
+ *  There are also three kinds of iteration that are defined:
+ *  - Simple iteration through the nodes ; it can be used either for side-effects
+ *    (~ foreach) or building a single result (~ fold)
+ *    the trait for this is `Iterate`
+ *  - Map-like operations where the input node children are either ignored or
+ *    transformed to one output node ; the result is a tree that is smaller
+ *    than the input tree.
+ *    the trait for this is `RecurBuilder`
+ *  - Flatmap-like operations where the input node result can be enriched with
+ *    additional nodes. This may involves replacing/merging/ignoring the additional
+ *    nodes, depending on the strategy used and presence of key conflicts.
+ *    the trait for this is `ExpandRecurBuilder`
+ *  When the iteration produces a tree like structure, two kinds are available:
+ *  - Views, which only implement `PrefixTraversableOnce` ; they can be seen as
+ *    lightweight trees as they don't hold the whole tree data but are usually
+ *    backed by an original tree and appropriate transformations. The traits
+ *    that produce Views contain View in their name.
+ *  - Trees, which implement `PrefixTreeLike` which usually involves building
+ *    a full data structure. The traits that produce Trees contain Tree in their name.
  *
- *  All of these cases have to be handled, which account in a large measure to the apparent complexity of this object.
+ *  Filtering operation are inherent to the algorithm.
+ *  Precisely, the following conditions always hold:
+ *  - if `nextX` returns `null`, the child for which X was computed is ignored
+ *  - if `mapValue` returns `null`, the node for which it was called is ignored
  */
 object PrefixLoop {
 
@@ -44,10 +69,12 @@ object PrefixLoop {
    *  Usually, if the provided traits are used (or the appropriate combination given as
    *  an abstract class below), then the user only has to concentrate on two methods:
    *  - `def mapValues(ctx:Context):Values` which is the transformation itself (and must
-   *     call `recur` in some way.)
+   *     call `recur` at some point.) ; it is allowed to return `null`, which means that
+   *     nothing will get produced for that context.
    *  - `def nextX(child:(K,This),ctx:Context):X` which, when external data is required
    *    for the transformation, provides the next layer of data for a given child within
-   *    a given context.
+   *    a given context ; it is allowed to return `null`, which means that nothing will
+   *    be produced for that child.
    *
    *  @tparam K the key type for the tree we are working on
    *  @tparam V the value type for the tree we are working on
@@ -64,7 +91,7 @@ object PrefixLoop {
     type Values>:Null   //some kind of data required to build the result
     type Result         //Result produced by the recursion : null value is possible but is reserved (skipped node)
 
-    /** this builds the `values` from a given context; very user dependent */
+    /** this builds the `values` from a given context; very context dependent */
     protected def mapValues(ctx:Context):Values
 
     /** given some Values and a Context, builds the converted result and associated key.
@@ -92,10 +119,8 @@ object PrefixLoop {
                      for (child <- getCurrent(ctx)._2)
                        nextData(child, ctx) match {
                          case null =>
-                         case d    => childContext(d,ctx) match {
-                           case null =>
-                           case c    => val r=recur(c); if (loop!=null && r!=null) loop(r)
-                         }
+                         case d    => val r=recur(childContext(d,ctx))
+                                      if (loop!=null && r!=null) loop(r)
                        }
                    )
     }
@@ -182,7 +207,10 @@ object PrefixLoop {
     type Result=(L,R)
     /** fetches the W value for the current node result */
     protected def getValue(v:Values):Option[W]
-    /** fetches the L key for the current node result */
+    /** fetches the L key for the current node result.
+     *  A proper transformation should never result in conflicting L keys.
+     *  This can only be ensured by the user.
+     */
     protected def getResultKey(v:Values,ctx:Context):L
     /** Running against the current tree */
     @throws(classOf[NoSuchElementException])
@@ -202,16 +230,15 @@ object PrefixLoop {
     protected def bf:PrefixTreeLikeBuilder[L,W,R]
     /** the method that provides the default function for a given Value. Often, it is built using the next two methods.*/
     protected def getDefault(v:Values):L=>R
-    /** The method that creates the L=>R default function from the initial K=>This default function. */
-    protected def buildDefault(ctx:Context,default:K=>This): L=>R
 
-    /** a method that is useful for building default functions. */
+    //methods that help in converting a source K=>This default to a L=>R default
+    /** The method that creates the L=>R default function from a given K=>This default function. */
+    protected def buildDefault(ctx:Context,default:K=>This): L=>R
+    /** a method that builds the result for a given child ; it is an extract from the standard algorithm,
+     *  adapted to deal with defaults (throws exception). */
     protected def stdDefault(ctx:Context,child:(K,This)):R = (nextData(child, ctx) match {
       case null => throw new PrefixTreeLike.NoDefault(child._1)
-      case d    => childContext(d,ctx) match {
-        case null => throw new PrefixTreeLike.NoDefault(child._1)
-        case c    => recur(c)
-      }
+      case d    => recur(childContext(d,ctx))
     })._2
 
     protected def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result = {
@@ -235,7 +262,9 @@ object PrefixLoop {
      */
     protected def merge(ctx:Context,r1:Result,r2:Result):R
 
-    /** This actually merges the children for the given context
+    /** This actually merges the children for the given context ; indeed, when expanding with
+     *  additional children, there is the possibility of conflict between keys, and this has to
+     *  be solved in some way.
      */
     protected def doMerge(ctx:Context,additional:Iterable[Result],loop:(Result=>Any) => Unit)(g:Result=>Any):Unit = {
       val add  = additional.toBuffer
@@ -300,6 +329,11 @@ object PrefixLoop {
       val k = reverseKey(l)
       stdDefault(ctx,(k,defa(k)))
     }
+  }
+  trait WithThisTreeDefault extends TreeRB {
+    type This <: PrefixTreeLike[K,V,This]
+    /** The method that creates the L=>R default function from the source default function if it exists. */
+    protected def buildStdDefault(ctx:Context): L=>R = buildDefault(ctx,getCurrent(ctx)._2.default)
   }
 
   /** These traits define common uses for the Values type.
@@ -413,7 +447,7 @@ object PrefixLoop {
   }
   /** Generalizes the method to loop through a tree.
    */
-  def loop[Context,X](extract:Context=>X)(g:(((X , => Unit) => Any) => ((Context, => Unit) => Unit)) => Unit):Unit =
+  def foreach[Context,X](extract:Context=>X)(g:(((X , => Unit) => Any) => ((Context, => Unit) => Unit)) => Unit):Unit =
     g(x => if (x==null) null else (ctx,recur) => x(extract(ctx),recur))
 
   /** Defines the general behavior when zipping:
