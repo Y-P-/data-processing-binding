@@ -14,29 +14,35 @@ package utils.tree
  *  - Seq[(K,This)] : the processing is deep, and the methods used can access
  *               the current child key/value pair, but also that of any of its
  *               parents.
+ *               the trait for this are:
  *               - `RecurNoData`
  *               - `Standalone`
  *  - ((K,This),X) : the processing is complex, and the methods used can access
  *               some additional, user provided, data of type X. This data may
  *               change for each node and is provided through a nextX method.
+ *               the trait for this are:
  *               - `RecurWithData`
  *               - `Layered`
  *  - Seq[((K,This),X)] : the processing is both deep and complex. This is of
  *               course the least efficient processing.
+ *               the trait for this are:
  *               - `RecurWithData`
  *               - `Layered`
  *
  *  There are also three kinds of iteration that are defined:
  *  - Simple iteration through the nodes ; it can be used either for side-effects
  *    (~ foreach) or building a single result (~ fold)
- *    the trait for this is `Iterate`
+ *    the base trait for this is `Iterate`
  *  - Map-like operations where the input node children are either ignored or
  *    transformed to one output node ; the result is a tree that is smaller
- *    than the input tree.
+ *    than the input tree : it is a 1 -> 0,1 transformation
  *    the trait for this is `RecurBuilder`
  *  - Flatmap-like operations where the input node result can be enriched with
  *    additional nodes. This may involves replacing/merging/ignoring the additional
- *    nodes, depending on the strategy used and presence of key conflicts.
+ *    nodes, depending on the strategy used and presence of key conflicts :
+ *    it is a 1 -> 0,n transformation and it can be quite expensive when node
+ *    conflicts arise (same key), which may result in partial tree merges, depending
+ *    on the strategyu chosen to handle conflicts.
  *    the trait for this is `ExpandRecurBuilder`
  *  When the iteration produces a tree like structure, two kinds are available:
  *  - Views, which only implement `PrefixTraversableOnce` ; they can be seen as
@@ -57,17 +63,15 @@ object PrefixLoop {
    *
    *  It lets do most recursive calls that apply to trees, including map-like or
    *  even flatMap-like transformations. The sheer number of possible combinations
-   *  will not make it possible to give a variant of each possible uses, which are
-   *  almost limitless.
+   *  will not make it possible to give a variant of each possible uses.
    *
    *  It is configurable by mixing in the appropriate subtraits.
-   *  Most 'internal' methods are made final on mixin to ensure that only compatible
-   *  are mixed together. The traits are 'orthogonal', in that they each define a set
-   *  of the required methods : in the end, a number of traits must be mixed together
-   *  to get a working class (or other implementations for the missing methods provided.)
+   *  Many methods are made final to ensure that only compatible traits are mixed together.
+   *  Many traits are 'orthogonal', in that they each define a set of the required methods :
+   *  in the end, a number of traits must be mixed together to get a working class.
    *
-   *  Usually, if the provided traits are used (or the appropriate combination given as
-   *  an abstract class below), then the user only has to concentrate on two methods:
+   *  Usually, if the provided traits are used (or the appropriate combination provided
+   *  through an abstract class), then the user only has to concentrate on two methods:
    *  - `def mapValues(ctx:Context):Values` which is the transformation itself (and must
    *     call `recur` at some point.) ; it is allowed to return `null`, which means that
    *     nothing will get produced for that context.
@@ -75,6 +79,8 @@ object PrefixLoop {
    *    for the transformation, provides the next layer of data for a given child within
    *    a given context ; it is allowed to return `null`, which means that nothing will
    *    be produced for that child.
+   *
+   *  This is not a trait to ensure sharing the base algorithm.
    *
    *  @tparam K the key type for the tree we are working on
    *  @tparam V the value type for the tree we are working on
@@ -144,6 +150,8 @@ object PrefixLoop {
   trait RecurWithData extends Recur {
     type X  //user type
     type Data = ((K,This),X)
+    /** Extracts the Data for the current node in the context */
+    protected def getCurrentX(ctx:Context):X
     /** this builds the user data for a given context and child; very user dependent */
     protected def nextX(child:(K,This),ctx:Context):X
     final protected def nextData(child:(K,This),ctx:Context) = nextX(child, ctx) match {
@@ -164,17 +172,20 @@ object PrefixLoop {
     final protected def initialize(d0:Data):Context = Seq(d0)
   }
 
-  /** These trait define how the current element is retrieved: this depends on the presence of X and
-   *  on the Context type. Together, they are the basis for recursions on trees.
+  /** These classes define how the current element is retrieved: this depends on the presence of X and
+   *  on the Context type. Together, they are the basis for recursions on trees. As abstract classes they
+   *  let share most of the basic methods.
    */
   abstract class RecWithDataRB extends RecurWithData with Layered {
-    final def getCurrent(ctx:Context):(K,This) = ctx.head._1
+    final protected def getCurrent(ctx:Context):(K,This) = ctx.head._1
+    final protected def getCurrentX(ctx:Context):X = ctx.head._2
   }
   abstract class RecNoDataRB extends RecurNoData with Layered {
     final protected def getCurrent(ctx:Context):(K,This) = ctx.head
   }
   abstract class BasicWithDataRB extends RecurWithData with Standalone {
     final protected def getCurrent(ctx:Context):(K,This) = ctx._1
+    final protected def getCurrentX(ctx:Context):X = ctx._2
   }
   abstract class BasicNoDataRB extends RecurNoData with Standalone {
     final protected def getCurrent(ctx:Context):(K,This) = ctx
@@ -253,7 +264,6 @@ object PrefixLoop {
   ////////////////////////////////////////////////////////////////////////////////////
 
   //we want to maximize code sharing
-  //Expanding is a complex matter, and we may give up on some optimizations
   abstract class ExpandRecurBuilder extends RecurBuilder with ValueLWDE {
     /** defines how to handle key conflict
      *  @param ctx is the parent context
@@ -284,13 +294,15 @@ object PrefixLoop {
   }
 
   abstract class ExpandRecWithDataRB extends ExpandRecurBuilder with RecurWithData with Layered {
-    final def getCurrent(ctx:Context):(K,This) = ctx.head._1
+    final protected def getCurrent(ctx:Context):(K,This) = ctx.head._1
+    final protected def getCurrentX(ctx:Context):X = ctx.head._2
   }
   abstract class ExpandRecNoDataRB extends ExpandRecurBuilder with RecurNoData with Layered {
     final protected def getCurrent(ctx:Context):(K,This) = ctx.head
   }
   abstract class ExpandBasicWithDataRB extends ExpandRecurBuilder with RecurWithData with Standalone {
     final protected def getCurrent(ctx:Context):(K,This) = ctx._1
+    final protected def getCurrentX(ctx:Context):X = ctx._2
   }
   abstract class ExpandBasicNoDataRB extends ExpandRecurBuilder with RecurNoData with Standalone {
     final protected def getCurrent(ctx:Context):(K,This) = ctx
@@ -380,98 +392,100 @@ object PrefixLoop {
     type K=K0
     type V=V0
     type This=T0
+    //that's it mostly: Values is nothing specific. But it cannot be Null (ignored), nor Unit (must be >:Null) ; so Context is fine.
     type Values = Context
+    //redefine buildResult in a more pratictal way: having now twice the same context as parameter is a bit redundant
     protected def deepLoop(ctx:Context,loop:(Result=>Any) => Unit):Result
+    //fixes mapValues
     final protected def mapValues(ctx:Context):Values = ctx
+    //fixes buildResult
     def buildResult(ctx:Context,v:Values,loop:(Result=>Any) => Unit):Result = deepLoop(ctx,loop)
     /** Running against the current tree. */
     @throws(classOf[NoSuchElementException])
     final def apply(d0:Data): Result = get(d0)
   }
 
-  /** Actual classes for deep iteration in the tree.
+  /** Defines some common behavior when the iteration deals with applying a method to each node.
+   *  Actually the most common use!
    */
-  abstract class LoopRecWithData[X,R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends RecWithDataRB with Iterate[X,R0,K,V,T]
-  abstract class LoopWithData[X,R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends BasicWithDataRB with Iterate[X,R0,K,V,T]
-  abstract class LoopRecNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends RecNoDataRB with Iterate[Nothing,R0,K,V,T]
-  abstract class LoopNoData[R0,K,V,T<:PrefixTraversableOnce[K,V,T]] extends BasicNoDataRB with Iterate[Nothing,R0,K,V,T]
-
-  /**
-   * This class provides a way iterates through the tree while unwinding O in parallel and applying f to all elements
-   */
-  class ZipRec[K,V,O<:PrefixTreeLike[K,_,O],T<:PrefixTraversableOnce[K,V,T]](f:(Seq[((K,T),O)],=>Unit)=>Any) extends LoopRecWithData[O,Unit,K,V,T] {
-    protected def nextX(child:(K,This), ctx:Context) = try { ctx.head._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
+  protected[this] trait FuncIterate[K,V,O,T<:PrefixTraversableOnce[K,V,T]] extends Iterate[O,Unit,K,V,T] {
+    protected[this] def f:(Context,=>Unit)=>Any
     protected def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
   }
-  /**
-   * builds a tuned up version of ZipRec.
-   * @param h a method to transform F (often a function) into the function of two arguments expected by ZipRec:
-   *          - Seq[((K,This),O)], the Context that is built while unwinding the trees
+  /** Adds in the case where we are zipping with a companion tree.
+   *  Here, the companion tree contains a type F, which the user can transform into an appropriate function.
+   */
+  protected[this] trait ZipFuncIterate[K,V,F,O<:PrefixTreeLike[K,F,O],T<:PrefixTraversableOnce[K,V,T]] extends FuncIterate[K,V,O,T] { this:RecurWithData =>
+    //this is used to convert a more user friendly function F into the required function which operates on Context
+    protected[this] val h:F=>(Context,=>Unit)=>Unit
+    val f:(Context,=>Unit)=>Unit = (ctx,recur)=>getCurrentX(ctx).value match {
+      case None    => recur
+      case Some(g) => if (g!=null) h(g)(ctx,recur)
+    }
+    protected def nextX(child:(K,This), ctx:Context):O = try { getCurrentX(ctx)(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
+  }
+
+  /** builds a deep iterator that unwinds the operation tree in parallel with the input tree.
+   * @param h0 a method to transform F (a user-provided function) into the function of two arguments that is expected:
+   *          - the Context that is built while unwinding the trees
    *          - =>Unit, the Recursion call that is built while unwinding the trees
    *          And which returns Unit
    *          It is assumed that:
    *          - if a node in O contains None, then the recursion proceeds, but (obviously), the current node is skipped
    *          - if a node in O contains Some(null), then the current node and its children are skipped
-   *          - otherwise, the recursion proceeds normally
+   *          - otherwise, the recursion proceeds normally and the matching function is applied on the current node
    * @tparam K the key type
    * @tparam V the value type
    * @tparam This the tree type
-   * @tparam F some data to work on
+   * @tparam F the type provided by the user ; usually a function
    * @tparam O the tree type for F
    *
-   * @return a ZipRec that satisfies all the previous conditions
+   * @return a deep tree iterator that applies F on the nodes of the tree
    */
-  def zipRec[K,V,F,O<:PrefixTreeLike[K,F,O],This<:PrefixTraversableOnce[K,V,This]](h:F=>(Seq[((K,This),O)],=>Unit)=>Unit) =
-    new ZipRec[K,V,O,This](zipBase(h,_.head._2.value))
-
-  //Same as above, but f doesn't reach to the parents
-  class Zip[K,V,O<:PrefixTreeLike[K,_,O],T<:PrefixTraversableOnce[K,V,T]](f:(((K,T),O),=>Unit)=>Any) extends LoopWithData[O,Unit,K,V,T] {
-    protected def nextX(child:(K,This), ctx:Context) = try { ctx._2(child._1) } catch { case _:NoSuchElementException => null.asInstanceOf[O] }
-    protected def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
+  def zipRec[K,V,F,O<:PrefixTreeLike[K,F,O],This<:PrefixTraversableOnce[K,V,This]](h0:F=>(Seq[((K,This),O)],=>Unit)=>Unit) = new RecWithDataRB with ZipFuncIterate[K,V,F,O,This] {
+    val h=h0
   }
-  //builds a tuned up version of Zip by providing a function and a tree of F ; the function is applied to F to get an appropriate function
-  //to use in the transformation. F is often itself a function. See uses in deepForeachZip
-  def zip[K,V,F,O<:PrefixTreeLike[K,F,O],This<:PrefixTraversableOnce[K,V,This]](h:F=>(((K,This),O),=>Unit)=>Unit) =
-    new Zip[K,V,O,This](zipBase(h,_._2.value))
+  def zip[K,V,F,O<:PrefixTreeLike[K,F,O],This<:PrefixTraversableOnce[K,V,This]](h0:F=>(((K,This),O),=>Unit)=>Unit) = new BasicWithDataRB with ZipFuncIterate[K,V,F,O,This] {
+    val h=h0
+  }
+  /** builds a deep iterator.
+   * @param h0 the function of two arguments that is expected:
+   *          - the Context that is built while unwinding the trees
+   *          - =>Unit, the Recursion call that is built while unwinding the trees
+   *          And which returns Unit
+   *          That function will be called on each node.
+   * @tparam K the key type
+   * @tparam V the value type
+   * @tparam This the tree type
+   * @tparam O the tree type for F
+   *
+   * @return a deep tree iterator that applies F on the nodes of the tree
+   */
+  def loopRec[K,V,This<:PrefixTraversableOnce[K,V,This]](h0:(Seq[(K,This)],=>Unit)=>Any) = new RecNoDataRB with FuncIterate[K,V,Nothing,This] {
+    val f=h0
+  }
+  def loop[K,V,This<:PrefixTraversableOnce[K,V,This]](h0:((K,This),=>Unit)=>Any) = new BasicNoDataRB with FuncIterate[K,V,Nothing,This] {
+    val f=h0
+  }
 
-  //Useful for recursive iterative operations
+  //Useful for fold operations, where we have to update a 'global' result at each traversed node
   def fold[U,Context](u0:U,topFirst:Boolean,f: (U, Context) => U)(g:((Context, =>Unit) => Unit) => Unit):U = {
     var u = u0
     g(if (topFirst) (ctx,recur) => { u=f(u,ctx); recur } else (ctx,recur) => { recur; u=f(u,ctx) })
     u
   }
-  def fold[U,Context,X](u0:U,topFirst:Boolean,extract:Context=>X)(g:(((U, X) => U) => ((Context, => Unit) => Unit)) => Unit) = {
+  //id above, but with an extractor Context => P involved
+  def fold[U,Context,P](u0:U,topFirst:Boolean,extract:Context=>P)(g:(((U, P) => U) => ((Context, => Unit) => Unit)) => Unit) = {
     var u = u0
     g(x => if (x==null) null else if (topFirst) (ctx,recur) => { u=x(u,extract(ctx)); recur } else (ctx,recur) => { recur; u=x(u,extract(ctx)) })
     u
   }
-  /** Generalizes the method to loop through a tree.
-   */
-  def foreach[Context,X](extract:Context=>X)(g:(((X , => Unit) => Any) => ((Context, => Unit) => Unit)) => Unit):Unit =
-    g(x => if (x==null) null else (ctx,recur) => x(extract(ctx),recur))
-
-  /** Defines the general behavior when zipping:
-   *  - if we have None as companion, ignore the current node but process the children
-   *  - if we have Some(null), ignore the current node and its children
-   *  - otherwise, process he current node and its children
-   *  This is used mostly to use companion trees for zip traversals, that don't contain functions on the
-   *  full context, but functions on a part of the context (usually only the keys or the (key,this) pair.)
-   *  For example in PrefixTraversableOnce.deepForeachZip the functions work only on (K,This) instead of
-   *  ((K,This),O), and this often makes much more sense (but O has to be in the context to be unwound in
-   *  parallel with This)
-   *
-   *  @param h     is a transformation from the companion tree element to a function usable in the transformation
-   *  @param value indicates how the F value is fetched from the Context
-   *  @return a function usable in Zip/ZipRec
-   *  @tparam Context is the context type for the kind of transformation involved
-   *  @tparam F is the kind of value in the companion tree
-   *  @see zip,zipRec for use
-   */
-  def zipBase[Context,F](h:F=>((Context,=>Unit)=>Unit),value:Context=>Option[F]):(Context,=>Unit)=>Unit = (ctx,recur)=>value(ctx) match {
-    case None    => recur
-    case Some(g) => if (g!=null) h(g)(ctx,recur)
+  //convenient for the rather usual case where the user manipulates a (P , => Unit) => Any function to work with,
+  //rather than the less user-friendly (Context,=>Unit)=>Unit one.
+  def extractor[Context,P](extract:Context=>P):(((P , => Unit) => Any))=>(Context,=>Unit)=>Unit = g => (ctx,recur) => extract(ctx) match {
+    case null =>
+    case x    => g(x,recur)
   }
-
 
   ////////////////////////////////////////////////////////////////////////////////////
   ///                    Classes for mapLike transformations                       ///
@@ -482,14 +496,6 @@ object PrefixLoop {
    *  - with or without access to the parents
    *  - using same key as input or transforming the key
    *  - building Views (PrefixTraversableOnce) or Trees (PrefixTreeLike)
-   *
-   *  Most of the methods involved are quite short and we can expect the JIT compiler to inline them.
-   *  This explains why these classes may be useful : apart from making things easier for the user (why
-   *  force him to use a Context of Seq[Data] when he doesn't require access to the parents, or why force
-   *  him to return the same key when he doesn't expect to transform the keys ?), it can be expected that
-   *  the simpler classes should run quite faster for being (after inlining) much simpler!
-   *
-   *  This would have to be verified with a real performance test though.
    */
   abstract class RecurRecView[X,K,V,L,W,T<:PrefixTraversableOnce[K,V,T]] extends RecWithDataRB with ViewRB with ValueLW with Binder[X,K,V,L,W,T,PrefixTraversableOnce.Abstract[L,W]]
   abstract class RecurRecTree[X,K,V,L,W,R<:PrefixTreeLike[L,W,R],T<:PrefixTraversableOnce[K,V,T]](implicit val bf:PrefixTreeLikeBuilder[L,W,R])  extends RecWithDataRB with OtherKeyDefault with ValueLWD with Binder[X,K,V,L,W,T,R]

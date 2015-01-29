@@ -14,6 +14,49 @@ import scala.concurrent.Await
  *  It shows that trees work even on sub-classes. As StringTree is an almost exact
  *  copy of PrefixTree, tests on StringTree also validate PrefixTree.
  */
+class TreeTests extends StandardTester {
+	import TreeTests._
+  @Test override def test():Unit = super.test()
+	def apply(file:Solver,out:PrintWriter) = {
+		implicit val o = out
+				import out._
+				var i=0
+				def t(f: =>Unit) = { println(s"----$i--------"); i+=1; f }
+		t(testPrint)
+		t(testMap1)
+		t(testMap2)
+		t(testMap3)
+		t(testFilter1)
+		t(testFilter2)
+		t(testSeqView)
+		t(testGet)
+		t(testBuildFromCanonical)
+		t(testSeqFlatMap)
+		t(testFlatMap)
+		t(testConstant)
+		t(testConstantMap)
+		t(testBasicDefault)
+		t(testDefFlatMap)
+		t(testBasicZip)
+		t(testBasicZipStrict)
+		t(testBasicRestrictZipStrict)
+		t(testBasicRestrictZip)
+		t(testZip2)
+		t(testZip2NonStrictAndFromFlatWithDefault)
+		t(testZipFull)
+		t(testZipFullView)
+		t(testForeach)
+		t(testFold)
+		t(testPushPull)
+		//navigable
+		//navigables in zip/other operations
+		//references
+		//references in zip/other operations
+		//val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
+		//println(r1.seqView().mkString("\n"))
+	}
+}
+
 object TreeTests {
   // test stripEmpty
 
@@ -272,7 +315,7 @@ object TreeTests {
           (Seq("f","d"),op1),
           (Seq("f","d","b"),op3)
       ))
-    implicit val b0 = PrefixTree.builder[String,String]  //we have PrefixTree et StringTree builders in view
+    implicit val b0 = PrefixTree.builder[String,String]  //we have PrefixTree and StringTree builders in view
     val rx = m1.zip2(m0,FULL_STRICT,opX)
     out.println(rx)
     val ry = m1.zip2(m0,FULL_STRICT,opY)
@@ -469,44 +512,7 @@ object TreeTests {
     Await.result(r, 10 millis)
   }
 
-  @Test class TreeTest extends StandardTester {
-    def apply(file:Solver,out:PrintWriter) = {
-      implicit val o = out
-      import out._
-      var i=0
-      def t(f: =>Unit) = { println(s"----$i--------"); i+=1; f }
-      t(testPrint)
-      t(testMap1)
-      t(testMap2)
-      t(testMap3)
-      t(testFilter1)
-      t(testFilter2)
-      t(testSeqView)
-      t(testGet)
-      t(testBuildFromCanonical)
-      t(testSeqFlatMap)
-      t(testFlatMap)
-      t(testConstant)
-      t(testConstantMap)
-      t(testBasicDefault)
-      t(testDefFlatMap)
-      t(testBasicZip)
-      t(testBasicZipStrict)
-      t(testBasicRestrictZipStrict)
-      t(testBasicRestrictZip)
-      t(testZip2)
-      t(testZip2NonStrictAndFromFlatWithDefault)
-      t(testZipFull)
-      t(testZipFullView)
-      t(testForeach)
-      t(testFold)
-      t(testPushPull)
-      //navigable
-      //navigables in zip/other operations
-      //references
-      //references in zip/other operations
-      //val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
-      //println(r1.seqView().mkString("\n"))
-    }
+  def main(args:Array[String]):Unit = {
+    (new TreeTests).apply(false,true)
   }
 }

@@ -87,7 +87,7 @@ object PushPull {
 
     /** converts the push/pull sequence through the given operator. */
     def run[U](op: ((K,Layer[K,V]),=>Unit) => U)(implicit executionContext:ExecutionContext):Future[Unit] =
-      Future { (new Layer[K,V](item)).deepForeach[U](null.asInstanceOf[K])(op) }
+      Future { (new Layer[K,V](item)).deepForeach(null.asInstanceOf[K])(op) }
   }
 
   /** Creates a pair for creating a PrefixTraversableOnce using a Push/Pull interface */

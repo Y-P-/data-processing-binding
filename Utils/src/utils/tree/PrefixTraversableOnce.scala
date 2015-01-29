@@ -114,8 +114,8 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    *  Both trees are explored 'in parallel' and each sub-node of this tree is transformed using the
    *  corresponding sub-node of the transformer tree using the provided `op`. The resulting tree is
    *  a subtree of the original tree (as far as keys are concerned) in that the operation only provides
-   *  result values (no result nodes), and some nodes may be skipped (so less nodes is possible) when op
-   *  returns null, the second tree contains a null for the current node, or the default from the second
+   *  result values (no result nodes), and some nodes may be skipped (so less nodes is possible) when `op`
+   *  returns null, the second tree contains a `null` for the current node, or the default from the second
    *  second tree exits with a NoSuchElementException.
    *  When the result is a PrefixLikeTree, it contains a default matching the input default.
    *  @param t      the transformer tree ; a node value that is null will skip the corresponding input node.
@@ -153,7 +153,7 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
 
   /** Similar to the previous method, but the operation is provided through a third tree which is explored
-   *  'in parallel' too so that it can change at each imput node.
+   *  'in parallel' too so that it can change at each input node.
    *  Input nodes are skipped when:
    *  - the transformer tree corresponding node is `null` or doesn't exist in strict mode. If not strict,
    *    it may still be skipped if the default returns null or throws a NoSuchElementException.
@@ -206,54 +206,64 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     transformRec(k0,(t,op),values,next)
   }
 
+  /** Iterates through all the nodes of the tree. For each node, this method invokes f for its side-effect.
+   *  The iteration order for the children of a given node depends on the underlying implementation for
+   *  retrieving said children. Top nodes get invoked before children nodes. However, f is passed a parameter
+   *  that is used to invoke the children : so depending where this invocation is done within f, it is
+   *  possible to get the side effect of children before or after the parent's one.
+   *  @param k0 an initial key for the top node (f requires it, but it may be irrelevant to your computation)
+   *  @param f, the operation to execute on each node. It has the following parameters:
+   *            (K,This) : the current node and its key
+   *            =>Unit   : a by-name parameter that should be evaluated somewhere to evaluate the current node
+   *                       children ; as a result, children invocation may also be skipped if you fail to invoke
+   *                       this parameter.
+   */
+  def deepForeach(k0:K)(f:((K,This),=>Unit)=>Any):Unit = PrefixLoop.loop[K,V,This](f)((k0,this))
+  /** Same as above, except that f can reach all the way to the top node within the call stack.
+   *  In the Seq[(K,This)], head refers to the current (lowest) node.
+   */
+  def deepForeachRec(k0:K)(f:(Seq[(K,This)],=>Unit)=>Any):Unit = PrefixLoop.loopRec[K,V,This](f)((k0,this))
+  /** Same as above, except that f is provided through a companion tree and can possibly change for each node.
+   *  For a given key, three possible cases:
+   *  - null or non existent (NoSuchElementException) matching operation: ignore that node and children
+   *  - node with None value: don't compute that node, but go on with the children
+   *  - node with a significant value: process normally
+   */
+  def deepForeachZip[O<:PrefixTreeLike[K,((K,This),=>Unit)=>Any,O]](k0:K)(op:O with PrefixTreeLike[K,((K,This),=>Unit)=>Any,O]):Unit =
+    PrefixLoop.zip[K,V,((K,This),=>Unit)=>Any,O,This](PrefixLoop.extractor(_._1))(((k0,this),op))
+  /** Same as above with the function being able to reach all the way to the top node
+   */
+  def deepForeachZipRec[O<:PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]](k0:K)(op:O with PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]):Unit =
+    PrefixLoop.zipRec[K,V,(Seq[(K,This)],=>Unit)=>Any,O,This](PrefixLoop.extractor(_.view.map(_._1)))(((k0,this),op))
+
+
   /** Fold left operations that descends through the subtrees.
    *  Children are evaluated before their parent if topFirst is false.
    *  The top tree is evaluated with k0 as key.
+   *  @param u0 the initial value
+   *  @param k0 the key associated with the top tree
+   *  @param topFirst if true, the children are evaluated after the parent
+   *  @param f the function that is applied on each node
+   *  @tparam U this type for the fold operation
    */
   def deepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,This)) => U): U =
     PrefixLoop.fold(u0,topFirst,f)(deepForeach(k0) _)
+  /** Same as above, but f can reach the current node parents
+   */
   def deepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,This)]) => U): U =
     PrefixLoop.fold(u0,topFirst,f)(deepForeachRec(k0) _)
-
-  /** Fold left operations that descends through the subtrees.
-   *  Children are evaluated before their parent if topFirst is false.
-   *  The top tree is evaluated with k0 as key.
-   *  The operation is now handled through a companion tree and can change at each input node.
-   *  Input nodes that have no matching operation or whose matching operation is null are skipped.
+  /** Same as above, but the function is provided through a companion tree.
+   *  See `deepForeachRec` for filtering behavior
    */
   def deepFoldZip[U,O<:PrefixTreeLike[K,(U,(K,This))=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,(K,This))=>U,O]) =
-    PrefixLoop.fold(u0,topFirst,(ctx:((K,This),O))=>ctx._1)(PrefixLoop.zip[K,V,(U,(K,This))=>U,O,This](_)(((k0,this),op)))
-  def deepFoldZipRec[U,O<:PrefixTreeLike[K,(U,Seq[(K,This)])=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,Seq[(K,This)])=>U,O]) =
-    PrefixLoop.fold(u0,topFirst,(ctx:Seq[((K,This),O)])=>ctx.view.map(_._1))(PrefixLoop.zipRec[K,V,(U,Seq[(K,This)])=>U,O,This](_)(((k0,this),op)))
-
-
-  /** A foreach that descends through the subtrees.
-   *  Children are all evaluated within the context of their parent, and
-   *  should be somewhere invoked through the =>Unit function parameter.
-   *  @param k0 an initial key for the top node
-   *  @param f/op, the operation to execute on each node.
-   *               (K,This) : the current node and its key (or sequence of parent node, head being current node)
-   *                =>Unit   : a by-name parameter that has to be evaluated somewhere to evaluate the current node children
-   *               if the call uses a function tree, then for a given key, three possible cases:
-   *               - matching null sub-tree: ignore that subtree
-   *               - subtree with None value: don't compute that node, but go on with the children
-   *               - subtree with a value: process normally
+    PrefixLoop.fold(u0,topFirst,(_:((K,This),O))._1)(PrefixLoop.zip[K,V,(U,(K,This))=>U,O,This](_)(((k0,this),op)))
+  /** Same as above with the function being able to reach all the way to the top node
    */
-  def deepForeach[X](k0:K)(f:((K,This),=>Unit)=>X) = (new PrefixLoop.LoopNoData[Unit,K,V,This] {
-    def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
-  })((k0,this))
-  def deepForeachRec[X](k0:K)(f:(Seq[(K,This)],=>Unit)=>X) = (new PrefixLoop.LoopRecNoData[Unit,K,V,This] {
-    def deepLoop(ctx:Context,loop:(Result=>Any)=>Unit):Result = f(ctx,loop(null))
-  })((k0,this))
-  //same, but the function used can change for each node and is handled through a companion tree
-  def deepForeachZip[X,O<:PrefixTreeLike[K,((K,This),=>Unit)=>X,O]](k0:K)(op:O with PrefixTreeLike[K,((K,This),=>Unit)=>X,O]) =
-    PrefixLoop.foreach[((K,This),O),(K,This)](_._1)(PrefixLoop.zip[K,V,((K,This),=>Unit)=>Any,O,This](_)(((k0,this),op)))
-  //same, but in addition the function used can refer to the node's parents
-  def deepForeachZipRec[O<:PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]](k0:K)(op:O with PrefixTreeLike[K,(Seq[(K,This)],=>Unit)=>Any,O]) =
-    PrefixLoop.foreach[Seq[((K,This),O)],Seq[(K,This)]](_.view.map(_._1))(PrefixLoop.zipRec[K,V,(Seq[(K,This)],=>Unit)=>Any,O,This](_)(((k0,this),op)))
+  def deepFoldZipRec[U,O<:PrefixTreeLike[K,(U,Seq[(K,This)])=>U,O]](u0:U,k0:K,topFirst:Boolean)(op:O with PrefixTreeLike[K,(U,Seq[(K,This)])=>U,O]) =
+    PrefixLoop.fold(u0,topFirst,(_:Seq[((K,This),O)]).view.map(_._1))(PrefixLoop.zipRec[K,V,(U,Seq[(K,This)])=>U,O,This](_)(((k0,this),op)))
 
   /** This class is used to iterate deeply through the tree.
-   *  @param cur the current sequence of key for the current element (from bottom to top!)
+   *  @param cur the sequence of key for the current element (from bottom to top: `cur.head=key` for deepest node)
    *  @param topFirst is true if an element appears before its children, false otherwise
    */
   protected class TreeIterator(cur:Seq[K],topFirst:Boolean) extends AbstractIterator[(Seq[K], This)] {
@@ -303,19 +313,22 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
       for (x <- iterator.toTraversable; r <- f(x._2)) yield ((x._1 ++ r._1, r._2))
   }
 
-  /** Creates the canonical flat representation of the tree.
+  /** Creates the canonical flat representation of the tree, that is the Iterable[(Seq[K], V)] that
+   *  represents the collection of developed path to each node that contains a significant value.
+   *  The canonical representation doesn't allow for building trees with `null` nodes (a path for
+   *  which the last key results in `null`)
    *  @return the canonical view of the tree
    */
   def seqView(topFirst:Boolean=true) = new SeqView(topFirst)
 
-  /** Appends all bindings of this tree to a string builder using start, end, and separator strings.
+  /** Appends all nodes of this tree to a string builder using start, end, and separator strings.
    *  The written text begins with the string `start` and ends with the string `end`.
-   *  Inside, the string representations of all bindings of this tree.
-   *  in the form of `key -> value` are separated by the string `sep`.
+   *  The form of `key -> node` represents the binding of a key to its associated node.
+   *  `sep` is used to separate sibblings.
    *
    *  @param b     the builder to which strings are appended.
    *  @param start the starting string.
-   *  @param sep   the separator string.
+   *  @param sep   the sibblings separator string.
    *  @param end   the ending string.
    *  @return      the string builder `b` to which elements were appended.
    */
@@ -339,9 +352,11 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
   }
 
   import PrefixLoop._
-  //generic transformations
-  //in all cases, v builds the values required to build the current node (null ignores that node)
-  //and x builds the next data for a child (null ignores that child)
+
+  /**generic transformations from this tree view to another tree view.
+   * in all cases, v builds the values required to build the current node (null ignores that node)
+   * and x builds the next data for a child (null ignores that child)
+   */
   @throws(classOf[NoSuchElementException])
   def transformRec[X, L, W](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W]), x:((K, This),Seq[((K, This), X)])=> X) = (new RecurRecView[X,K,V,L,W,This] {
     def mapValues(ctx: Context): Values   = v(ctx)
@@ -379,7 +394,8 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
     def mapValues(ctx: Context): Values   = v(ctx)
   })(k0,this)
 
-  //generic conversions to some PrefixTree
+  /**generic transformations from this tree view to a PrefixTree
+   */
   @throws(classOf[NoSuchElementException])
   def toTreeRec[X, L, W, R<:PrefixTreeLike[L,W,R]](k0:K, x0:X, v:Seq[((K, This), X)]=>(L, Option[W], L=>R), x:((K, This),Seq[((K, This), X)])=> X)(implicit bf:PrefixTreeLikeBuilder[L,W,R]) = (new RecurRecTree[X,K,V,L,W,R,This] {
     def reverseKey = null
@@ -429,12 +445,13 @@ object PrefixTraversableOnce {
     override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
   }
 
-  def empty[K,V] = new Abstract[K,V](None) {
-    def foreach[X](f0:((K,Abstract[K,V]))=>X):Unit = ()
+  private val empty0 = new Abstract[Nothing,Nothing](None) {
+    def foreach[X](f0:((Nothing,Abstract[Nothing,Nothing]))=>X):Unit = ()
     override def isNonSignificant = true
     override def isEmpty = true
     override def size = 0
   }
 
+  def empty[K,V] = empty0.asInstanceOf[Abstract[K,V]]
 }
 
