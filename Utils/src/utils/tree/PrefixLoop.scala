@@ -121,14 +121,46 @@ object PrefixLoop {
      */
     final protected def recur(ctx: Context):Result = mapValues(ctx) match {
       case null => null.asInstanceOf[Result]
-      case u    => buildResult(ctx, u,(loop:(Result=>Any)) =>
-                     for (child <- getCurrent(ctx)._2)
+      case u    => buildResult(ctx, u,(loop:(Result=>Any)) => {
+                     val node = getCurrent(ctx)._2
+                     for (child <- node)
                        nextData(child, ctx) match {
                          case null =>
                          case d    => val r=recur(childContext(d,ctx))
                                       if (loop!=null && r!=null) loop(r)
                        }
-                   )
+                   })
+    }
+    /** Applies the recursion on all the tree layers below ctx.
+     *  Accounts for references which are only handled once.
+     *
+     *  A node is walked through as soon as it is seen (even though it may be a reference),
+     *  and never walked again (even when not a reference) ; this is necessary to ensure that
+     *  if a node references an orphan tree, that tree is indeed walked through.
+     *  Because checking references is costly, this is made a separate method,
+     *  although a tree with no reference will work safely here too.
+     *
+     *  If you walk a tree containing references with the standard algorithm, you may walk over
+     *  the same nodes more than once (which may not be a problem), and if the tree loops on
+     *  itself you may loop indefinitely (which is definitely a problem.)
+     *  @param ctx  the context on which children we are looping
+     *  @param seen the map of nodes already seen
+     *  @return the Result for that ctx
+     */
+    final protected def recurRef(ctx: Context,seen:java.util.IdentityHashMap[This,This]):Result = mapValues(ctx) match {
+      case null => null.asInstanceOf[Result]
+      case u    => buildResult(ctx, u,(loop:(Result=>Any)) => {
+                     val node = getCurrent(ctx)._2
+                     if (!seen.containsKey(node)) {
+                       seen.put(node, node)
+                       for (child <- node)
+                         nextData(child, ctx) match {
+                           case null =>
+                           case d    => val r=recurRef(childContext(d,ctx),seen)
+                                        if (loop!=null && r!=null) loop(r)
+                         }
+                     }
+                   })
     }
 
     /** Applies the transformation
@@ -136,10 +168,11 @@ object PrefixLoop {
      *  @return the Result of the transformation
      */
     @throws(classOf[NoSuchElementException])
-    final def get(d0:Data): Result = recur(initialize(d0)) match {
-      case null => throw new NoSuchElementException
-      case r    => r
-    }
+    final def get(d0:Data)(implicit x:CheckRefs): Result =
+      if (x==NO_REFS) recur(initialize(d0)) else recurRef(initialize(d0),new java.util.IdentityHashMap[This,This]) match {
+        case null => throw new NoSuchElementException
+        case r    => r
+      }
   }
 
   //traits for cases with (or without) specific X data

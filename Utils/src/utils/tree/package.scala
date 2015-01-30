@@ -33,4 +33,10 @@ package object tree {
   val MERGE_OVERWRITE         = new MergeMode(3)
   val MERGE_REVERSE           = new MergeMode(4)
   val MERGE_REVERSE_OVERWRITE = new MergeMode(5)
+
+  /** Used to specify if the generic tree walking algorithm is supposed to check for references */
+  sealed class CheckRefs
+  object CheckRefs { implicit val default=NO_REFS }
+  val WITH_REFS = new CheckRefs
+  val NO_REFS   = new CheckRefs
 }
