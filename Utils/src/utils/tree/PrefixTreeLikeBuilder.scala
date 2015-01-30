@@ -54,26 +54,18 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
   def apply(v:V,tree:(K,Tree)*):Tree                                    = apply(Some(v),tree,null)
   def apply(v:V,tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree = apply(Some(v),tree,default)
 
-  /** Creates a full reference to a Node .
+  /** Creates a reference to a Node .
    *  A Tree Builder class may not support this feature.
    *  @param value   the value for that node ; if null, the value of the target is used
    *  @param default the default function for the new node ; if None, the value of the target is used
-   *  @param tree    the node from which the reference is built
-   *  @param path    the path from 'tree' to reach the referenced node
+   *  @param origin  the node from which the reference is built
+   *  @param path    the path of key from the origin to the referenced node
    *  @return a new Node that holds a reference to an existing Node
    */
-  def asRef(value:Option[V],default:Option[K=>Tree],origin:Tree,path:K*):Tree
-
-  // Some shortcuts to build references. Not all combinations are present : there
-  //  are too many for a feature that is seldom used.
-  /** builds a reference with a new value (not None) and default */
-  def asRef(v:V,default:K=>Tree,origin:Tree,path:K*):Tree = asRef(Some(v),Some(default),origin)
-  /** builds a reference with a new default */
-  def asRef(default:K=>Tree,origin:Tree,path:K*):Tree     = asRef(null,Some(default),origin)
-  /** builds a reference with a new value (not None) */
-  def asRef(v:V,origin:Tree,path:K*):Tree                 = asRef(Some(v),None,origin)
-  /** builds a full reference -the target node is unchanged in default or value- */
-  def asRef(origin:Tree,path:K*):Tree                     = asRef(null,None,origin)
+  def asRef(value:Option[V],default:K=>Tree,origin: =>Tree,path:K*):Tree
+  def asRef(default:K=>Tree,origin: =>Tree,path:K*):Tree
+  def asRef(value:Option[V],origin: =>Tree,path:K*):Tree
+  def asRef(origin: =>Tree,path:K*):Tree
 
   /** A builder of the same kind, ready to use */
   def newEmpty:PrefixTreeLikeBuilder[K,V,Tree]
@@ -206,13 +198,18 @@ object PrefixTreeLikeBuilder {
   /** This trait is used to create references to other nodes
    */
   trait Ref[K,+V,+This<:PrefixTreeLike[K,V,This]] { this:This=>
-    protected val origin:This //lazy because the likehood is a reference within the same tree
-    protected val path:Seq[K]
+    if (params.navigable.id!=0) throw new IllegalStateException("references cannot be navigable as a referenced node children would have more than one parent")
+    def valuex:Option[V] = null        //a value for this node (not referenced)
+    def defaultx: K=>This = null       //a default for this node (not referenced)
+    def state:Int                      //what is referenced=> 0: only tree, 0x10: tree & value, 0x01: tree & default, 0x11: all
+    protected val origin:This          //will be lazy because the likehood is a reference within the same tree
+    protected val path:Seq[K]          //the path to reach the referenced node from the origin
     protected[this] lazy val target:This = origin(path:_*) //lazy because we cannot evaluate this before the tree is built
     override def get(key: K) = target.get(key)
     override def iterator    = target.iterator
-    override def value       = target.value
-    override def default     = target.default
+    override def value       = if ((state & 0x10)==0) target.value   else valuex
+    override def default     = if ((state & 0x01)==0) target.default else defaultx
+    def isRef:Boolean        = true
   }
 
   /** Defines a builder for a tree type where both K and V are free */
@@ -235,7 +232,7 @@ object PrefixTreeLikeBuilder {
     def constant[K,V](v:V)(implicit p:P0[K,V]) = builder.constant(v)
 
     def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, Tree[K,V]] { type Params=P0[K,V] }
-    implicit def toBuilder[K,V](g:this.type)(implicit p:P0[K,V]) = g.builder(p)
+    implicit def toBuilder[K,V](g:this.type)(implicit p:P0[K,V]) = g.builder
   }
 
   /** Defines a builder for a tree type where K is fixed and V is free */

@@ -62,12 +62,10 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
   /** The value for the current node */
   def value: Option[V]
-
-  /** true if this is a tree which contains no information (no value, no children, no significant default)
-   */
+  /** Tells if this node references another node */
+  def isRef:Boolean = false
+  /** true if this is a tree which contains no information (no value, no children, no significant default) */
   def isNonSignificant = value.isEmpty && isEmpty
-
-  protected override def reversed = super.reversed
 
   /** Forces this PrefixTraversableOnce into some PrefixTreeLike representation.
    *  This is rather generic as it allows specific defaults for each node.
