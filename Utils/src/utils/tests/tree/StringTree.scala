@@ -40,14 +40,6 @@ object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
     override def initNav() = ()
   }
 
-  protected class Ref[V](valuex:Option[V], defaultx:K=>StringTree[V], val state:Int, originx: => StringTree[V], val path:K*)(implicit params:P0[V]) extends Abstract[V] with PrefixTreeLikeBuilder.Ref[K,V,StringTree[V]] {
-    lazy val origin   = originx
-    override def tree = target.tree
-    override def isRef = super[Ref].isRef
-  }
-
-
-
   /** The actual Parameters required to build a StringTree.
    *  These are similar with what is required for a PrefixTree, but the class actually differ.
    */
@@ -70,11 +62,6 @@ object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
       type Params = P0[V]
       def params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,StringTree[V]] = builder[V]
-
-      def asRef(value:Option[V],default:K=>Repr,origin: =>Repr, path:K*):Repr = new Ref[V](value,default,0x11,origin,path:_*)
-      def asRef(default:K=>Repr,origin: =>Repr, path:K*):Repr = new Ref[V](null,default,0x01,origin,path:_*)
-      def asRef(value:Option[V], origin: =>Repr, path:K*):Repr = new Ref[V](value,null,0x10,origin,path:_*)
-      def asRef(origin: =>Repr, path:K*):Repr = new Ref[V](null,null,0,origin,path:_*)
 
       def apply(v: Option[V], t: GenTraversableOnce[(String, StringTree[V])], d: String=>StringTree[V]) = {
         val t0 = params.emptyMap ++ t

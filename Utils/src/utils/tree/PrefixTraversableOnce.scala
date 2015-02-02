@@ -62,8 +62,6 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
 
   /** The value for the current node */
   def value: Option[V]
-  /** Tells if this node references another node */
-  def isRef:Boolean = false
   /** true if this is a tree which contains no information (no value, no children, no significant default) */
   def isNonSignificant = value.isEmpty && isEmpty
 

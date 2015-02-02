@@ -83,16 +83,6 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
     override def initNav() = ()
   }
 
-  /** This creates a reference on another node.
-   *  A reference relies on the other node for its children, and the referenced node may also provide the value or default.
-   *  Note that references prevent navigation : a referenced child would have more than one parent.
-   */
-  protected class Ref[K,V](valuex:Option[V], defaultx:K=>PrefixTree[K, V], val state:Int, originx: => PrefixTree[K,V], val path:K*)(implicit params:P0[K,V]) extends Abstract[K,V] with PrefixTreeLikeBuilder.Ref[K,V,PrefixTree[K,V]] {
-    lazy val origin   = originx
-    override def tree = target.tree
-    override def isRef = super[Ref].isRef
-  }
-
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass Abstract so as to minimize the memory footprint for each node.
    */
@@ -101,11 +91,6 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
       type Params = P0[K,V]
       val params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,Repr] = builder[K,V](params)
-
-      def asRef(value:Option[V], default:K=>Repr, origin: =>Repr, path:K*):Repr = new Ref[K,V](value,default,0x11,origin,path:_*)
-      def asRef(                 default:K=>Repr, origin: =>Repr, path:K*):Repr = new Ref[K,V](null,default,0x01,origin,path:_*)
-      def asRef(value:Option[V],                  origin: =>Repr, path:K*):Repr = new Ref[K,V](value,null,0x10,origin,path:_*)
-      def asRef(                                  origin: =>Repr, path:K*):Repr = new Ref[K,V](null,null,0x00,origin,path:_*)
 
       def apply(v: Option[V], t: GenTraversableOnce[(K, Repr)], d: K=>Repr) = {
         val t0 = params.emptyMap ++ t
