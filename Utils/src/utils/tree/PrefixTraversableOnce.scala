@@ -317,6 +317,11 @@ trait PrefixTraversableOnce[K, +V, +This <: PrefixTraversableOnce[K, V, This]]
    */
   def seqView(topFirst:Boolean=true) = new SeqView(topFirst)
 
+  /** Flattens the tree to it's canonical state as a sequence of pairs (key path, value)
+   *  Degenerate nodes cannot be represented in the canonical view.
+   */
+  def flatten:Seq[(Seq[K],V)] = seqView(true).toSeq
+
   /** Appends all nodes of this tree to a string builder using start, end, and separator strings.
    *  The written text begins with the string `start` and ends with the string `end`.
    *  The form of `key -> node` represents the binding of a key to its associated node.

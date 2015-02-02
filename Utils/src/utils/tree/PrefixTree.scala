@@ -92,10 +92,10 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
       val params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,Repr] = builder[K,V](params)
 
-      def apply(v: Option[V], t: GenTraversableOnce[(K, Repr)], d: K=>Repr) = {
+      def apply(v: Option[V], t: GenTraversableOnce[(K, Repr)], d: K=>Repr):Repr = {
         val t0 = params.emptyMap ++ t
         val t1 = if (p.stripEmpty) t0.filterNot(_._2.isNonSignificant) else t0
-        (if (params.navigable.id>0) -params.navigable.id else (if (v==None) 0x100 else 0)+(if (t.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0): @switch) match {
+        (if (params.navigable.id>0) -params.navigable.id else (if (v==None) 0x100 else 0)+(if (t1.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0): @switch) match {
           case 0x111 => new Abstract[K,V] { override def isNonSignificant = true }
           case 0x110 => new Abstract[K,V] { override val default = d }
           case 0x101 => new Abstract[K,V] { override val tree = t1 }

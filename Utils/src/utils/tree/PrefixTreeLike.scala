@@ -220,9 +220,9 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Similar to the previous method, but the result is a view and doesn't rebuild
    *  a new tree. Such views are only useful when relatively few elements are used ;
-   *  in other cases, it may be more performant to use filterAll.
+   *  in other cases, it may be more efficient to use filterAll.
    */
-  def filterView(p: ((K,Repr)) => Boolean): This = super.filter(null.asInstanceOf[K])(p,x => x._2.default)(newBuilder)
+  def filterView(p: ((K,Repr)) => Boolean): PrefixTraversableOnce[K,V,_] = super.filterView(null.asInstanceOf[K])(p)
 
   /** Returns a new tree obtained by removing all key/value pairs for which the predicate
    *  `p` returns `true`.
@@ -240,30 +240,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     for (kv <- this)
       if (p(kv)) res -= kv._1
     res
-  }
-
-  /** This class yields a filtered view of the current tree.
-   *  `default` apply and is filtered : an excluded key falls back on the noDefault method.
-   *  Some operations will not work on views, in particular all methods that return Repr.
-   *  A call to 'force' will create a full blown new Tree of `This` type..
-   */
-  protected class WithFilter(p: ((K,Repr)) => Boolean) extends PrefixTreeLike.Abstract[K,V,This#WithFilter] {
-    type P = Nothing
-    //useless
-    def -(key: K): This#WithFilter = ???
-    def params: Nothing = ???
-    protected[this] override def newBuilder: PrefixTreeLikeBuilder[K,V,This#WithFilter] = ???
-    def update1[W >: V, T >: This#WithFilter <: PrefixTreeLike[K,W,T]](kv: (K, T))(implicit bf: PrefixTreeLikeBuilder[K,W,T]): T = ???
-    //implementation
-    override def default:K=>Repr = self.asDefault(k => { val r=self(k); if (p(k,r)) new r.WithFilter(p) else { val r=self.params.noDefault(k); new r.WithFilter(p) } })
-    def get(key: K): Option[This#WithFilter] = self.get(key).filter(t=>p(key,t)).map(x => new x.WithFilter(p))
-    def iterator: Iterator[(K, This#WithFilter)] = self.iterator.filter(p).map(x => (x._1,new x._2.WithFilter(p)))
-    def value: Option[V] = self.value
-    def force:This = {
-      val bf = self.newBuilder
-      if (!isEmpty) for (x <- this) bf += ((x._1,x._2.force))
-      bf.result(self.value,self.default)
-    }
   }
 
   /**  Returns the value associated with a key, or a default value if the key is not contained in the tree.
@@ -594,6 +570,43 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     result
   }
 
+  /** Tries to turn a one level deep hierarchy to a map.
+   *  This will fail if any subtree exists.
+   *  Empty nodes (with no value) are skipped.
+   *  Order is preserved.
+   *  @param b a builder for the expected map result
+   *  @tparam M the expected map kind
+   */
+  def toMap[W>:V,M<:Map[K, W]](implicit b:scala.collection.mutable.Builder[(K, V), M]):M = {
+    for (v <- this) {
+      if (!v._2.isEmpty) throw new IllegalStateException("cannot transform hierarchy to map if not exactly 1 level deep")
+      if (v._2.value!=None) b += ((v._1,v._2.value.get))
+    }
+    b.result
+  }
+
+  /** Partitions this tree in two trees according to a predicate.
+   *
+   *  @param k0 a key for this tree.
+   *  @param p the predicate on which to partition.
+   *  @return  a pair of trees: the first tree contains all values from elements that
+   *           satisfy the predicate `p` and the second tree contains all values from
+   *           elements that don't. The relative order of the elements in the resulting
+   *           trees is the same as in the original tree.
+   *           Both trees may contain overlapping nodes (with the same key sequence),
+   *           but only one of these will contain a value.
+   *           Defaults are removed from the result.
+   */
+  def partition(k0:K)(p: ((K,This)) => Boolean): (Repr, Repr) = (new PrefixLoop.BasicNoDataRB with PrefixLoop.Iterate[Nothing,(This,This),K,V,This] {
+    protected def deepLoop(ctx:Data, loop: ((Result,Context)=>Any)=>Unit):Result = {
+      val l, r = newBuilder                                            //prepare buffer for accepted/non accepted nodes
+      loop { (x,c)=> l+=((c._1,x._1)); r+=((c._1,x._2)) }              //shuffle partitioned children between both buffers with the right key
+      if (p(ctx)) (l.result(ctx._2.value,null), r.result(None,null))   //build this result if accepted
+      else        (l.result(None,null),  r.result(ctx._2.value,null))  //build this result if rejected
+    }
+  }).get((k0,this))
+
+
   override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
 
   // Common generic transformations on PrefixTreeLike ; they all build a PreficTreeLike
@@ -692,120 +705,3 @@ object PrefixTreeLike {
   }
 
 }
-
-
-
-/*
-  def collect[B, That](pf: PartialFunction[A, B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    val b = bf(repr)
-    foreach(pf.runWith(b += _))
-    b.result
-  }
-
-  /** Builds a new collection by applying an option-valued function to all
-   *  elements of this $coll on which the function is defined.
-   *
-   *  @param f      the option-valued function which filters and maps the $coll.
-   *  @tparam B     the element type of the returned collection.
-   *  @tparam That  $thatinfo
-   *  @param bf     $bfinfo
-   *  @return       a new collection of type `That` resulting from applying the option-valued function
-   *                `f` to each element and collecting all defined results.
-   *                The order of the elements is preserved.
-   *
-   *  @usecase def filterMap[B](f: A => Option[B]): $Coll[B]
-   *    @inheritdoc
-   *
-   *    @param pf     the partial function which filters and maps the $coll.
-   *    @return       a new $coll resulting from applying the given option-valued function
-   *                  `f` to each element and collecting all defined results.
-   *                  The order of the elements is preserved.
-  def filterMap[B, That](f: A => Option[B])(implicit bf: CanBuildFrom[Repr, B, That]): That = {
-    val b = bf(repr)
-    for (x <- this)
-      f(x) match {
-        case Some(y) => b += y
-        case _ =>
-      }
-    b.result
-  }
-   */
-
-  /** Partitions this $coll in two ${coll}s according to a predicate.
-   *
-   *  @param p the predicate on which to partition.
-   *  @return  a pair of ${coll}s: the first $coll consists of all elements that
-   *           satisfy the predicate `p` and the second $coll consists of all elements
-   *           that don't. The relative order of the elements in the resulting ${coll}s
-   *           is the same as in the original $coll.
-   */
-  def partition(p: A => Boolean): (Repr, Repr) = {
-    val l, r = newBuilder
-    for (x <- this) (if (p(x)) l else r) += x
-    (l.result, r.result)
-  }
- */
-/*
-trait CanBuildFrom[-From, -Elem, +To] {
-// Creates a new builder
-def apply(from: From): Builder[Elem, To]
-}
-
-  /** runs through all entries which hold data.
-   *  @param key, the Key for the current (this) entry
-   */
-  def forDefined[U](key:K)(f:(K,This)=>U):Unit = {
-    if (value!=None) f(key,this)
-    for (x <- iterator) x._2.forDefined(x._1)(f)
-  }
-  /** Tries to turn a one level deep hierarchy to a map*/
-  def toMap:Map[K,V] = try {
-    val m = scala.collection.mutable.HashMap.empty[K,V]
-    for (v <- iterator) {
-      if (!v._2.isEmpty) throw new IllegalStateException("cannot transform hierarchy to map if not exactly 1 level deep")
-      m += ((v._1,v._2.value.get))
-    }
-    m.toMap
-  } catch {
-    case _:Throwable => throw new IllegalStateException("cannot transform hierarchy to a map"+this)
-  }
-
-  /** Adds or replaces T for the given sequence of keys */
-  def add[V1>:V,T>:This<:R[K,V1,T]](keys:Seq[K], tree:T): T = {
-    val x = keys(0)
-    if (keys.length==1) this +[V1,T] ((x,tree))
-    else {
-      val t = get(x) match {
-        case None    => throw new NullPointerException //builder.empty(None)
-        case Some(m) => m
-      }
-      val t1 = t.add[V1,T](keys.tail,tree)
-      this +[V1,T] ((x,t1))
-    }
-  }
-  /** Removes the value for the given sequence of keys.
-   *  If the result is empty and has no value, the truncated key is removed too.
-   *  This happens as long as the conditions holds walking up the sequence.
-   *  Ex: this rem ("a","b","c") first removes "a"->"b"->"c"
-   *      then it checks if "a"->"b" is still significant (has a proper value or non empty subtree)
-   *      if not it removes it, and in that case it proceeds to "a"...
-   */
-  def rem (keys:K*): This = {
-    if (keys.length==0) return this
-    val x = keys(0)
-    val m = get(x)
-    if (m.isEmpty)               this
-    else if (keys.length==1)     this - x
-    else {
-      val r = (m.get rem (keys.tail:_*))
-      if (r.isEmpty && r.value.isEmpty) this rem (keys.init:_*)
-      else                              repr.updated(x,r)
-    }
-  }
-
-  /** provides a global iterator ; that iterator is used to visit the whole sub-trees */
-  def seqIterator(topFirst:Boolean):Iterator[(Seq[K], This)] = new TreeIterator(Nil,topFirst)
-  /** flattens the tree to it's canonical state. */
-  def flatten:Seq[(Seq[K],This)] = seqIterator(true).toSeq
-*/
-

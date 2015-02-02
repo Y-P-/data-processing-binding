@@ -48,6 +48,7 @@ class TreeTests extends StandardTester {
 		t(testForeach)
 		t(testFold)
 		t(testPushPull)
+    t(testPartition)
 		//navigable
 		//navigables in zip/other operations
 		//references
@@ -510,6 +511,11 @@ object TreeTests {
     s.pull
     s.pull
     Await.result(r, 10 millis)
+  }
+
+  def testPartition(implicit out:PrintWriter) = {
+    //partition even/odd
+    out.println(m.partition(null)(x => x._2.value.map(_ % 2 == 0).getOrElse(false)))
   }
 
   def main(args:Array[String]):Unit = {
