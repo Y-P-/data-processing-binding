@@ -70,7 +70,9 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
    *  Default values usually are unsafe to navigate upwards.
    */
   protected class NavigableUnsafe[K,V](override val value:Option[V], override val tree:Map[K,PrefixTree[K,V]], override val default:K=>PrefixTree[K,V])(implicit params:P0[K,V])
-                      extends Abstract[K,V] with PrefixTreeLikeBuilder.Navigable[K, V, PrefixTree[K, V]]
+                      extends Abstract[K,V] with PrefixTreeLikeBuilder.Navigable[K, V, PrefixTree[K, V]] {
+    override def isNonSignificant = value.isEmpty && isEmpty && default==null //restore standard behavior: we don't nitpick on this classes
+  }
 
   /** The second implementation for navigable trees. Safe.
    *  Even default values will have a correct parent if they return an element isNavigable.

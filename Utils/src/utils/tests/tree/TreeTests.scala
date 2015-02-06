@@ -19,42 +19,39 @@ class TreeTests extends StandardTester {
   @Test override def test():Unit = super.test()
 	def apply(file:Solver,out:PrintWriter) = {
 		implicit val o = out
-				import out._
-				var i=0
-				def t(f: =>Unit) = { println(s"----$i--------"); i+=1; f }
-		t(testPrint)
-		t(testMap1)
-		t(testMap2)
-		t(testMap3)
-		t(testFilter1)
-		t(testFilter2)
-		t(testSeqView)
-		t(testGet)
-		t(testBuildFromCanonical)
-		t(testSeqFlatMap)
-		t(testFlatMap)
-		t(testConstant)
-		t(testConstantMap)
-		t(testBasicDefault)
-		t(testDefFlatMap)
-		t(testBasicZip)
-		t(testBasicZipStrict)
-		t(testBasicRestrictZipStrict)
-		t(testBasicRestrictZip)
-		t(testZip2)
-		t(testZip2NonStrictAndFromFlatWithDefault)
-		t(testZipFull)
-		t(testZipFullView)
-		t(testForeach)
-		t(testFold)
-		t(testPushPull)
-    t(testPartition)
+		import out._
+		def t(i:Int,f: =>Unit) = { println(s"--------$i--------"); f }
+		t(0,testPrint)
+		t(1,testMap1)
+		t(2,testMap2)
+		t(3,testMap3)
+		t(4,testFilter1)
+		t(5,testFilter2)
+		t(6,testSeqView)
+		t(7,testGet)
+		t(8,testBuildFromCanonical)
+		t(9,testSeqFlatMap)
+    t(10,testFlatMap)
+    t(11,testFlatMap1)
+		t(12,testConstant)
+		t(13,testConstantMap)
+		t(14,testBasicDefault)
+		t(15,testBasicZip)
+		t(16,testBasicZipStrict)
+		t(17,testBasicRestrictZipStrict)
+		t(18,testBasicRestrictZip)
+		t(19,testZip2)
+		t(20,testZip2NonStrictAndFromFlatWithDefault)
+		t(21,testZipFull)
+		t(22,testZipFullView)
+		t(23,testForeach)
+		t(24,testFold)
+		t(25,testPushPull)
+    t(26,testPartition)
 		//navigable
 		//navigables in zip/other operations
 		//references
 		//references in zip/other operations
-		//val r1 = StringTree.builder[Int](t1.seqView().flatMap(mapper _).toBuffer)
-		//println(r1.seqView().mkString("\n"))
 	}
 }
 
@@ -77,7 +74,7 @@ object TreeTests {
   val m0  = StringTree(7,Seq("d"->StringTree(4,Seq("a"->c1),(x:String)=>m),"f"->StringTree(6,"d"->StringTree(4,Seq("b"->c2)))))
 
   /*
-   * The same basic tree with complex default everywhere.
+   * almost same basic tree with complex default everywhere ; c13 differs (subtrees d and x reversed).
    * This is an extremely convoulted tree which loops on itself in several ways.
    */
   val (m1,amap1) = {
@@ -113,7 +110,7 @@ object TreeTests {
     c3  = StringTree(3,f3)
     c11 = StringTree(4,Seq("a"->c1,"b"->c2),f4)
     c12 = StringTree(5,Seq("c"->c3),f1)
-    c13 = StringTree(6,Seq("d"->c11,"x"->c12),f2)
+    c13 = StringTree(6,Seq("d"->c12,"x"->c11),f2)
     m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13),f3)
     (m,Array(m,c1,c2,c3,c11,c12,c13)) //an array for mapping operation from Int => StringTree[Int]
   }
@@ -121,7 +118,6 @@ object TreeTests {
   val amap = Array(m,c1,c2,c3,c11,c12,c13) //an array for mapping operation from Int => StringTree[Int]
 
   def mapper(i:Int) = amap(i-1).seqView()
-  def mapper1(i:Int) = amap(i-1)
 
   //tests the toString operation
   def testPrint(implicit out:PrintWriter) = out.println(m)
@@ -158,44 +154,39 @@ object TreeTests {
   def testSeqView(implicit out:PrintWriter) = m.seqView().foreach(out.println)
 
   //tests FlatMap for SeqView
+  //note that while the next test looks like it should yield the same results, it does not.
+  //this comes from the fact that expansion in sequence view is 'immediate', whereas it is hierarchical
+  //in the normal flatMap: hence while we have the same tree structure, some values do differ.
   def testSeqFlatMap(implicit out:PrintWriter) = StringTree.fromFlat(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
 
-  //tests FlatMap for SeqView
-  def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](MERGE,false)(mapper1 _).seqView().foreach(out.println)
+  //tests FlatMap
+  //For any level, we have:
+  // - old keys stand, and their value is now F(old value)
+  // - new keys developed as from the transformation for their value (Fv).
+  // - overlapping keys merge
+  //  F(m)   : d=F(c11), e=F(c12), f=F(c13) // Fv(7)=c13 => d=c11, x=c11 // d=merge(F(c11),c11)
+  //  F(c13) : d=F(c11), e=F(c12) // Fv(6)=c12 => c=c3 // no merge
+  //  F(c12) : c=F(c3) // Fv(5)=c11 => a=c1, b=c2 // no merge
+  //  F(c11) : a=F(c1), b=F(c2) // Fv(4)=c3 // no merge
+  //  F(c3)  : no key // Fv(3)=c2 // no merge
+  //  F(c2)  : no key // Fv(2)=c1 // no merge
+  //  F(13)  : no key // Fv(1)=m1 => d=c11, e=c12, f=c13 // no merge
+  // in particular note that key d ends up with value 4 (from the merge with Fv(7)(d)=c11)) ; this applies to d.a (1) and d.b (2) too.
+  def testFlatMap(implicit out:PrintWriter) = m.flatMap[Int,StringTree[Int]](MERGE)(i=>amap(i-1)).seqView().foreach(out.println)
+
+  //almost same, but check key 'd' ; in m1, c13 is slightly different. This results for key 'd' in a
+  //merge between F(c11) [3,a,b] and c12 [5,c] hence [5,a,b,c]
+  //sub key c comes out of c12 and its value is c3 (value 3)
+  //sub key b comes out of F(c11) and is F(c2) (no merge) = c1 (no merge) (value 1)
+  //sub key a comes out of F(c11) and is F(c1) (no merge) = m1 (no merge) (value 7) : a contains m1 as a proper sub tree
+  //for fun, the resulting class is also different
+  def testFlatMap1(implicit out:PrintWriter) = out.println(m1.flatMap[Int,PrefixTree[String,Int]](MERGE)(i=>amap1(i-1)).apply("d"))
 
   //tests FlatMap for map with default
   def testBasicDefault(implicit out:PrintWriter) = {
     out.println(m1("x").value)            //5
     out.println(m1("x")("a").value)       //1
     out.println(m1("x")("a")("z").value)  //7
-  }
-
-  //tests FlatMap for map with default
-  def testDefFlatMap(implicit out:PrintWriter) = {
-    //we have to take a looks at the flat development of the tree with no default first
-    //we remember that flatMap enriches the existing tree, and replaces the current value with the value of the mapped tree
-    val m2 = m1.flatMap[Int,StringTree[Int]](MERGE,false)((i:Int)=>amap1(i-1))
-    //the value of the map for 7 will replace m1 value => 6
-    out.println(m2.value)
-    //"x" is not a key for m1, but it is for c13 which was expended straight into m1 : m2("x") = c13("x") = c12
-    out.println(m2("x").value)            //value for c12 (5)
-    out.println(m2("x")("a").value)       //'a' is a default for c12 => f1(a) = c1 (1)
-    out.println(m2("x")("a")("z").value)  //'z' is no value for c1 => f1(z) = old top (7)  --remember: this subtree is expanded straight ; no subexpension within
-    out.println(m2("x")("a")("x").value)  //'x' is no value => f1(x) = c2 (2)
-    //"o" is not a key in m1, nor in map(7) ; its value is m1.default("o") = f3("o") = m1, expanded with flatmap => value of 6
-    //now, this default behaves as above : the transformation happens once only
-    //the itch of course is that each call to m2("o") rebuilds the image
-    out.println(m2("o").value)
-    out.println(m2("o")("x").value)            //value for c12 (5)
-    out.println(m2("o")("x")("a").value)       //'a' is a default for c12 => f1(a) = c1 (1)
-    out.println(m2("o")("x")("a")("z").value)  //'z' is no value for c1 => f1(z) = old top (7)  --remember: this subtree is expanded straight ; no subexpension within
-    out.println(m2("o")("x")("a")("x").value)  //'x' is no value => f1(x) = c2 (2)
-    //check that the flapMap propagates down
-    out.println(m2("d").value)                 //was 4, replaced by 3
-    out.println(m2("d")("a").value)            //was 1, replaced by 7
-    out.println(m2("d")("a")("x").value)       //apply flatMap on f1("x")=c2 => c1 (1)
-    out.println(m2("d")("a")("a").value)       //apply flatMap on f1("a")=c1 => old top (7)
-    out.println(m2("d")("a")("o").value)       //apply flatMap on f1("o")=old top => c13 (6)
   }
 
   def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.fromFlat(Seq(
@@ -216,7 +207,7 @@ object TreeTests {
     out.println(c("a")("b")("c"))
     //tests that constant works on flatmap as expected
     val c2 = StringTree.constant(5.01)
-    val c1 = c.flatMap[Double,StringTree[Double]](MERGE,false)((i:Int)=> if (i==3) c2 else null)
+    val c1 = c.flatMap[Double,StringTree[Double]](MERGE)((i:Int)=> if (i==3) c2 else null)
     out.println(c1)
     out.println(c1("a"))
     out.println(c1("a")("b")("c"))
@@ -255,8 +246,8 @@ object TreeTests {
     out.printExc(r("u","v"))
     out.printExc(r("x"))
     out.printExc(r("x","c"))
-    out.println(r("f","d","a"))
-    out.printExc(r("f","d","a","x"))
+    out.println(r("f","x","a"))
+    out.printExc(r("f","x","a","x"))
     //to compare with the next test result where some matches will disappear
     out.println(r("e"))
     out.println(r("d"))
@@ -265,8 +256,8 @@ object TreeTests {
   }
 
   def testBasicRestrictZipStrict(implicit out:PrintWriter) = {
-    //restrict result using m0 instead of full tree
-    implicit val b0 = StringTree.builder[String]  //we have PrefixTree et StringTree builders in view
+    //restrict result using m0
+    implicit val b0 = StringTree.builder[String]  //we have PrefixTree and StringTree builders in view
     val r = m1.zip(m0, true, (t1:StringTree[Int],t2) =>
       for (v1<-t1.value; v2<-t2.value) yield s"$v1-$v2"
     )
@@ -291,7 +282,7 @@ object TreeTests {
     out.println(r("d","a"))      // a in m0(d)
     out.println(r("f"))          // f in m0
     out.println(r("f","d"))      // d in m0(f)
-    out.println(r("f","d","b"))  // b in m0(f,d)
+    out.println(r("f","d","b"))  // b in m0(f,d) - uses default for b in m1(f,d)
     out.println(r("d","d"))      // d->d not in m0(d) but defaults to m, d not in m1(d) but defaults to c1 through f4
     out.println(r("d","b","d"))  // that's hotter: in m1, d->b->b=m (following defaults), in m0 this gives c11 (again following defaults)
   }
@@ -515,10 +506,16 @@ object TreeTests {
 
   def testPartition(implicit out:PrintWriter) = {
     //partition even/odd
-    out.println(m.partition(null)(x => x._2.value.map(_ % 2 == 0).getOrElse(false)))
+    val x = m.partition(null)(x => x._2.value.map(_ % 2 == 0).getOrElse(false))
+    out.println(x)
+    //rebuild tree (order differs obviously)
+    out.println(x._1.merge(x._2,false,(x,y)=>if (x==None) y else x,false))
   }
 
   def main(args:Array[String]):Unit = {
-    (new TreeTests).apply(false,true)
+    implicit val out = new PrintWriter(System.out)
+    testFlatMap1
+    out.flush
+    //(new TreeTests).apply(false,true)
   }
 }

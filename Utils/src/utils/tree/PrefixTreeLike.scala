@@ -123,7 +123,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Defines the default value computation for the tree, returned when a key is not found.
    *  It can be null, in which case a fallback default (usually an exception) is used.
-   *  This is assumed to throw `NoSuchElementException` when it doesn't handle a given key.
+   *  This is assumed to throw `NoDefault` when it doesn't handle a given key so as to
+   *  fallback on the noDefault handler.
    *
    *  @param key the given key value for which a binding is missing.
    */
@@ -442,19 +443,20 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  Defaults are not merged : the most appropriate default from either tree is used!
    *  @param r the tree which is merged onto this tree
    *  @param overwrite whose effect is described above
+   *  @param mergeValues which computes the resulting value from the current value and the merged node value
    *  @param useDefault is true if the merge also uses the default values of the merged tree when a key in this
    *                    tree has no correspondence in the merged tree
    *  @tparam L the key kind for the merged tree
    *  @tparam W the value kind for the merged tree
    *  @tparam R the tree kind for the merged tree
    */
-  def merge[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean,useDefault:Boolean)(implicit bf: PrefixTreeLikeBuilder[L,W,R]):R = {
+  def merge[L>:K,W>:V,R>:This<:PrefixTreeLike[L,W,R]](r:R,overwrite:Boolean,mergeValues:(Option[W],Option[W])=>Option[W],useDefault:Boolean)(implicit bf: PrefixTreeLikeBuilder[L,W,R]):R = {
     if      (r eq this)          this  //if merging with oneself (comparing references), return self
     else if (isNonSignificant)   r     //if this is empty, the merge is r
     else (new PrefixLoop.ExpandTree[R,K,V,L,W,R,This] {
       protected def buildDefault(ctx:Context,default:K => This): L => R = ???  //unused
-      protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = if (overwrite) r2._2 else r1._2.merge(r2._2,overwrite,useDefault)
-      protected def mapValues(ctx:Context): Values = (ctx._1._1, ctx._2.value, ctx._2.default, ctx._2)
+      protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = if (overwrite) r2._2 else r1._2.merge(r2._2,overwrite,mergeValues,useDefault)
+      protected def mapValues(ctx:Context): Values = (ctx._1._1, mergeValues(ctx._1._2.value,ctx._2.value), ctx._2.default, ctx._2)
       protected def nextX(child:(K,This),ctx:Context): R = ctx._2.get(child._1) match {
         case None     => if (useDefault) try { ctx._2(child._1) } catch { case _:NoSuchElementException=>child._2 } else child._2 //if nothing to merge with : merge with self
         case Some(r1) => r1            //merge with found branch
@@ -472,6 +474,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *        the transformation makes sense:
    *        - intermediate nodes are unaffected (no value to expand)
    *        - terminal nodes are expanded downwards with the trees attached to the held value
+   *
    *  @param  f the function used to transform the values of this tree.
    *  @param  mode defines how conflicts are resolved:
    *          - KEEP ignores the newly expended tree conflicting child in favor of the existing child
@@ -486,11 +489,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *            The resulting tree is a new tree with the same key type, the new value type,
    *            which expands this tree with new subtrees.
    */
-  def flatMap[W,T<:PrefixTreeLike[K,W,T]](mode:MergeMode, useDefault:Boolean)(f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
+  def flatMap[W,T<:PrefixTreeLike[K,W,T]](mode:MergeMode)(f:V=>T)(implicit bf:PrefixTreeLikeBuilder[K,W,T]):T = {
     (new PrefixLoop.ExpandTreeNoData[K,V,K,W,T,This] with PrefixLoop.SameKeyDefault {
       protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = {
         if (mode==null) throw new IllegalStateException("merge required: MergeMode cannot be null")
-        mode[L,W,T](r1._2,r2._2,useDefault)
+        mode[L,W,T](r1._2,r2._2,(u,v)=>v)
       }
       protected def mapValues(ctx:Context): Values = {
         val e = (if (ctx._2.value.isDefined) f(ctx._2.value.get) else bf.empty)
@@ -501,12 +504,12 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** Same as above, but the transformation works on a recursive context rather than simply on the node value.
    */
-  def flatMap[L,W,T<:PrefixTreeLike[L,W,T]](k0:K,mode:MergeMode,useDefault:Boolean,g:L=>K)(f:Seq[(K,This)]=>(L,T))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):(L,T) = {
+  def flatMap[L,W,T<:PrefixTreeLike[L,W,T]](k0:K,mode:MergeMode,g:L=>K)(f:Seq[(K,This)]=>(L,T))(implicit bf:PrefixTreeLikeBuilder[L,W,T]):(L,T) = {
     (new PrefixLoop.ExpandRecTreeNoData[K,V,L,W,T,This] with PrefixLoop.OtherKeyDefault {
       def reverseKey = g
       protected def merge(ctx:Context,r1:(L,R),r2:(L,R)):R = {
         if (mode==null) throw new IllegalStateException("merge required: MergeMode cannot be null")
-        mode[L,W,T](r1._2,r2._2,useDefault)
+        mode[L,W,T](r1._2,r2._2,(u,v)=>v)
       }
       protected def mapValues(ctx:Context): Values = {
         val e = f(ctx)
@@ -514,6 +517,37 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       }
     }).get((k0,this))
   }
+
+  /** Partitions this tree in two trees according to a predicate.
+   *
+   *  @param k0 a key for this tree.
+   *  @param p the predicate on which to partition.
+   *  @return  a pair of trees: the first tree contains all values from elements that
+   *           satisfy the predicate `p` and the second tree contains all values from
+   *           elements that don't. The relative order of the elements in the resulting
+   *           trees is the same as in the original tree.
+   *           Both trees may contain overlapping nodes (with the same key sequence),
+   *           but only one of these will contain a value.
+   *           Defaults are removed from the result.
+   */
+  def partition(k0:K)(p: ((K,This)) => Boolean): (Repr, Repr) = (new PrefixLoop.BasicNoDataRB with PrefixLoop.Iterate[Nothing,(This,This),K,V,This] {
+    protected def deepLoop(ctx:Context, loop: ((Result,Context)=>Any)=>Unit):Result = {
+      val l, r = newBuilder                                            //prepare buffer for accepted/non accepted nodes
+      loop { (x,c)=> l+=((c._1,x._1)); r+=((c._1,x._2)) }              //shuffle partitioned children between both buffers with the right key
+      if (p(ctx)) (l.result(ctx._2.value,null), r.result(None,null))   //build this result if accepted
+      else        (l.result(None,null),  r.result(ctx._2.value,null))  //build this result if rejected
+    }
+  }).get((k0,this))
+
+  def partitionRec(k0:K)(p: (Seq[(K,This)]) => Boolean): (Repr, Repr) = (new PrefixLoop.RecNoDataRB with PrefixLoop.Iterate[Nothing,(This,This),K,V,This] {
+    protected def deepLoop(ctx:Context, loop: ((Result,Context)=>Any)=>Unit):Result = {
+      val l, r = newBuilder                                                 //prepare buffer for accepted/non accepted nodes
+      loop { (x,c)=> l+=((c.head._1,x._1)); r+=((c.head._1,x._2)) }         //shuffle partitioned children between both buffers with the right key
+      if (p(ctx)) (l.result(ctx.head._2.value,null), r.result(None,null))   //build this result if accepted
+      else        (l.result(None,null),  r.result(ctx.head._2.value,null))  //build this result if rejected
+    }
+  }).get((k0,this))
+
 
   /** Identical to the previous method, but more than one element is updated.
    */
@@ -585,29 +619,14 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     b.result
   }
 
-  /** Partitions this tree in two trees according to a predicate.
-   *
-   *  @param k0 a key for this tree.
-   *  @param p the predicate on which to partition.
-   *  @return  a pair of trees: the first tree contains all values from elements that
-   *           satisfy the predicate `p` and the second tree contains all values from
-   *           elements that don't. The relative order of the elements in the resulting
-   *           trees is the same as in the original tree.
-   *           Both trees may contain overlapping nodes (with the same key sequence),
-   *           but only one of these will contain a value.
-   *           Defaults are removed from the result.
+  /** Defines the prefix of this object's `toString` representation.
+   *  @return  a string representation which starts the result of `toString` applied to this $coll.
+   *           Unless overridden in subclasses, the string prefix of every tree is `"Map"`.
    */
-  def partition(k0:K)(p: ((K,This)) => Boolean): (Repr, Repr) = (new PrefixLoop.BasicNoDataRB with PrefixLoop.Iterate[Nothing,(This,This),K,V,This] {
-    protected def deepLoop(ctx:Data, loop: ((Result,Context)=>Any)=>Unit):Result = {
-      val l, r = newBuilder                                            //prepare buffer for accepted/non accepted nodes
-      loop { (x,c)=> l+=((c._1,x._1)); r+=((c._1,x._2)) }              //shuffle partitioned children between both buffers with the right key
-      if (p(ctx)) (l.result(ctx._2.value,null), r.result(None,null))   //build this result if accepted
-      else        (l.result(None,null),  r.result(ctx._2.value,null))  //build this result if rejected
-    }
-  }).get((k0,this))
-
-
-  override def stringPrefix: String = super[PrefixTraversableOnce].stringPrefix
+  override def stringPrefix: String = value match {
+    case None    => if (default==null) "Tree" else "Tree*"
+    case Some(v) => if (default==null) "Tree{"+v+"}" else "Tree*{"+v+"}"
+  }
 
   // Common generic transformations on PrefixTreeLike ; they all build a PreficTreeLike
 
@@ -684,8 +703,8 @@ object PrefixTreeLike {
      *  It is strongly recommended that it either throws an exception or returns a
      *  non significant value.
      *  This method must not be understood as a fallback default, but as a handler
-     *  for errors, that is any key not handled by the underlying iterable when
-     *  there is not provided default.
+     *  for errors, that is any key not handled either by the underlying iterable or
+     *  the provided default (exception NoDefault) or there is not provided default.
      */
     val noDefault:K=>T,
     /** The tree will not contain non significant nodes.
