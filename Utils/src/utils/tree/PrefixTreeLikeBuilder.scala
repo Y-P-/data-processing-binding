@@ -33,7 +33,7 @@ abstract class PrefixTreeLikeBuilder[K,V,Tree<:PrefixTreeLike[K,V,Tree]] extends
    */
   def apply(value:Option[V],tree:GenTraversableOnce[(K,Tree)],default:K=>Tree):Tree
 
-  /** sipmlified factories for no value */
+  /** simplified factories for no value */
   def apply(tree:(K,Tree)*):Tree                                        = apply(None,tree,null)
   def apply(default:K=>Tree):Tree                                       = apply(None,Nil,default)
   def apply(default:K=>Tree,tree:(K,Tree)*):Tree                        = apply(None,tree,default)
@@ -183,13 +183,36 @@ object PrefixTreeLikeBuilder {
   }
 
   /** Defines a builder for a tree type where both K and V are free */
-  abstract class Gen2 {
+  abstract class Factory2 {
     type Tree[k,+v] <: PrefixTreeLike[k,v,Tree[k,v]]
     type P0[k,+v] <: Params[k,v,Tree[k,v]]
 
     class Params[K,+V,+T<:Tree[K,V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
              extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
-      private[Gen2] def b2:Gen2.this.type = Gen2.this
+      private[Factory2] def b2:Factory2.this.type = Factory2.this
+    }
+
+    protected trait Abstract[K,V] {
+      implicit val params:P0[K,V]
+      type Value = V
+      type Params = P0[K,V]
+      def newBuilder = params.b2.builder(params)
+    }
+
+    def constant[K,V](v:V)(implicit p:P0[K,V]) = builder.constant(v)
+
+    def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, Tree[K,V]] { type Params=P0[K,V] }
+    implicit def toBuilder[K,V](g:this.type)(implicit p:P0[K,V]) = g.builder
+  }
+
+  /** Idem : remove covariance */
+  abstract class Factory2i {
+    type Tree[k,v] <: PrefixTreeLike[k,v,Tree[k,v]]
+    type P0[k,v] <: Params[k,v,Tree[k,v]]
+
+    class Params[K,V,T<:Tree[K,V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
+      private[Factory2i] def b2:Factory2i.this.type = Factory2i.this
     }
 
     protected trait Abstract[K,V] {
@@ -206,14 +229,38 @@ object PrefixTreeLikeBuilder {
   }
 
   /** Defines a builder for a tree type where K is fixed and V is free */
-  abstract class Gen1[K0] {
+  abstract class Factory1[K0] {
     type K = K0
     type Tree[+v] <: PrefixTreeLike[K,v,Tree[v]]
     type P0[+v] <: Params[v,Tree[v]]
 
     class Params[+V,+T<:Tree[V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
              extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
-      private[Gen1] def b1:Gen1.this.type = Gen1.this
+      private[Factory1] def b1:Factory1.this.type = Factory1.this
+    }
+
+    protected trait Abstract[V] {
+      implicit val params:P0[V]
+      type Value = V
+      type Params = P0[V]
+      def newBuilder = params.b1.builder[V](params)
+    }
+
+    def constant[V](v:V)(implicit p:P0[V]) = builder.constant(v)
+
+    def builder[V](implicit p:P0[V]):PrefixTreeLikeBuilder[K, V, Tree[V]] { type Params=P0[V] }
+    implicit def toBuilder[V](g:this.type)(implicit p:P0[V]) = g.builder(p)
+  }
+
+  /** Idem : remove covariance */
+  abstract class Factory1i[K0] {
+    type K = K0
+    type Tree[v] <: PrefixTreeLike[K,v,Tree[v]]
+    type P0[v] <: Params[v,Tree[v]]
+
+    class Params[V,T<:Tree[V] with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
+             extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
+      private[Factory1i] def b1:Factory1i.this.type = Factory1i.this
     }
 
     protected trait Abstract[V] {
@@ -230,7 +277,7 @@ object PrefixTreeLikeBuilder {
   }
 
   /** Defines a builder for a tree type where both K and V are fixed */
-  abstract class Gen0[K0,V0] {
+  abstract class Factory0[K0,V0] {
     type K = K0
     type V = V0
     type Tree <: PrefixTreeLike[K,V,Tree]
@@ -238,7 +285,7 @@ object PrefixTreeLikeBuilder {
 
     class Params[+T<:Tree with PrefixTreeLike[K,V,T]] (noDefault:K=>T,stripEmpty:Boolean,navigable:PrefixTreeLike.NavigableMode)
              extends PrefixTreeLike.Params[K,V,T](noDefault,stripEmpty,navigable)  {
-      private[Gen0] def b0:Gen0.this.type = Gen0.this
+      private[Factory0] def b0:Factory0.this.type = Factory0.this
     }
 
     protected trait Abstract {

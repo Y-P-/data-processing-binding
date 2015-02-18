@@ -121,23 +121,62 @@ object PrefixLoop {
     protected def nextData(child:(K,This),ctx:Context):Data
 
     /** Applies the recursion on all the tree layers below ctx
+     *  Non arborescent trees may contain infinite loops ; these may be detected (at a hefty processing cost)
+     *  by using the seen parameter (disable if it is 'null') ; in that case, only the first such node is actually
+     *  processed : repeated nodes are just ignored. However, seen contains, when the call returns, the list of
+     *  all such nodes and context that were left unprocessed.
      *  @param ctx the context on which children we are looping
+     *  @param seen the set of nodes that have been processed ; used to prevent infinite loops in non arborescent trees
+     *         it can be 'null', in which case no check is done : this may dramatically speed up the recursion
+     *         at the end, it contains all processed contexts and associated Return : entries where the List[Context]
+     *         part contain more than one element correspond to skipped contexts.
      *  @return the Result for that ctx
      */
-    final protected def recur(ctx: Context):Result = mapValues(ctx) match {
-      case null => null.asInstanceOf[Result]
-      case u    => buildResult(ctx, u, (loop:((Result,Context)=>Any)) => {
-                     val node = getCurrent(ctx)._2
-                     for (child <- node)
-                       nextData(child, ctx) match {
-                         case null =>
-                         case d    => val ctx1 = childContext(d,ctx)
-                                      val r=recur(ctx1)
-                                      if (loop!=null && r!=null) loop(r,ctx1)
-                       }
-                   })
-    }
-
+    final protected def recur(ctx: Context, seen:java.util.IdentityHashMap[This,(List[Context],Result)]):Result = {
+      if (seen!=null && seen.containsKey(getCurrent(ctx)._2)) { //don't process
+        val nd = getCurrent(ctx)._2
+        val l  = seen.get(nd)
+        seen.put(nd,(ctx +: l._1, l._2))
+        null.asInstanceOf[Result]
+      } else {
+        if (seen!=null)
+          seen.put(getCurrent(ctx)._2,(List(ctx),null.asInstanceOf[Result]))
+        val r = mapValues(ctx) match {
+          case null => null.asInstanceOf[Result]
+          case u    => buildResult(ctx, u, (loop:((Result,Context)=>Any)) => {
+                       val node = getCurrent(ctx)._2
+                       for (child <- node)
+                         nextData(child, ctx) match {
+                           case null =>
+                           case d    => val ctx1 = childContext(d,ctx)
+                                        val r=recur(ctx1,seen)
+                                        if (loop!=null && r!=null) loop(r,ctx1)
+                         }
+                       })
+        }
+        if (seen!=null) {
+          val nd = getCurrent(ctx)._2
+          val l  = seen.get(nd)
+          seen.put(nd,(l._1, r))
+        }
+        r
+      }
+  }
+  /** The simpler version
+   */
+  final protected def recur(ctx: Context):Result = mapValues(ctx) match {
+    case null => null.asInstanceOf[Result]
+    case u    => buildResult(ctx, u, (loop:((Result,Context)=>Any)) => {
+                 val node = getCurrent(ctx)._2
+                 for (child <- node)
+                   nextData(child, ctx) match {
+                     case null =>
+                     case d    => val ctx1 = childContext(d,ctx)
+                                  val r=recur(ctx1)
+                                  if (loop!=null && r!=null) loop(r,ctx1)
+                   }
+                 })
+        }
 
     /** Applies the transformation
      *  @param d0, the initial layer
@@ -145,6 +184,7 @@ object PrefixLoop {
      */
     @throws(classOf[NoSuchElementException])
     final def get(d0:Data): Result = recur(initialize(d0))
+    //final def get(d0:Data): Result = recur(initialize(d0),new java.util.IdentityHashMap[This,(List[Context],Result)])
   }
 
   //traits for cases with (or without) specific X data
@@ -254,7 +294,7 @@ object PrefixLoop {
      *  adapted to deal with defaults (throws exception). */
     protected def stdDefault(ctx:Context,child:(K,This)):R = (nextData(child, ctx) match {
       case null => throw new PrefixTreeLike.NoDefault(child._1)
-      case d    => recur(childContext(d,ctx))
+      case d    => recur(childContext(d,ctx),null)
     })._2
 
     protected def buildResult(ctx:Context,v:Values,loop:((Result,Context)=>Any) => Unit):Result = {

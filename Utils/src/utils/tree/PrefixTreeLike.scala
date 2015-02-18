@@ -15,6 +15,29 @@ import scala.annotation.switch
  *  A tree can be viewed as a map where the values are themselves trees. However, the likeness to maps
  *  stops there, as the recursive nature of trees bring different properties.
  *
+ *  One can distinguish three kinds of trees, with important topological differences.
+ *  - 'canonical' : trees nodes are unique : no two nodes are memory wise identical
+ *  - 'degenerated' : trees that contain duplicate nodes, but no infinite path
+ *  - 'infinite' : trees that contain infinite paths, which can only be achieved by also being 'degenerated'
+ *                 in that case, one can distinguish these trees where infinite path require the use of the
+ *                 default function (type 1) and these which do not (type 2).
+ *                 Some features that type 2 trees break:
+ *                 * no flat representation
+ *                 * no order for nodes
+ *                 * no natural traversal
+ *                 infinite-1 trees will perform correctly for most transformations,
+ *                 however their computed default will be mostly wrong.
+ *
+ *  All of the methods perform as expected on 'canonical' trees.
+ *  The identity semantic carried by 'degenerated' trees cannot be duplicated through transformations at a
+ *  reasonable cost (e.g. if the degenerated tree is mapped, two memory identical nodes won't transform to
+ *  two memory identical nodes, but into two different nodes that carry identical information)
+ *  Trying to conserve the identity semantic is usually not useful, in addition to being costly.
+ *  Infinite trees enter a quite different category because their topology class is different ; most tree
+ *  transformations are ensured to loop endlessly (type 2), and while this can be avoided (at some cost), only the
+ *  user can ensure that the algorithm does what he wants (it is not possible to prepare a generic algorithm
+ *  that will easily cover all use case.)
+ *
  *  The actual data of type V is optional in intermediary nodes, but a well formed tree should not have
  *  empty leaves. Using the methods with (GenTraversable[K],V) parameters (flat view of the tree) rely
  *  on that property (they will omit to output such degenerate branches, and will not build them.)
@@ -404,6 +427,19 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def map[W,R<:PrefixTreeLike[K,W,R]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,R]):R =
     genMap(null.asInstanceOf[K],(x:(K,This))=>x._2.value.flatMap(z=>Some(f(z))))
 
+
+  /** 'cloning' this tree.
+   *  More subtle than it seems, this lets change the underlying Tree representation.
+   *  It will also respect the actual tree structure which may contain inner references or
+   *  cross references onto other trees.
+   *//*
+  def copy[R<:PrefixTreeLike[K,V,R]](implicit bf: PrefixTreeLikeBuilder[K,V,R]):R = {
+    val seen = new java.util.IdentityHashMap[This,R]
+    genMap(null.asInstanceOf[K],seen,
+        (x:(K,This))=>x._2.value.flatMap(z=>Some(f(z))),
+        null
+    )
+  }*/
 
   /** Transforms this tree by applying a function to every retrieved value and key.
    *  It works also on default values, but be aware that using deep trees

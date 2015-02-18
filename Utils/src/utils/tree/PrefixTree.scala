@@ -34,7 +34,7 @@ abstract class PrefixTree[K,+V] protected extends PrefixTreeLike.Abstract[K,V,Pr
  *  - concrete implementations for PrefixTree
  *  - a factory for building the most appropriate implementation
  */
-object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
+object PrefixTree extends PrefixTreeLikeBuilder.Factory2 {
   type Tree[k,+v] = PrefixTree[k, v]
   type P0[k,+v]   = Params[k,v,PrefixTree[k, v]]
 
@@ -112,4 +112,7 @@ object PrefixTree extends PrefixTreeLikeBuilder.Gen2 {
       }
     }
   }
+
+  def apply[K,V](implicit p:P0[K,V]) = builder[K,V](p)
+  implicit def toBuilder[K,V](x:PrefixTree.type)(implicit p:P0[K,V]) = x.builder(p)
 }

@@ -512,6 +512,21 @@ object TreeTests {
     out.println(x._1.merge(x._2,false,(x,y)=>if (x==None) y else x,false))
   }
 
+  def testMutable(implicit out:PrintWriter) = {
+    val m2 = PrefixTree[String,Int].apply(7)
+    val m1:MutablePrefixTree[String,Int] = MutablePrefixTree(7)
+  val c1:StringTree[Int]  = StringTree(Some(1))
+  val c2  = StringTree(2)
+  val c3  = StringTree(3)
+  val c11 = StringTree(4,Seq("a"->c1,"b"->c2))
+  val c12 = StringTree(5,"c"->c3)
+  val c13 = StringTree(6,"d"->c11,"x"->c12)
+  val m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13))
+  //an extract: (7) => { d/4 => { a/1 }, f/6 => { d/4 => { b/2 } } }
+  val m0  = StringTree(7,Seq("d"->StringTree(4,Seq("a"->c1),(x:String)=>m),"f"->StringTree(6,"d"->StringTree(4,Seq("b"->c2)))))
+
+  }
+
   def main(args:Array[String]):Unit = {
     implicit val out = new PrintWriter(System.out)
     testFlatMap1

@@ -13,7 +13,7 @@ import utils.tree._
  */
 abstract class StringTree[+V] extends PrefixTree[String,V] with PrefixTreeLike[String,V,StringTree[V]]
 
-object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
+object StringTree extends PrefixTreeLikeBuilder.Factory1[String] {
   type Tree[+v] = StringTree[v]
   type P0[+v]   = Params[v,Tree[v]]
 
@@ -82,5 +82,5 @@ object StringTree extends PrefixTreeLikeBuilder.Gen1[String] {
     }
   }
 
-  implicit def toBuilder[K,V](x:StringTree.type)(implicit p:P0[V]) = x.builder(p)
+  implicit def toBuilder[V](x:StringTree.type)(implicit p:P0[V]) = x.builder(p)
 }
