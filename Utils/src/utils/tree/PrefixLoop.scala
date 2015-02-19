@@ -125,41 +125,47 @@ object PrefixLoop {
      *  by using the seen parameter (disable if it is 'null') ; in that case, only the first such node is actually
      *  processed : repeated nodes are just ignored. However, seen contains, when the call returns, the list of
      *  all such nodes and context that were left unprocessed.
-     *  @param ctx the context on which children we are looping
-     *  @param seen the set of nodes that have been processed ; used to prevent infinite loops in non arborescent trees
+     *  For a use case, see the 'PrefixTreeLike.copy' method.
+     *  @param ctx, the context on which children we are looping
+     *  @param seen, the set of nodes that have been processed ; used to prevent infinite loops in non arborescent trees
      *         it can be 'null', in which case no check is done : this may dramatically speed up the recursion
      *         at the end, it contains all processed contexts and associated Return : entries where the List[Context]
      *         part contain more than one element correspond to skipped contexts.
-     *  @return the Result for that ctx
+     *  @param reprocess, the method that gets called whenever a result becomes available for some node that could not
+     *         be processed immediately (due to a looping reference to itself among its children) ; that method is handled
+     *         the context for the waiting node, the expected result, and a method that may return the result for any
+     *         already computed node (including itself).
+     *  @return the Result for that ctx ; it may be unknown if it is being processed (current node refers to a parent)
      */
-    final protected def recur(ctx: Context, seen:java.util.IdentityHashMap[This,(List[Context],Result)]):Result = {
-      if (seen!=null && seen.containsKey(getCurrent(ctx)._2)) { //don't process
-        val nd = getCurrent(ctx)._2
-        val l  = seen.get(nd)
-        seen.put(nd,(ctx +: l._1, l._2))
-        null.asInstanceOf[Result]
+    final protected def recur(ctx: Context, seen:java.util.IdentityHashMap[This,(List[Context],Option[Result])], reprocess:(Result,Context,This=>Option[Result])=>Unit):Option[Result] = {
+      def fetch:This=>Option[Result] = x => if (seen.containsKey(x)) seen.get(x)._2 else None
+      val nd = getCurrent(ctx)._2
+      if (seen.containsKey(nd)) { //don't process : fetch current result
+        val l = seen.get(nd)
+        if (l._2==None)
+          seen.put(nd,(ctx +: l._1, l._2))
+        else
+          reprocess(l._2.get,ctx,fetch)
+        l._2
       } else {
-        if (seen!=null)
-          seen.put(getCurrent(ctx)._2,(List(ctx),null.asInstanceOf[Result]))
+        seen.put(nd,(Nil,None))
         val r = mapValues(ctx) match {
           case null => null.asInstanceOf[Result]
           case u    => buildResult(ctx, u, (loop:((Result,Context)=>Any)) => {
-                       val node = getCurrent(ctx)._2
-                       for (child <- node)
-                         nextData(child, ctx) match {
-                           case null =>
-                           case d    => val ctx1 = childContext(d,ctx)
-                                        val r=recur(ctx1,seen)
-                                        if (loop!=null && r!=null) loop(r,ctx1)
-                         }
-                       })
+                         for (child <- nd)
+                           nextData(child, ctx) match {
+                             case null =>
+                             case d    => val ctx1 = childContext(d,ctx)
+                                          val r=recur(ctx1,seen,reprocess)
+                                          if (loop!=null && r!=null) loop(r.get,ctx1)
+                           }
+                         })
         }
-        if (seen!=null) {
-          val nd = getCurrent(ctx)._2
-          val l  = seen.get(nd)
-          seen.put(nd,(l._1, r))
-        }
-        r
+        val r1 = Some(r)
+        val waiting = seen.get(nd)._1
+        seen.put(nd,(Nil, r1))
+        for (c <- waiting) reprocess(r,c,fetch)
+        r1
       }
   }
   /** The simpler version
@@ -178,13 +184,22 @@ object PrefixLoop {
                  })
         }
 
-    /** Applies the transformation
+    /** Applies the transformation to a canonical or degenerated tree.
+     *  In the latter case, duplicate nodes are handled as if they were fully distinct.
      *  @param d0, the initial layer
      *  @return the Result of the transformation
      */
     @throws(classOf[NoSuchElementException])
     final def get(d0:Data): Result = recur(initialize(d0))
-    //final def get(d0:Data): Result = recur(initialize(d0),new java.util.IdentityHashMap[This,(List[Context],Result)])
+
+    /** Applies the transformation to any tree, even infinite.
+     *  Duplicate nodes are handled as soon as possible by the reprocess function.
+     *  @param d0, the initial layer
+     *  @param reprocess, the function to handle nodes waiting for their result
+     *  @return the Result of the transformation
+     */
+    @throws(classOf[NoSuchElementException])
+    final def get(d0:Data, reprocess:(Result,Context,This=>Option[Result])=>Unit): Result = recur(initialize(d0),new java.util.IdentityHashMap[This,(List[Context],Option[Result])],reprocess).get
   }
 
   //traits for cases with (or without) specific X data
@@ -271,6 +286,9 @@ object PrefixLoop {
     /** Running against the current tree */
     @throws(classOf[NoSuchElementException])
     final def apply(d0:Data): R = get(d0)._2
+    /** Running against the current tree */
+    @throws(classOf[NoSuchElementException])
+    final def apply(d0:Data,reprocess:(Result,Context,This=>Option[Result])=>Unit): R = get(d0,reprocess)._2
   }
 
   //traits for building View
@@ -294,7 +312,7 @@ object PrefixLoop {
      *  adapted to deal with defaults (throws exception). */
     protected def stdDefault(ctx:Context,child:(K,This)):R = (nextData(child, ctx) match {
       case null => throw new PrefixTreeLike.NoDefault(child._1)
-      case d    => recur(childContext(d,ctx),null)
+      case d    => recur(childContext(d,ctx))
     })._2
 
     protected def buildResult(ctx:Context,v:Values,loop:((Result,Context)=>Any) => Unit):Result = {
@@ -448,6 +466,9 @@ object PrefixLoop {
     /** Running against the current tree. */
     @throws(classOf[NoSuchElementException])
     final def apply(d0:Data): Result = get(d0)
+    /** Running against the current tree. */
+    @throws(classOf[NoSuchElementException])
+    final def apply(d0:Data,reprocess:(Result,Context,This=>Option[Result])=>Unit): Result = get(d0,reprocess)
   }
 
   /** Defines some common behavior when the iteration deals with applying a method to each node.

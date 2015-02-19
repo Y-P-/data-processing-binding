@@ -48,6 +48,7 @@ class TreeTests extends StandardTester {
 		t(24,testFold)
 		t(25,testPushPull)
     t(26,testPartition)
+    t(27,testMutable)
 		//navigable
 		//navigables in zip/other operations
 		//references
@@ -513,18 +514,28 @@ object TreeTests {
   }
 
   def testMutable(implicit out:PrintWriter) = {
-    val m2 = PrefixTree[String,Int].apply(7)
-    val m1:MutablePrefixTree[String,Int] = MutablePrefixTree(7)
-  val c1:StringTree[Int]  = StringTree(Some(1))
-  val c2  = StringTree(2)
-  val c3  = StringTree(3)
-  val c11 = StringTree(4,Seq("a"->c1,"b"->c2))
-  val c12 = StringTree(5,"c"->c3)
-  val c13 = StringTree(6,"d"->c11,"x"->c12)
-  val m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13))
-  //an extract: (7) => { d/4 => { a/1 }, f/6 => { d/4 => { b/2 } } }
-  val m0  = StringTree(7,Seq("d"->StringTree(4,Seq("a"->c1),(x:String)=>m),"f"->StringTree(6,"d"->StringTree(4,Seq("b"->c2)))))
-
+    //rebuild tree using mutability
+    val bd = MutablePrefixTree.builder[String,Int]
+    val xm = bd(7)
+    val xc1 = bd(Some(1))
+    val xc2 = bd()
+    val xc3 = bd(3)
+    val xc11 = bd(4)
+    val xc12 = bd(5)
+    val xc13 = bd(6)
+    xc2.value = Some(2)
+    xc11.tree += (("a",xc1))
+    xc11.tree.put("b",xc2)
+    val t = scala.collection.mutable.HashMap[String,MutablePrefixTree[String,Int]]("c"->xc3)
+    xc12.tree = t
+    xc13.tree ++= Seq("d"->xc11, "x"->xc12)
+    xm.tree ++= Seq("d"->xc11,"e"->xc12,"f"->xc13)
+    out.println(xm)
+    import MutablePrefixTree._
+    val xm1:MutablePrefixTree[String,Int] = xm.copy(MutablePrefixTree.builder[String,Int])
+    out.println(xm1)
+    out.println(xm1("d") eq xm1("f","d"))
+   // out.println(xm1("e") eq xm1("f","x"))
   }
 
   def main(args:Array[String]):Unit = {

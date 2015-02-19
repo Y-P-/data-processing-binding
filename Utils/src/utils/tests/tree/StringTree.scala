@@ -81,6 +81,4 @@ object StringTree extends PrefixTreeLikeBuilder.Factory1[String] {
       }
     }
   }
-
-  implicit def toBuilder[V](x:StringTree.type)(implicit p:P0[V]) = x.builder(p)
 }

@@ -192,3 +192,5 @@ Tree{'7+7}(4 -> Tree{'d4+4}(1 -> Tree{'a1*1}(),2 -> Tree{'b7%2}()))
 null={a={}()aa={}(1)ab={aab={d={}(5)}(3)aac={}(4)}(2)}()--------26--------
 (Tree(d -> Tree{4}(b -> Tree{2}()), f -> Tree{6}(d -> Tree{4}(b -> Tree{2}()))),Tree{7}(d -> Tree(a -> Tree{1}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree(d -> Tree(a -> Tree{1}()), x -> Tree{5}(c -> Tree{3}()))))
 Tree{7}(d -> Tree{4}(b -> Tree{2}(), a -> Tree{1}()), f -> Tree{6}(d -> Tree{4}(b -> Tree{2}(), a -> Tree{1}()), x -> Tree{5}(c -> Tree{3}())), e -> Tree{5}(c -> Tree{3}()))
+--------27--------
+Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))

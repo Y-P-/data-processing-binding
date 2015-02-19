@@ -4,19 +4,21 @@ import scala.collection.mutable.Map
 import scala.collection.GenTraversableOnce
 import scala.collection.mutable.LinkedHashMap
 
+
 /** This is a mutable tree implementation, where everything can change:
  *  - the sub tree
  *  - the value
  *  - the default function
  *  - entries in the sub tree
  *  It is made compatible with PrefixTree (but usual PrefixTree cannot of course downclass to Mutable...)
- *  Mutability is not compatible with upwards navigation.
+ *  Mutability is not compatible with upwards navigation and is forcibly disabled.
  */
-abstract class MutablePrefixTree[K,V] protected extends PrefixTree[K,V] with PrefixTreeLike[K,V,MutablePrefixTree[K,V]] {
+abstract class MutablePrefixTree[K,V] protected extends PrefixTree[K,V] with MutablePrefixTreeLike[K,V,MutablePrefixTree[K,V]] {
   def value_=(v:Option[V]):Unit
   def default_=(d:K=>Repr):Unit
-  override def tree: Map[K,Repr]
   def tree_=(t:Map[K,Repr]):Unit
+  override def tree: Map[K,Repr]
+  def update(k:K,t:Repr):Unit = tree(k)=t
 }
 
 /** The PrefixTree object contains:
@@ -41,6 +43,7 @@ object MutablePrefixTree extends PrefixTreeLikeBuilder.Factory2i {
   /** A factory for working with varied map kinds if necessary.
    */
   implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, MutablePrefixTree[K, V]] { type Params=P0[K,V] } = {
+    if (p.navigable!=PrefixTreeLike.nonNavigable) throw new IllegalArgumentException("tree navigability is not allowed for mutable trees")
     new PrefixTreeLikeBuilder[K, V, MutablePrefixTree[K, V]] { self=>
       type Params = P0[K,V]
       val params:Params = p
@@ -51,13 +54,11 @@ object MutablePrefixTree extends PrefixTreeLikeBuilder.Factory2i {
         new MutablePrefixTree[K, V] with MutablePrefixTree.super.Abstract[K,V] {
           override var tree: Map[K,Repr] = (if (p.stripEmpty) t0.filterNot(_._2.isNonSignificant) else t0)
           override var default:K=>Repr = d
-          override var value = v
+          override var value:Option[V] = v
           override def newBuilder = super[Abstract].newBuilder
           implicit val params:P0[K,V] = self.params
         }
       }
     }
   }
-
-  implicit def toBuilder[K,V](x:MutablePrefixTree.type)(implicit p:P0[K,V]) = x.builder(p)
 }
