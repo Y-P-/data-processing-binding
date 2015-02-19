@@ -440,19 +440,18 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
       todo = ((keys,r)) +: todo
     }
     import PrefixLoop._
-    val r = (new RecNoDataRB with SameKeyDefault with ValueW with Binder[Nothing,K,V,K,W,This,R] {
-      protected def bf: utils.tree.PrefixTreeLikeBuilder[K,W,R] = bf0
-      protected def getDefault(v: Option[W]): K ⇒ R = null
-      def mapValues(ctx: Context): Values = ctx.head._2.value
+    val r = (new PrefixLoop.RecurRecTreeNoDataSameKey[K,V,W,R,This] {
+      def mapValues(ctx: Context): Values = (ctx.head._2.value,null)
       override protected def buildResult(ctx:Context,v:Values,loop:((Result,Context)=>Any) => Unit):Result = {
         val b = bf.newEmpty
         loop {(r,c)=> b += r}
-        (ctx.head._1,b.result(v,null))
+        (ctx.head._1,b.result(v._1,null))
       }
     })((null.asInstanceOf[K],this), fetch)
     for (x <- todo) {
       val nd = r(x._1:_*)
-      nd(x._2._1) = x._2._2
+      println(x._1+"/"+x._2._1)
+      // nd(x._2._1) = x._2._2
     }
     r
   }
