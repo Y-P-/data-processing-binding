@@ -429,27 +429,29 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
 
   /** 'cloning' this tree.
-   *  More subtle than it seems, this lets change the underlying Tree representation.
-   *  It will also respect the actual tree structure which may contain inner references or
-   *  cross references onto other trees. However, keeping defaults make no sense.
+   *  It also lets change the underlying Tree representation.
+   *  It will respect the actual tree structure which may contain inner references or
+   *  cross references onto other trees.
+   *  However, keeping defaults make no sense (they could refer to the old tree) so we discard them.
    */
-  def copy[W>:V,R<:MutablePrefixTreeLike[K,W,R]](implicit bf0: PrefixTreeLikeBuilder[K,W,R]):R = {
-    var todo = List[(Seq[K],(K,R))]()
-    val process : (Boolean,(K,R),Seq[(K,This)],This=>(K,R))=>Unit = (b,r,ctx,get) => {
-      val keys = ctx.tail.map(_._1).reverse.tail
-      todo = ((keys,(ctx.head._1,r._2))) +: todo  //keep current node key, and assign computed result node
-      if (!b) { //reserve node in the result in order to keep the right order
-        val parent = get(ctx.tail.head._2)
-        parent._2(ctx.head._1) = null.asInstanceOf[R]
-      }
+  def copy[W>:V,R<:MutablePrefixTreeLike[K,W,R]](implicit bf: PrefixTreeLikeBuilder[K,W,R]):R = {
+    //here we keep the list of keys to the node where a child is not yet filled up ; the key for that child ; a way to retrieve the result later
+    var todo = List[(Seq[K],K,()=>R)]()
+    //processes duplicate entries
+    val process : (Option[(K,R)],Seq[(K,This)],This=>Option[(K,R)])=>Option[(K,R)] = (r,ctx,fetch) => r match {
+      //the result is not yet ready : keep the current item state in store for later
+      case None    => val keys = ctx.tail.map(_._1).reverse.tail                         //ctx(0) is the missing key, ctx(last) is the virtual top key -null-
+                      todo = ((keys,ctx.head._1,()=>fetch(ctx.head._2).get._2)) +: todo  //get will know the result!
+                      Some((ctx.head._1,bf.empty))                                       //prepare the entry to preserve node order ; set it with a placeholder at this time
+      //here we already have the result : forward it (only the node value is kept, the key from the original entry is of no interest!)
+      case Some(x) => Some(ctx.head._1,x._2)
     }
+    //main loop, discard default
     val r = (new PrefixLoop.RecurRecTreeNoDataSameKey[K,V,W,R,This] {
       def mapValues(ctx: Context): Values = (ctx.head._2.value,null)
     })((null.asInstanceOf[K],this), process)
-    for (x <- todo) {
-      val nd = r(x._1:_*)
-      nd(x._2._1) = x._2._2
-    }
+    //once finished, all dangling references should exist!
+    for (x <- todo) r(x._1:_*)(x._2) = x._3()  //assign unknown nodes by calling the method 'which knows the appropriate result'!
     r
   }
 

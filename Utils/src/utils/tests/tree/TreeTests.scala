@@ -49,6 +49,7 @@ class TreeTests extends StandardTester {
 		t(25,testPushPull)
     t(26,testPartition)
     t(27,testMutable)
+    t(28,testInfinite)
 		//navigable
 		//navigables in zip/other operations
 		//references
@@ -531,11 +532,42 @@ object TreeTests {
     xc13.tree ++= Seq("d"->xc11, "x"->xc12)
     xm.tree ++= Seq("d"->xc11,"e"->xc12,"f"->xc13)
     out.println(xm)
-    import MutablePrefixTree._
-    val xm1:MutablePrefixTree[String,Int] = xm.copy(MutablePrefixTree.builder[String,Int])
+    //check copy operation on this basic case
+    val xm1 = xm.copy[Int,MutablePrefixTree[String,Int]]
     out.println(xm1)
     out.println(xm1("d") eq xm1("f","d"))
     out.println(xm1("e") eq xm1("f","x"))
+  }
+  
+  def testInfinite(implicit out:PrintWriter) = {
+    //rebuild tree using mutability
+    val bd = MutablePrefixTree.builder[String,Int]
+    val xm1 = bd(1)
+    val xm2 = bd(2)
+    val xm3 = bd(3)
+    xm1("a") = xm2
+    xm2("a") = xm3
+    xm3("a") = xm1  //rotating dependency
+    xm1("b") = xm1  //self dependency
+    xm2("b") = xm1  //another loop
+    xm3("b") = xm2  //and a other
+    xm1("c") = bd(4) //new layer
+    xm1("c")("a") = xm2 //another cycle at a lower level
+    xm1("c")("b") = xm1 //another cycle at a lower level
+    xm1("c")("c") = xm3 //another cycle at a lower level
+    xm3("c") = xm1("c") //yet another
+    //check copy operation on this complex case (no standard print! would loop forever)
+    val x1 = xm1.copy[Int,MutablePrefixTree[String,Int]]
+    val x2 = x1("a")
+    val x3 = x2("a")
+    out.println(x3("a") eq x1)
+    out.println(x1("b") eq x1)
+    out.println(x2("b") eq x1)
+    out.println(x3("b") eq x2)
+    out.println(x1("c","a") eq x2)
+    out.println(x1("c","b") eq x1)
+    out.println(x1("c","c") eq x3)
+    out.println(x1("c") eq x3("c"))
   }
 
   def main(args:Array[String]):Unit = {
