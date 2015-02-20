@@ -435,23 +435,20 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def copy[W>:V,R<:MutablePrefixTreeLike[K,W,R]](implicit bf0: PrefixTreeLikeBuilder[K,W,R]):R = {
     var todo = List[(Seq[K],(K,R))]()
-    val fetch : ((K,R),Seq[(K,This)],This=>Option[(K,R)])=>Unit = (r,ctx,get) => {
+    val process : (Boolean,(K,R),Seq[(K,This)],This=>(K,R))=>Unit = (b,r,ctx,get) => {
       val keys = ctx.tail.map(_._1).reverse.tail
-      todo = ((keys,r)) +: todo
+      todo = ((keys,(ctx.head._1,r._2))) +: todo  //keep current node key, and assign computed result node
+      if (!b) { //reserve node in the result in order to keep the right order
+        val parent = get(ctx.tail.head._2)
+        parent._2(ctx.head._1) = null.asInstanceOf[R]
+      }
     }
-    import PrefixLoop._
     val r = (new PrefixLoop.RecurRecTreeNoDataSameKey[K,V,W,R,This] {
       def mapValues(ctx: Context): Values = (ctx.head._2.value,null)
-      override protected def buildResult(ctx:Context,v:Values,loop:((Result,Context)=>Any) => Unit):Result = {
-        val b = bf.newEmpty
-        loop {(r,c)=> b += r}
-        (ctx.head._1,b.result(v._1,null))
-      }
-    })((null.asInstanceOf[K],this), fetch)
+    })((null.asInstanceOf[K],this), process)
     for (x <- todo) {
       val nd = r(x._1:_*)
-      println(x._1+"/"+x._2._1)
-      // nd(x._2._1) = x._2._2
+      nd(x._2._1) = x._2._2
     }
     r
   }

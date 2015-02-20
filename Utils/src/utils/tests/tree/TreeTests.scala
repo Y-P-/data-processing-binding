@@ -535,13 +535,13 @@ object TreeTests {
     val xm1:MutablePrefixTree[String,Int] = xm.copy(MutablePrefixTree.builder[String,Int])
     out.println(xm1)
     out.println(xm1("d") eq xm1("f","d"))
-   // out.println(xm1("e") eq xm1("f","x"))
+    out.println(xm1("e") eq xm1("f","x"))
   }
 
   def main(args:Array[String]):Unit = {
     implicit val out = new PrintWriter(System.out)
-    testFlatMap1
+    //testFlatMap1
+    (new TreeTests).apply(false,true)
     out.flush
-    //(new TreeTests).apply(false,true)
   }
 }
