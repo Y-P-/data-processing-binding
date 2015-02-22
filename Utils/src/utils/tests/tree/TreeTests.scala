@@ -568,6 +568,10 @@ object TreeTests {
     out.println(x1("c","b") eq x1)
     out.println(x1("c","c") eq x3)
     out.println(x1("c") eq x3("c"))
+    //check that not everything is equal!!!
+    out.println(x1 eq x2)
+    out.println(x1 eq x3)
+    out.println(x2 eq x3)
   }
 
   def main(args:Array[String]):Unit = {
