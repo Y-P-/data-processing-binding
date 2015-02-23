@@ -50,10 +50,6 @@ class TreeTests extends StandardTester {
     t(26,testPartition)
     t(27,testMutable)
     t(28,testInfinite)
-		//navigable
-		//navigables in zip/other operations
-		//references
-		//references in zip/other operations
 	}
 }
 

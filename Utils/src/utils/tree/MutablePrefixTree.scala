@@ -11,7 +11,6 @@ import scala.collection.mutable.LinkedHashMap
  *  - the default function
  *  - entries in the sub tree
  *  It is made compatible with PrefixTree (but usual PrefixTree cannot of course downclass to Mutable...)
- *  Mutability is not compatible with upwards navigation and is forcibly disabled.
  */
 abstract class MutablePrefixTree[K,V] protected extends PrefixTree[K,V] with MutablePrefixTreeLike[K,V,MutablePrefixTree[K,V]] {
   def value_=(v:Option[V]):Unit
@@ -32,7 +31,7 @@ object MutablePrefixTree extends PrefixTreeLikeBuilder.Factory2i {
   /** The actual Parameters required to build a PrefixTree.
    */
   class Params[K,V,T<:Tree[K,V] with PrefixTreeLike[K,V,T]](noDefault:K=>T,stripEmpty:Boolean,mapKind:scala.collection.mutable.Map[K,T])
-        extends super.Params[K,V,T](noDefault,stripEmpty,PrefixTreeLike.nonNavigable) {
+        extends super.Params[K,V,T](noDefault,stripEmpty) {
     def emptyMap: Map[K,T] = mapKind.empty
   }
   object Params {
@@ -43,7 +42,6 @@ object MutablePrefixTree extends PrefixTreeLikeBuilder.Factory2i {
   /** A factory for working with varied map kinds if necessary.
    */
   implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, MutablePrefixTree[K, V]] { type Params=P0[K,V] } = {
-    if (p.navigable!=PrefixTreeLike.nonNavigable) throw new IllegalArgumentException("tree navigability is not allowed for mutable trees")
     new PrefixTreeLikeBuilder[K, V, MutablePrefixTree[K, V]] { self=>
       type Params = P0[K,V]
       val params:Params = p

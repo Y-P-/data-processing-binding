@@ -58,24 +58,27 @@ import scala.annotation.switch
  *  `default` doesn't have to handle all possible keys. Whenever it doesn't handle a key, it can throw
  *  whatever exception, or `PrefixTreeLike.NoDefault[K]` which then calls another 'global' default method.
  *
- *  There are usually three kinds of trees, in ascending order of complexity, memory footprint, building speed:
- *  - Standard trees provide no way to ascend into the tree.
- *    It is strongly recommended to use these trees unless some navigation is absolutely necessary.
- *    Note that most methods that deal with trees (`foreach`, `fold`...) have a variant that hand the
- *    current path to the tree top as parameter (context) : this often makes it unnecessary to be able
- *    to actually navigate trees.
- *  - Weak Navigable trees allow access to the parent, BUT it relies on mutation and may sometimes be
- *    unsafe to use ; in particular, a tree that is built using shared branches may have incorrect parents.
- *    These trees can contain sub-parts that are not navigable.
- *  - Strong Navigable trees are just like weak navigable trees, but nodes are always rebuilt on assignment.
- *    In particular, these tree nodes always correctly point to the right parent. However, the building
- *    cost is usually expensive. Nodes are still mutable on the remove operation where the parent is reset
- *    to null.
- *
  *  Building a tree involves a parameter that specifies some of the implementation details:
  *  - `noDefault` fallback method to handle the PrefixTreeLike.NoDefault[K] exception
  *  - `stripEmpty` which specifies whether to keep degenerated nodes
- *  - `navigable` which spefies the navigability capabilities of the tree (see above)
+ *  It is usually a two step process:
+ *  - fetch a builder: e.g. 'val bd = MutablePrefixTree.builder[String,Int]' will fetch a builder for
+ *    MutablePrefixTree[String,Int] using the currently viewed implicit parameter.
+ *  - build nodes and pluck them together. On a non mutable tree, this has to be done from down up.
+ *    e.g. 'val nd1 = bd(1)  //terminal node with value 1'
+ *         'val nd2 = bd(2,"a"->nd1,"b"->nd1) //node with value 2 and two children, both pointing on the same nd1 leaf'
+ *  Another way to build a tree is to describe it as its flat canonical representation, then to gobble it up in
+ *  one unique call. e.g.
+ *    'bd.fromFlat(Seq(
+ *       (Seq("x","y"),1),
+ *       (Seq("x","y","z"),2),
+ *       (Seq("x"),3),
+ *       (Seq("x","v"),4),
+ *       (Seq("z","a","b"),6),
+ *       (Seq("z"),7),
+ *       (Seq(),8)
+ *     )))'
+ *  which would create a tree containing all the described paths and values.
  *
  *  The main difference between the methods in this class and the parent class is the way `default` is hanled.
  *  Here, an effort is made to specifically use the current tree default where this is possible.
@@ -97,7 +100,6 @@ import scala.annotation.switch
  *    `def - (key: K): Repr`          //can throw an exception as no internal method requires it
  *
  *    For classes that support upwards navigation (not recommended):
- *    `def isNavigable:Boolean`       //if your class supports navigation upwards
  *    `def parent:Repr`
  *    `def depth:Int`
  *
@@ -161,13 +163,6 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   def update1[W>:V,T>:Repr<:PrefixTreeLike[K,W,T]](kv:(K,T))(implicit bf:PrefixTreeLikeBuilder[K,W,T]): T
 
-  /** tells if the two following method should work with no exception */
-  def isNavigable:Boolean = false
-  /** the parent of that PrefixTree ; this is not required and usually makes the implementation heavier */
-  def parent:Repr = throw new NotImplementedError(s"parent is not accessible in that implementation: $getClass")
-  /** the depth within the tree ; this is not required and usually makes the implementation heavier */
-  def depth:Int   = throw new NotImplementedError(s"depth is not accessible in that implementation: $getClass")
-
 
   //an internal utility to correctly rebuild default when necessary
   @inline final protected def asDefault[L,T](f:L=>T):L=>T = if (default==null) null else f
@@ -193,7 +188,8 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     e = withDefault(k=>e)(newBuilder)
     e
   }
-  /** The clone of this tree is the same tree using the same builder, cloning each sub-tree
+  /** The clone of this tree is the same tree using the same builder, cloning each sub-tree.
+   *  However, @see xcopy below.
    */
   override def clone:Repr = {
     val bf = newBuilder
@@ -769,11 +765,6 @@ object PrefixTreeLike {
 
   implicit def toSeq[T<:PrefixTreeLike[_,_,T]](t:T):t.SeqView = t.seqView()
 
-  sealed class NavigableMode(val id:Int)
-  val nonNavigable    = new NavigableMode(0)
-  val unsafeNavigable = new NavigableMode(1)
-  val safeNavigable   = new NavigableMode(2)
-
   /** The minimum for building the Params used by the Tree implementation.
    */
   class Params[K,+V,+T<:PrefixTreeLike[K,V,T]] (
@@ -789,10 +780,7 @@ object PrefixTreeLike {
      *  As a consequence, some defined sequences of keys that led to such values will disappear,
      *  and if invoked, they will fall back on the default.
      */
-    val stripEmpty:Boolean,
-    /** The tree is built with navigable elements.
-     */
-    val navigable:NavigableMode
+    val stripEmpty:Boolean
   )
 
   /** An abstract class for the trait. Used to share code.
