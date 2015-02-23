@@ -217,7 +217,7 @@ object PrefixTreeLikeBuilder {
     implicit def toBuilder[V](g:this.type)(implicit p:P0[V]) = g.builder(p)
   }
 
-  /** Idem : remove covariance */
+  /** Idem : removes covariance */
   abstract class Factory1i[K0] {
     type K = K0
     type Tree[v] <: PrefixTreeLike[K,v,Tree[v]]
