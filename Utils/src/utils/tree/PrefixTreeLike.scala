@@ -428,40 +428,68 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
     genMap(null.asInstanceOf[K],(x:(K,This))=>x._2.value.flatMap(z=>Some(f(z))))
 
 
-  /** 'cloning' this tree.
-   *  It also lets change the underlying Tree representation.
-   *  It will respect the actual tree structure which may contain inner references or
-   *  cross references onto other trees.
-   *  However, keeping defaults make no sense (they could refer to the old tree) so we discard them.
+  /** A map operation that preserves the memory identity semantics of the original tree.
+   *  Use this only for 'infinite' trees, or 'degenerate' trees that require such semantics.
+   *  Defaults are ignored.
    */
-  def copy[W>:V,R<:MutablePrefixTreeLike[K,W,R]](implicit bf: PrefixTreeLikeBuilder[K,W,R]):R = {
+  def xmap[L,W,R<:MutablePrefixTreeLike[L,W,R]](fk:K=>L,fv:V=>W)(implicit bf: PrefixTreeLikeBuilder[L,W,R]):R = {
     //here we keep the list of keys to the node where a child is not yet filled up ; the key for that child ; a way to retrieve the result later
-    var todo = List[(Seq[K],K,()=>R)]()
+    var todo = List[(Seq[L],L,()=>R)]()
     //processes duplicate entries
-    val process : (Option[(K,R)],Seq[(K,This)],This=>Option[(K,R)])=>Option[(K,R)] = (r,ctx,fetch) => r match {
+    val process : (Boolean,Option[(L,R)],Seq[(K,This)],This=>Option[(L,R)])=>Option[(L,R)] = (immediate,r,ctx,fetch) => r match {
       //the result is not yet ready : keep the current item state in store for later
-      case None    => val keys = ctx.tail.map(_._1).reverse.tail                         //ctx(0) is the missing key, ctx(last) is the virtual top key -null-
-                      todo = ((keys,ctx.head._1,()=>fetch(ctx.head._2).get._2)) +: todo  //get will know the result!
-                      Some((ctx.head._1,bf.empty))                                       //prepare the entry to preserve node order ; set it with a placeholder at this time
+      case None    => val keys = ctx.tail.map(x=>fk(x._1)).reverse.tail        //ctx(0) is the missing key, ctx(last) is the virtual top key -null-
+                      val l = fk(ctx.head._1)
+                      todo = ((keys,l,()=>fetch(ctx.head._2).get._2)) +: todo  //get will know the result!
+                      Some((l,bf.empty))                                       //prepare the entry to preserve node order ; set it with a placeholder at this time
       //here we already have the result : forward it (only the node value is kept, the key from the original entry is of no interest!)
-      case Some(x) => Some(ctx.head._1,x._2)
+      case Some(x) => Some(fk(ctx.head._1),x._2)
     }
     //main loop, discard default
-    val r = (new PrefixLoop.RecurRecTreeNoDataSameKey[K,V,W,R,This] {
-      def mapValues(ctx: Context): Values = (ctx.head._2.value,null)
+    val r = (new PrefixLoop.RecurRecTreeNoData[K,V,L,W,R,This] {
+      def reverseKey: L=>K = null
+      def mapValues(ctx: Context): Values = (fk(ctx.head._1),ctx.head._2.value.map(fv),null)
     })((null.asInstanceOf[K],this), process)
     //once finished, all dangling references should exist!
     for (x <- todo) r(x._1:_*)(x._2) = x._3()  //assign unknown nodes by calling the method 'which knows the appropriate result'!
     r
   }
 
+  /** A copy operation that preserves the memory identity semantics of the original tree.
+   *  Use this only for 'infinite' trees, or 'degenerate' trees that require such semantics.
+   *  Defaults are ignored.
+   */
+  def xcopy[W>:V,R<:MutablePrefixTreeLike[K,W,R]](implicit bf: PrefixTreeLikeBuilder[K,W,R]):R =
+    xmap[K,W,R](identity,identity)
+
+
+  /** Iterates through an 'infinite' tree.
+   *  While 'f' is called on each node (even duplicated ones), children of duplicated
+   *  nodes are not explored.
+   *  As all methods deeling with 'infinite' trees, this is costly and should be avoided
+   *  when you know that your tree is not 'infinite'.
+   *  You may also wish to use this method too on 'degenerate' trees if you don't want
+   *  to explore duplicated nodes more than once.
+   */
+  def xdeepForeachRec(k0:K)(f:(Seq[(K,This)],=>Unit)=>Any):Unit =
+    PrefixLoop.loopRec[K,V,This](f)((k0,this),(immediate,r,ctx,fetch) => { if (immediate) f(ctx,()); None })
+  def xdeepForeach(k0:K)(f:((K,This),=>Unit)=>Any):Unit =
+    PrefixLoop.loop[K,V,This](f)((k0,this),(immediate,r,ctx,fetch) => { if (immediate) f(ctx,()); None })
+
+  /** A fold operation for infinite trees, with the same limitations as above.
+   */
+  def xdeepFoldLeft[U](u0:U,k0:K,topFirst:Boolean)(f: (U, (K,This)) => U): U =
+    PrefixLoop.fold(u0,topFirst,f)(xdeepForeach(k0) _)
+  def xdeepFoldLeftRec[U](u0:U,k0:K,topFirst:Boolean)(f: (U, Seq[(K,This)]) => U): U =
+    PrefixLoop.fold(u0,topFirst,f)(xdeepForeachRec(k0) _)
+
   /** Transforms this tree by applying a function to every retrieved value and key.
    *  It works also on default values, but be aware that using deep trees
    *  in the default results may lead to a severe performance load.
    *  @param  f the function used to transform the keys and values of this tree.
    *            it must be bijective in K<=>L if there are any default involved,
-   *            and in that case, f._2 must be given ; otherwise it can be null
-   *            and bijectivity is not compulsory
+   *            and in that case, f._2 must be given ; otherwise it can be null,
+   *            bijectivity is not compulsory but defaults are ignored.
    *  @return a tree which maps every element of this tree.
    *          The resulting tree is a new tree.
    */

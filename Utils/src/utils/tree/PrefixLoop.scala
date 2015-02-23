@@ -134,6 +134,8 @@ object PrefixLoop {
      *         part contain more than one element correspond to skipped contexts.
      *  @param reprocess, the method that gets called whenever a result becomes available for some node that could not
      *         be processed immediately (due to a looping reference to itself among its children) ; that method is handled:
+     *         - a boolean that tells if the call is 'on-time', i.e. at the expected time and place (true),
+     *           or delayed (false) because it could not be completed yet (which happens when the node is a child of itself)
      *         - the context for the waiting node
      *         - an option containing the result for the node ; None if that result is yet not computed
      *         - a method that will return the result for any already successfully processed node (including itself)
@@ -142,14 +144,14 @@ object PrefixLoop {
      *         to some Result.
      *  @return the Result for that ctx ; it may be unknown if it is being processed (current node refers to a parent)
      */
-    final protected def recur(ctx: Context, seen:java.util.IdentityHashMap[This,(List[Context],Option[Result])], reprocess:(Option[Result],Context,This=>Option[Result])=>Option[Result]):Option[Result] = {
+    final protected def recur(ctx: Context, seen:java.util.IdentityHashMap[This,(List[Context],Option[Result])], reprocess:(Boolean,Option[Result],Context,This=>Option[Result])=>Option[Result]):Option[Result] = {
       def fetch:This=>Option[Result] = x => if (seen.containsKey(x)) seen.get(x)._2 else None
       val nd = getCurrent(ctx)._2
       if (seen.containsKey(nd)) { //don't process : fetch current result
         val l = seen.get(nd)
         if (l._2==None)
           seen.put(nd,(ctx +: l._1, None))
-        reprocess(l._2,ctx,fetch)
+        reprocess(true,l._2,ctx,fetch)
       } else {
         seen.put(nd,(Nil,None))
         val r = Some(mapValues(ctx) match {
@@ -166,7 +168,7 @@ object PrefixLoop {
         })
         val waiting = seen.get(nd)._1
         seen.put(nd,(Nil, r))
-        for (c <- waiting) reprocess(r,c,fetch)
+        for (c <- waiting) reprocess(false,r,c,fetch)
         r
       }
   }
@@ -201,7 +203,7 @@ object PrefixLoop {
      *  @return the Result of the transformation
      */
     @throws(classOf[NoSuchElementException])
-    final def get(d0:Data, reprocess:(Option[Result],Context,This=>Option[Result])=>Option[Result]): Result = recur(initialize(d0),new java.util.IdentityHashMap[This,(List[Context],Option[Result])],reprocess).get
+    final def get(d0:Data, reprocess:(Boolean,Option[Result],Context,This=>Option[Result])=>Option[Result]): Result = recur(initialize(d0),new java.util.IdentityHashMap[This,(List[Context],Option[Result])],reprocess).get
   }
 
   //traits for cases with (or without) specific X data
@@ -290,7 +292,7 @@ object PrefixLoop {
     final def apply(d0:Data): R = get(d0)._2
     /** Running against the current tree */
     @throws(classOf[NoSuchElementException])
-    final def apply(d0:Data,reprocess:(Option[Result],Context,This=>Option[Result])=>Option[Result]): R = get(d0,reprocess)._2
+    final def apply(d0:Data,reprocess:(Boolean,Option[Result],Context,This=>Option[Result])=>Option[Result]): R = get(d0,reprocess)._2
   }
 
   //traits for building View
@@ -470,7 +472,7 @@ object PrefixLoop {
     final def apply(d0:Data): Result = get(d0)
     /** Running against the current tree. */
     @throws(classOf[NoSuchElementException])
-    final def apply(d0:Data,reprocess:(Option[Result],Context,This=>Option[Result])=>Option[Result]): Result = get(d0,reprocess)
+    final def apply(d0:Data,reprocess:(Boolean,Option[Result],Context,This=>Option[Result])=>Option[Result]): Result = get(d0,reprocess)
   }
 
   /** Defines some common behavior when the iteration deals with applying a method to each node.

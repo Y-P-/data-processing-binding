@@ -533,12 +533,12 @@ object TreeTests {
     xm.tree ++= Seq("d"->xc11,"e"->xc12,"f"->xc13)
     out.println(xm)
     //check copy operation on this basic case
-    val xm1 = xm.copy[Int,MutablePrefixTree[String,Int]]
+    val xm1 = xm.xcopy[Int,MutablePrefixTree[String,Int]]
     out.println(xm1)
     out.println(xm1("d") eq xm1("f","d"))
     out.println(xm1("e") eq xm1("f","x"))
   }
-  
+
   def testInfinite(implicit out:PrintWriter) = {
     //rebuild tree using mutability
     val bd = MutablePrefixTree.builder[String,Int]
@@ -550,14 +550,14 @@ object TreeTests {
     xm3("a") = xm1  //rotating dependency
     xm1("b") = xm1  //self dependency
     xm2("b") = xm1  //another loop
-    xm3("b") = xm2  //and a other
+    xm3("b") = xm2  //and another
     xm1("c") = bd(4) //new layer
     xm1("c")("a") = xm2 //another cycle at a lower level
     xm1("c")("b") = xm1 //another cycle at a lower level
     xm1("c")("c") = xm3 //another cycle at a lower level
     xm3("c") = xm1("c") //yet another
     //check copy operation on this complex case (no standard print! would loop forever)
-    val x1 = xm1.copy[Int,MutablePrefixTree[String,Int]]
+    val x1 = xm1.xcopy[Int,MutablePrefixTree[String,Int]]
     val x2 = x1("a")
     val x3 = x2("a")
     out.println(x3("a") eq x1)
@@ -572,6 +572,17 @@ object TreeTests {
     out.println(x1 eq x2)
     out.println(x1 eq x3)
     out.println(x2 eq x3)
+    //check foreach: this will write a flat representation of the infinite tree
+    xm1.xdeepForeach("z") { (kv,loop)=>
+      out.print(s"${kv._1}->(${kv._2.value}){")
+      loop
+      out.print(s"}")
+    }
+    out.println
+    //check fold: this should write the string of all node values, in the same order as in the previous foreach
+    out.println(xm1.xdeepFoldLeft("","z",true) { (u,kv)=> u+kv._2.value.get })
+    //idem, but using the down->up order
+    out.println(xm1.xdeepFoldLeft("","z",false) { (u,kv)=> u+kv._2.value.get })
   }
 
   def main(args:Array[String]):Unit = {

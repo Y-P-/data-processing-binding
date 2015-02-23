@@ -7,7 +7,7 @@ import scala.annotation.switch
 
 /** This provides the standard implementation for PrefixTreeLike. not surprisingly, it sits on Maps.
  *  This opens up some opportunities by using Map operations.
- *  Other esoteric implementation could exist, but this one should satisfy most needs, especially
+ *  Other implementation could exist, but this one should satisfy most needs, especially
  *  when it can be subclassed while keeping the same subtype for operation return (such as + etc.)
  *  See the StringTree subclass in the test code.
  *
@@ -46,8 +46,9 @@ object PrefixTree extends PrefixTreeLikeBuilder.Factory2 {
   }
   object Params {
     protected val p0 = new Params[Any,Any,Tree[Any,Any]](PrefixTreeLikeBuilder.noElt,true,PrefixTreeLike.nonNavigable,LinkedHashMap.empty[Any,Tree[Any,Any]])
-    //This is the default parameter set used
-    //the default value implies the LinkedHashMap Map implementation which preserve the iteration order.
+    //This is the default parameter set used.
+    //The default value implies the LinkedHashMap Map implementation which preserve the iteration order.
+    //We would prefer an immutable implementation but there is none.
     //The cast is OK because in this case, neither V nor K are actually used.
     //We also choose the simplest implementation: no empty node, not navigable
     //You can always redefine another implicit in your scope to override this!

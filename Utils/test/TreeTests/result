@@ -194,3 +194,21 @@ null={a={}()aa={}(1)ab={aab={d={}(5)}(3)aac={}(4)}(2)}()--------26--------
 Tree{7}(d -> Tree{4}(b -> Tree{2}(), a -> Tree{1}()), f -> Tree{6}(d -> Tree{4}(b -> Tree{2}(), a -> Tree{1}()), x -> Tree{5}(c -> Tree{3}())), e -> Tree{5}(c -> Tree{3}()))
 --------27--------
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
+Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
+true
+true
+--------28--------
+true
+true
+true
+true
+true
+true
+true
+true
+false
+false
+false
+z->(Some(1)){a->(Some(2)){a->(Some(3)){a->(Some(1)){}b->(Some(2)){}c->(Some(4)){a->(Some(2)){}b->(Some(1)){}c->(Some(3)){}}}b->(Some(1)){}}b->(Some(1)){}c->(Some(4)){}}
+123124213114
+122134312141
