@@ -53,6 +53,7 @@ class TreeTests extends StandardTester {
     t(29,testDOM1)
     t(30,testDOM2)
     t(31,testDOM3)
+    t(32,testDOM4)
 	}
 }
 
@@ -586,7 +587,7 @@ object TreeTests {
 
   def testDOM1(implicit out:PrintWriter) = {
     val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
-    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,_.toString,null)
+    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,(_:Int).toString,null)
     val dom = m.copy[Int,DOMPrefixTree[Int]]
     //print as xml
     dom.asXml(out, false)
@@ -598,7 +599,7 @@ object TreeTests {
   }
   def testDOM2(implicit out:PrintWriter) = {
     val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
-    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,_.toString,"@value")
+    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,(_:Int).toString,"@value")
     val dom = m.copy[Int,DOMPrefixTree[Int]]
     //print as xml with attributes
     dom.asXml(out, false)
@@ -610,7 +611,19 @@ object TreeTests {
   }
   def testDOM3(implicit out:PrintWriter) = {
     val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
-    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,_.toString,"value")
+    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,(_:Int).toString,"value")
+    val dom = m.copy[Int,DOMPrefixTree[Int]]
+    //print as xml with additional node for value
+    dom.asXml(out, false)
+    out.println
+    //check that actual values are accessible
+    out.println(dom("f","d","a").value)
+    out.println(dom("f").value)
+    out.println(dom.value)
+  }
+  def testDOM4(implicit out:PrintWriter) = {
+    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
+    implicit val params  = DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,dbf.newDocumentBuilder.newDocument,"_",(_:Int).toString,"val",identity[String] _)
     val dom = m.copy[Int,DOMPrefixTree[Int]]
     //print as xml with additional node for value
     dom.asXml(out, false)
