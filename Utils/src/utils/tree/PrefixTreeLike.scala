@@ -423,6 +423,11 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
   def map[W,R<:PrefixTreeLike[K,W,R]](f:V=>W)(implicit bf:PrefixTreeLikeBuilder[K,W,R]):R =
     genMap(null.asInstanceOf[K],(x:(K,This))=>x._2.value.flatMap(z=>Some(f(z))))
 
+  /** Copies this PrefixTreeLike into some other representation.
+   */
+  def copy[W>:V,R<:PrefixTreeLike[K,W,R]](implicit bf:PrefixTreeLikeBuilder[K,W,R]):R =
+    map[W,R](identity[V] _)
+
 
   /** A map operation that preserves the memory identity semantics of the original tree.
    *  Use this only for 'infinite' trees, or 'degenerate' trees that require such semantics.

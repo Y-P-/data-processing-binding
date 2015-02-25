@@ -2,56 +2,89 @@ package utils.tree
 
 import scala.collection.Map
 import scala.collection.GenTraversableOnce
-import org.w3c.dom.Document
-import org.w3c.dom.Element
+import scala.collection.JavaConversions._
+import scala.annotation.tailrec
+import org.w3c.dom.{Document,Element,Node,NodeList}
+import javax.xml.transform.{TransformerFactory,OutputKeys}
+import javax.xml.transform.dom.DOMSource
+import javax.xml.transform.stream.StreamResult
+import java.io.Writer
 
 /** This provides an implementation based on DOM.
  *  This is costly to use, but provides access to advanced features from the W3 world, such as xpath or xquery.
- *  Here, keys are String and are associated to the DOM local name (no namespace used.)
- *  Nodes are stored as user data in the "" key.
+ *  - keys are element names
+ *  - the PrefixTree node is stored in the user data (key "")
+ *  - the DOM node may have a text representation for V in its last child OR as an attribute
+ *  - the DOM may flatten terminal leaves into attributes
+ *  This DOM contains only Element , Attribute and Text nodes. In any case, it contains:
+ *  - one Element or Attribute for each child entry
+ *  - possibly one Text or Attribute child for the stored V string value
+ *  The DOM provides the whole navigation/storage infrastructure and the DOMPrefixTree class provides only the
+ *  glue to PrefixTreeLike: DOMPrefixTree is mostly a wrapper
  */
 abstract class DOMPrefixTree[+V] protected extends PrefixTreeLike.Abstract[String,V,DOMPrefixTree[V]] {
+  import DOMPrefixTree._
   def elt:Element
   def value:Option[V]
-  def update1[W>:V,T>:Repr<:PrefixTreeLike[String,W,T]](kv:(String,T))(implicit bf:PrefixTreeLikeBuilder[String,W,T]): T = bf(value,tree+kv,default)
-  def -(key: String): Repr              = newBuilder(value,tree-key,default)
-  def get(key: String): Option[Repr]    = Option(if (isAttribute(key)) elt.getAttribute(key) else elt.getElement(key))
-  def iterator:Iterator[(String, Repr)] = new Iterator[(String, Repr)] {
+  def update1[W>:V,T>:Repr<:PrefixTreeLike[String,W,T]](kv:(String,T))(implicit bf:PrefixTreeLikeBuilder[String,W,T]): T = bf(value,iterator++Some(kv),default)
+  def -(key: String): Repr = newBuilder(value,iterator.filter(_._1==key),default)
+  def get(key: String): Option[Repr] = Option(elt.getElementsByTagName(key).item(0))
+  /** additional method to recover all children having the same tag */
+  def getAll(key: String): Iterator[Repr] = elt.getElementsByTagName(key).map(DOMPrefixTree.getNode[V,Repr])
+  /* overridden for efficiency or necessity */
+  override def isEmpty: Boolean = elt.getChildNodes.getLength<=1 && size==0
+  override def foreach[U](f: ((String,Repr)) => U): Unit = iterator.foreach(f)
+  override def update[W>:V,T>:Repr<:PrefixTreeLike[String,W,T]](kv:GenTraversableOnce[(String,T)])(implicit bf:PrefixTreeLikeBuilder[String,W,T]): T = bf(value,iterator ++ kv,default)
 
+  /** XML representation of this Node
+   */
+  def asXml(out:Writer, indent:Boolean) = {
+     val tf = TransformerFactory.newInstance.newTransformer
+     tf.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes")
+     tf.setOutputProperty(OutputKeys.INDENT, if (indent) "yes" else "no")
+     tf.transform(new DOMSource(elt), new StreamResult(out))
+     out.flush
   }
-  /* overridden for efficiency */
-  override def size: Int        = elt.getChildNodes.getLength
-  override def isEmpty: Boolean = !elt.hasChildNodes
-  override def foreach[U](f: ((String,Repr)) => U): Unit = for (i <- 0 until size) {
-    val e = elt.getChildNodes.item(i)
-    f(e.getLocalName,e.getUserData("").asInstanceOf[DOMPrefixTree[V]])
-  }
-  override def update[W>:V,T>:Repr<:PrefixTreeLike[String,W,T]](kv:GenTraversableOnce[(String,T)])(implicit bf:PrefixTreeLikeBuilder[String,W,T]): T = bf(value,tree ++ kv,default)
 }
 
 /** The PrefixTree object contains:
  *  - concrete implementations for PrefixTree
  *  - a factory for building the most appropriate implementation
  */
-object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1 {
-  type Tree[+v] = DOMPrefixTree[v]
-  type P0[k,+v] = Params[v,DOMPrefixTree[v]]
+object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
+  type Tree[v] = DOMPrefixTree[v]
+  type P0[v] = Params[v,DOMPrefixTree[v]]
 
-  /** The actual Parameters required to build a PrefixTree.
+  implicit def getNode[V,R<:DOMPrefixTree[V]](elt:Node):R = elt.getUserData("").asInstanceOf[R]
+
+  implicit class NodeListIterator(val nd:NodeList) extends Iterator[Node] {
+    val lg = nd.getLength-1
+    var i  = -1
+    override def length = lg
+    def hasNext: Boolean = i<lg
+    def next: Node = { i+=1; nd.item(i) }
+  }
+
+  /** The actual Parameters required to build a DOMPrefixTree.
+   *  It contains many settings.
+   *  - noDefault is from the parent
+   *  - stripEmpty is from the parent
+   *  - doc is the document used for the DOM ; it should change for each tree, and this prevents any implicit default //XXX check this
+   *  - topTag is the tag to be used for the top node
+   *  - toText is a method to convert V to a text value ; if null the value is not output as text
+   *  - valueTag is the name of the tag for the value ; if null or "", the value is output as a text node that comes last
+   *    otherwise is output either as an Element containing a single TextNode or an attribute, depending on how the tag gets analyzed
+   *  - asAttr is a method that determines when a tag should be output as an attribute:
+   *    1) whatever the return value, an attribute is only valid for a terminal leaf
+   *    2) if asAttr returns either null or "" for the tag, then the result is an Element, otherwise an attribute
    */
-  class Params[+V,+T<:Tree[V] with PrefixTreeLike[String,V,T]](noDefault:String=>T,stripEmpty:Boolean)
-        extends super.Params[String,V,T](noDefault,stripEmpty) {
-   // def emptyMap: Map[K,T] = mapKind.empty
+  class Params[V,T<:Tree[V] with PrefixTreeLike[String,V,T]](noDefault:String=>T,stripEmpty:Boolean,val doc:Document,val topTag:String,val toText:V=>String,val valueTag:String,val asAttr:String=>String)
+        extends super.Params[V,T](noDefault,stripEmpty) {
+    val valueAttrTag = if (asAttr==null) null else if (valueTag!=null && valueTag.length>0) asAttr(valueTag) else null
   }
   object Params {
-    protected val p0 = new Params[Any,Tree[Any]](PrefixTreeLikeBuilder.noElt,true)
-    //This is the default parameter set used.
-    //The default value implies the LinkedHashMap Map implementation which preserve the iteration order.
-    //We would prefer an immutable implementation but there is none.
-    //The cast is OK because in this case, neither V nor K are actually used.
-    //We also choose the simplest implementation: no empty node
-    //You can always redefine another implicit in your scope to override this!
-    implicit def default[K,V,T<:Tree[V] with PrefixTreeLike[K,V,T]] = p0.asInstanceOf[Params[V,T]]
+    //a simplified factory with standard defaults ; attributes are recognized by starting with @ (which anyway is not valid for elements)
+    def apply[V](doc:Document,toText:V=>String,attrTag:String):Params[V,Tree[V]] = new Params[V,Tree[V]](PrefixTreeLikeBuilder.noElt,true,doc,"_",toText,attrTag,x=>{if (x(0)=='@') x.substring(1) else null })
   }
 
   /** The first concrete PrefixTree class.
@@ -60,34 +93,56 @@ object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1 {
    *  It's constructor is protected because we want users to only rely on PrefixTree[K,V] and use the factory method.
    *  params is made implicit to facilitate code writing below.
    */
-  class Abstract[K,V] protected (implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V] {
-    def tree: Map[K,Repr] = params.emptyMap
-    override def isNonSignificant = false
+  class Abstract[V](val elt:Element, val value:Option[V])(implicit val params:P0[V]) extends DOMPrefixTree[V] with super.Abstract[V] {
+    elt.setUserData("", this, null)  //XXX data handler
+    if (value!=None && params.toText!=null) {
+      val txt = params.toText(value.get)
+      //case 1: V text is an attribute
+      if (params.valueAttrTag!=null && params.valueAttrTag.length>0)
+        elt.setAttribute(params.valueAttrTag,txt)
+      //case 2: V text is a text node inside a standard element node
+      else if (params.valueTag!=null && params.valueTag.length>0) {
+        val elt1 = params.doc.createElement(params.valueTag)
+        elt1.appendChild(params.doc.createTextNode(txt))
+        elt.appendChild(elt1)
+      //case 3: V text is a text node
+      } else {
+        elt.appendChild(params.doc.createTextNode(txt))
+      }
+    }
+    def iterator:Iterator[(String, Repr)] = elt.getChildNodes.filter { x=>
+      //yields all children: must remove V text node/attribute (and possible super element) but keep possible leaves flattened as attributes
+      x.getNodeType match {
+        case Node.ELEMENT_NODE   => params.valueTag!=x.getNodeName     //sub child if doesn't contain the V text representation
+        case Node.ATTRIBUTE_NODE => params.valueAttrTag!=x.getNodeName //sub child if doesn't contain the V text representation
+        case Node.TEXT_NODE      => false                              //never a proper sub child
+      }
+    }.map(e=>(e.getNodeName,e))
     override def newBuilder = super[Abstract].newBuilder
   }
 
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass Abstract so as to minimize the memory footprint for each node.
    */
-  implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type Params=P0[K,V] } = {
-    new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
-      type Params = P0[K,V]
+  implicit def builder[V](implicit p:P0[V]):PrefixTreeLikeBuilder[String, V, DOMPrefixTree[V]] { type Params=P0[V] } = {
+    new PrefixTreeLikeBuilder[String, V, DOMPrefixTree[V]] {
+      type Params = P0[V]
       val params:Params = p
-      def newEmpty:PrefixTreeLikeBuilder[K,V,Repr] = builder[K,V](params)
+      def newEmpty:PrefixTreeLikeBuilder[String,V,Repr] = builder[V](params)
 
       def apply(v: Option[V], t: GenTraversableOnce[(K, Repr)], d: K=>Repr):Repr = {
-        val t0 = params.emptyMap ++ t
-        val t1 = if (p.stripEmpty) t0.filterNot(_._2.isNonSignificant) else t0
-        (if (v==None) 0x100 else 0)+(if (t1.isEmpty) 0x10 else 0)+(if (d==null) 0x1 else 0: @switch) match {
-          case 0x111 => new Abstract[K,V] { override def isNonSignificant = true }
-          case 0x110 => new Abstract[K,V] { override val default = d }
-          case 0x101 => new Abstract[K,V] { override val tree = t1 }
-          case 0x100 => new Abstract[K,V] { override val tree = t1; override val default = d }
-          case 0x011 => new Abstract[K,V] { override val value = v }
-          case 0x010 => new Abstract[K,V] { override val value = v; override val default = d }
-          case 0x001 => new Abstract[K,V] { override val value = v; override val tree = t1 }
-          case 0x000 => new Abstract[K,V] { override val value = v; override val tree = t1; override val default = d }
+        val elt = params.doc.createElement(params.topTag)
+        for (x <- t) if (!p.stripEmpty || !x._2.isNonSignificant) {
+          val attr = if (params.asAttr!=null) params.asAttr(x._1) else null
+          if (attr==null || attr.length==0 || x._2.size>0) //standard node
+            elt.appendChild(params.doc.renameNode(x._2.elt, null, x._1))
+          else { //degen node as attribute
+            val a = params.doc.createAttribute(attr)
+            a.setValue("")
+            elt.appendChild(a)
+          }
         }
+        new Abstract[V](elt,v)
       }
     }
   }

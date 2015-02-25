@@ -50,6 +50,9 @@ class TreeTests extends StandardTester {
     t(26,testPartition)
     t(27,testMutable)
     t(28,testInfinite)
+    t(29,testDOM1)
+    t(30,testDOM2)
+    t(31,testDOM3)
 	}
 }
 
@@ -579,6 +582,43 @@ object TreeTests {
     out.println(xm1.xdeepFoldLeft("","z",true) { (u,kv)=> u+kv._2.value.get })
     //idem, but using the down->up order
     out.println(xm1.xdeepFoldLeft("","z",false) { (u,kv)=> u+kv._2.value.get })
+  }
+
+  def testDOM1(implicit out:PrintWriter) = {
+    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
+    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,_.toString,null)
+    val dom = m.copy[Int,DOMPrefixTree[Int]]
+    //print as xml
+    dom.asXml(out, false)
+    out.println
+    //check that actual values are accessible
+    out.println(dom("f","d","a").value)
+    out.println(dom("f").value)
+    out.println(dom.value)
+  }
+  def testDOM2(implicit out:PrintWriter) = {
+    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
+    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,_.toString,"@value")
+    val dom = m.copy[Int,DOMPrefixTree[Int]]
+    //print as xml with attributes
+    dom.asXml(out, false)
+    out.println
+    //check that actual values are accessible
+    out.println(dom("f","d","a").value)
+    out.println(dom("f").value)
+    out.println(dom.value)
+  }
+  def testDOM3(implicit out:PrintWriter) = {
+    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
+    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,_.toString,"value")
+    val dom = m.copy[Int,DOMPrefixTree[Int]]
+    //print as xml with additional node for value
+    dom.asXml(out, false)
+    out.println
+    //check that actual values are accessible
+    out.println(dom("f","d","a").value)
+    out.println(dom("f").value)
+    out.println(dom.value)
   }
 
   def main(args:Array[String]):Unit = {
