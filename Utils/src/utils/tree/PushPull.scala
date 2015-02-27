@@ -39,28 +39,46 @@ trait PushPull[-K,-V] {self=>
 
 
 object P {
-  
+
   def apply[K,V](p:PushPull[K,V]):PrefixTraversableOnce[K,V,_] = {
     null
   }
-  
-  def apply[K,V](g:O[K,V]=>Unit):PrefixTraversableOnce[K,V,PrefixTraversableOnce[K,V,T] forSome { type T<:PrefixTraversableOnce[K,V,T] }] = new O[K,V](g).init
-  
-  class O[K,V](g:O[K,V]=>Unit) {
+
+  //def apply[K,V](g:O[K,V]=>Unit):PrefixTraversableOnce[K,V,PrefixTraversableOnce[K,V,T] forSome { type T<:PrefixTraversableOnce[K,V,T] }] = new O[K,V](g).init
+
+  class O[K,V] {
+    var g:this.type=>Unit = _
     var cur:(K,P) = _
     var f1:((K,P))=>Any = _
     class P(key:K,val prev:(K,P)) extends Traversable[(K,P)] with PrefixTraversableOnce[K,V,P] {
       cur = (key,this)
       var value:Option[V] = None
-      def foreach[U](f:((K,P))=>U) = { if (f1==null) { f1=f; g(O.this) }; println(prev._1+"->"+cur._1) }
+      def foreach[U](f:((K,P))=>U) = { if (f1==null) { f1=f; g(O.this) } }
       override def stringPrefix = super[PrefixTraversableOnce].stringPrefix
     }
     def push(key:K):Unit   = new P(key,cur)
     def pull(value:V):Unit = cur._2.value=Some(value)
-    def pull():Unit        = { f1(cur); cur=cur._2.prev }
-    def init()             = new P(null.asInstanceOf[K],null)
+    def pull():Unit        = { val c=cur; cur=cur._2.prev; f1(c) }
+    def init(g0:this.type=>Unit) = { g=g0; new P(null.asInstanceOf[K],null) }
   }
-  
+
+  def main(args:Array[String]):Unit = {
+    val o = new O[String,String]
+    val p = o.init { s=>
+    s.push("a")
+    s.push("b")
+    s.pull("2")
+    s.pull
+    s.pull("1")
+    s.pull
+    }
+    p.deepForeach(null) { (x,r)=>
+      println(s"${x._1}={")
+      r
+      println("}")
+    }
+  }
+
   /** Used to turn the push/pull into a PrefixTraversableOnce.
    *  The 'once' is not to trifle with: even 'hasNext' cannot be called more than once per element!
    *  This implementation is naive as it doesn't care about handling any error.
@@ -75,11 +93,11 @@ object P {
     protected var value0:Option[V] = None
     def value = value0
     def foreach[U](f: ((K, utils.tree.P.Layer[K,V])) ⇒ U):Unit = {
-      
+
     }
     override def stringPrefix = super[PrefixTraversableOnce].stringPrefix
   }
-  
+
 }
 
 object PushPull {
@@ -88,7 +106,7 @@ object PushPull {
   import scala.concurrent.Future
   import scala.concurrent.ExecutionContext
 
-  
+
   /** marker for the PushPull */
   val End = new AnyRef
 

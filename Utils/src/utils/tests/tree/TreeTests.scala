@@ -585,21 +585,9 @@ object TreeTests {
     out.println(xm1.xdeepFoldLeft("","z",false) { (u,kv)=> u+kv._2.value.get })
   }
 
-  def testDOM1(implicit out:PrintWriter) = {
-    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
-    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,(_:Int).toString,null)
-    val dom = m.copy[Int,DOMPrefixTree[Int]]
-    //print as xml
-    dom.asXml(out, false)
-    out.println
-    //check that actual values are accessible
-    out.println(dom("f","d","a").value)
-    out.println(dom("f").value)
-    out.println(dom.value)
-  }
-  def testDOM2(implicit out:PrintWriter) = {
-    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
-    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,(_:Int).toString,"@value")
+  def testDOM(implicit out:PrintWriter, params:DOMPrefixTree.P0[Int]) = {
+    params.doc.createElementNS("urn:my-namespace", "x")
+    //copy m to DOMPrefixTree
     val dom = m.copy[Int,DOMPrefixTree[Int]]
     //print as xml with attributes
     dom.asXml(out, false)
@@ -608,30 +596,39 @@ object TreeTests {
     out.println(dom("f","d","a").value)
     out.println(dom("f").value)
     out.println(dom.value)
+    out.printExc(dom("val"))
+    out.printExc(dom("@val"))
+    //check that the DOMPrefixTree behaves well first by printing it then by copying it back into a PrefixTree
+    out.println(dom)
+    out.println(dom.copy[Int,PrefixTree[String,Int]])
+    //transform with xsl
+    /*
+    val r = dom.transform("src/utils/tests/tree/transform.xsl",dom.params.doc)
+    val dom1 = DOMPrefixTree.bind(r)
+    dom1.asXml(out, false)
+    out.println(dom1)
+    */
+    val r0 = dom.find("/_/d").item(0)
+    val r = DOMPrefixTree.bind(r0)
+    r.asXml(out,false)
+    out.println
+    out.println(r)
+  }
+  def testDOM1(implicit out:PrintWriter) = {
+    //value as text node
+    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,null))
+  }
+  def testDOM2(implicit out:PrintWriter) = {
+    //value as attribute
+    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"@val"))
   }
   def testDOM3(implicit out:PrintWriter) = {
-    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
-    implicit val params  = DOMPrefixTree.Params[Int](dbf.newDocumentBuilder.newDocument,(_:Int).toString,"value")
-    val dom = m.copy[Int,DOMPrefixTree[Int]]
-    //print as xml with additional node for value
-    dom.asXml(out, false)
-    out.println
-    //check that actual values are accessible
-    out.println(dom("f","d","a").value)
-    out.println(dom("f").value)
-    out.println(dom.value)
+    //value in embedded element
+    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"val"))
   }
   def testDOM4(implicit out:PrintWriter) = {
-    val dbf     = javax.xml.parsers.DocumentBuilderFactory.newInstance
-    implicit val params  = DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,dbf.newDocumentBuilder.newDocument,"_",(_:Int).toString,"val",identity[String] _)
-    val dom = m.copy[Int,DOMPrefixTree[Int]]
-    //print as xml with additional node for value
-    dom.asXml(out, false)
-    out.println
-    //check that actual values are accessible
-    out.println(dom("f","d","a").value)
-    out.println(dom("f").value)
-    out.println(dom.value)
+    //some leaves as attributes, use of namespace and renaming of some nodes
+    testDOM(out,DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case x=>x},("my-ns","x")))
   }
 
   def main(args:Array[String]):Unit = {

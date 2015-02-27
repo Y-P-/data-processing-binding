@@ -6,54 +6,93 @@ import scala.collection.JavaConversions._
 import scala.annotation.tailrec
 import org.w3c.dom.{Document,Element,Node,NodeList,NamedNodeMap,Attr}
 import javax.xml.transform.{TransformerFactory,OutputKeys}
-import javax.xml.transform.dom.DOMSource
-import javax.xml.transform.stream.StreamResult
+import javax.xml.transform.dom.{DOMSource,DOMResult}
+import javax.xml.transform.stream.{StreamResult,StreamSource}
+import javax.xml.XMLConstants
+import javax.xml.xpath.XPath
+import javax.xml.xpath.XPathConstants
+import javax.xml.xpath.XPathExpression
+import javax.xml.xpath.XPathExpressionException
+import javax.xml.xpath.XPathFactory
 import java.io.Writer
 
 /** This provides an implementation based on DOM.
  *  This is costly to use, but provides access to advanced features from the W3 world, such as xpath or xquery.
- *  - keys are element names
+ *  - keys are (almost) element names
  *  - the PrefixTree node is stored in the user data (key "")
  *  - the DOM node may have a text representation for V in its last child OR as an attribute
  *  - the DOM may flatten terminal leaves into attributes
- *  This DOM contains only Element , Attribute and Text nodes. In any case, it contains:
+ *  This DOM contains only Element, Attribute and Text nodes. In any case, it contains:
  *  - one Element or Attribute for each child entry
  *  - possibly one Text or Attribute child for the stored V string value
- *  - order is respected as possible, but any item that maps as an attribute will likely see its place changed
+ *  - order is respected as possible, but any item that maps as an attribute may see its place changed
+ *
  *  In this implementation the DOM provides the whole navigation/storage infrastructure and the DOMPrefixTree
  *  class provides only the glue to PrefixTreeLike: DOMPrefixTree is only a wrapper, which is built on demand.
  *  Because of this property, any subtree extracted for the original can easily be traversed as a PrefixTree:
- *  no specific rebuilding is necessary.
+ *  no specific rebuilding is necessary. However, this prevents using default.
+ *
+ *  Names have a specific problem, because XML doesn't accept any input.
+ *  Furthermore, we may want attributes and some way to distinguish them.
+ *  A translation method is given, to convert from any String into an acceptable xml tag. This tag is prefixed
+ *  by @ if we want it to appear as an attribute.
+ *  However, while the DOM only knows the XML names, the associated DOMPrefixTree only knows about the original
+ *  names, not the XML name.
+ *  It is possible to use namespaces provided the prefix are declared in the Params used for building the tree.
+ *
  *  Multiple DOM representation are possible:
  *  o the text value for V may or may not appear in the DOM. If it does:
  *    - it can appear as an attribute
+ *      e.g. <tag val="vtxtvalue"><child1>...</child1>...<childn>...</childn></tag>
  *    - it can appear as a text node
+ *      e.g. <tag><child1>...</child1>...<childn>...</childn>vtxtvalue</tag>
  *    - it can appear as an element containing a single text node
- *  o leaves (no children) may appear either as element, which may be empty depending on the previous choice
- *    or as attributes (in which case the V text data will be the value if output)
+ *      e.g. <tag><child1>...</child1>...<childn>...</childn><val>vtxtvalue<val></tag>
+ *  o leaves (no children) may appear either as element or as attributes
+ *      e.g. <tag val="vtxtvalue" terminal1="t1vtxtvalue"><child2>...</child2>...<childn>...</childn></tag>
  */
 abstract class DOMPrefixTree[+V] protected extends PrefixTreeLike.Abstract[String,V,DOMPrefixTree[V]] {
   import DOMPrefixTree._
+  type Params <: DOMPrefixTree.P0[_<:V]
   def elt:Node
   def value:Option[V]
-  def update1[W>:V,T>:Repr<:PrefixTreeLike[String,W,T]](kv:(String,T))(implicit bf:PrefixTreeLikeBuilder[String,W,T]): T = bf(value,iterator++Some(kv),default)
+  def update1[W>:V,T>:Repr<:PrefixTreeLike[String,W,T]](kv:(String,T))(implicit bf:PrefixTreeLikeBuilder[String,W,T]): T = bf(value,iterator++Seq(kv),default)
   def -(key: String): Repr = newBuilder(value,iterator.filter(_._1==key),default)
-  /** additional method to recover all children having the same tag */
-  def getAll(key: String): Iterator[Repr]
+  /** recovers all children having the same tag */
+  def getAll(key: String): Seq[Repr]
+  /** text value for V */
+  def getTextValue:String
   /* overridden for efficiency or necessity */
-  override def isEmpty: Boolean = elt.getChildNodes.getLength<=1 && size==0
   override def foreach[U](f: ((String,Repr)) => U): Unit = iterator.foreach(f)
   override def update[W>:V,T>:Repr<:PrefixTreeLike[String,W,T]](kv:GenTraversableOnce[(String,T)])(implicit bf:PrefixTreeLikeBuilder[String,W,T]): T = bf(value,iterator ++ kv,default)
 
   /** XML representation of this Node
    */
-  def asXml(out:Writer, indent:Boolean) = {
+  def asXml(out:Writer, indent:Boolean):Unit = {
      val tf = TransformerFactory.newInstance.newTransformer
      tf.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes")
      tf.setOutputProperty(OutputKeys.INDENT, if (indent) "yes" else "no")
      tf.transform(new DOMSource(elt), new StreamResult(out))
      out.flush
   }
+
+  def transform(in:StreamSource,doc:Document):Node = {
+    val factory = TransformerFactory.newInstance
+    val template = factory.newTemplates(in)
+    val transformer = factory.newTransformer
+    val result = new DOMResult(doc)
+    transformer.transform(in, result)
+    result.getNode
+  }
+  def transform(in:String,doc:Document):Node = transform(new StreamSource(in),doc)
+
+  def find(expr:String):NodeList = {
+    val xpathFactory = XPathFactory.newInstance
+    val xpath = xpathFactory.newXPath
+    val x = xpath.compile(expr)
+    x.evaluate(elt,XPathConstants.NODESET).asInstanceOf[NodeList]
+  }
+
 }
 
 /** The PrefixTree object contains:
@@ -68,19 +107,32 @@ object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
   protected def getParams[V](elt:Node):P0[V]   = elt.getOwnerDocument.getUserData("").asInstanceOf[P0[V]]
 
 
-  implicit class NodeListIterator(val nd:NodeList) extends Iterator[Node] {
-    val lg = nd.getLength-1
-    var i  = -1
-    override def length = lg
-    def hasNext: Boolean = i<lg
-    def next: Node = { i+=1; nd.item(i) }
+  class NodeListSeq(val nd:NodeList) extends Seq[Node] {
+    if (nd==null) throw new IllegalArgumentException
+    def apply(idx:Int) = nd.item(idx)
+    def length = nd.getLength
+    def iterator = new Iterator[Node] {
+      var i = 0
+      override def length = NodeListSeq.this.length
+      def hasNext: Boolean = i<length
+      def next: Node = { val r=nd.item(i); i+=1; r }
+    }
   }
-  implicit class AttrListIterator(val nd:NamedNodeMap) extends Iterator[Node] {
-    val lg = nd.getLength-1
-    var i  = -1
-    override def length = lg
-    def hasNext: Boolean = i<lg
-    def next: Node = { i+=1; nd.item(i) }
+  object NodeListSeq {
+    implicit def apply(nd:NodeList) = if (nd==null) Seq.empty else new NodeListSeq(nd)
+  }
+  class AttrListSeq(val nd:NamedNodeMap) extends Seq[Attr] {
+    def apply(idx:Int) = nd.item(idx).asInstanceOf[Attr]
+    def length = nd.getLength
+    def iterator = new Iterator[Attr] {
+      var i = 0
+      override def length = AttrListSeq.this.length
+      def hasNext: Boolean = i<length
+      def next: Attr = { val r=nd.item(i).asInstanceOf[Attr]; i+=1; r }
+    }
+  }
+  object AttrListSeq {
+    implicit def apply(nd:NamedNodeMap) = if (nd==null) Seq.empty else new AttrListSeq(nd)
   }
 
   /** The actual Parameters required to build a DOMPrefixTree.
@@ -92,73 +144,133 @@ object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
    *  - topTag is the tag to be used for the top node
    *  - toText is a method to convert V to a text value ; if null the value is not output as text
    *  - valueTag is the name of the tag for the value ; if null or "", the value is output as a text node that comes last
-   *    otherwise is output either as an Element containing a single TextNode or an attribute, depending on how the tag gets analyzed
-   *  - asAttr is a method that determines when a tag should be output as an attribute:
-   *    1) whatever the return value, an attribute is only valid for a terminal leaf
-   *    2) if asAttr returns either null or "" for the tag, then the result is an Element, otherwise an attribute
+   *    otherwise is output either as an Element containing a single TextNode or an attribute, depending on whether the tag starts with @.
+   *  - toXMLname is a method that determines how to map an input String name as a valid xml tag (all strings are not acceptable for xml.)
+   *    in addition, if the result starts with @, it will be created as an attribute (whose name matches the end of the string) if that
+   *    is possible. If this is null, it is considered as identity.
    */
-  class Params[V,T<:Tree[V] with PrefixTreeLike[String,V,T]](noDefault:String=>T,stripEmpty:Boolean,val doc:Document,val topTag:String,val toText:V=>String,val valueTag:String,val asAttr:String=>String)
+  class Params[V,T<:Tree[V] with PrefixTreeLike[String,V,T]](noDefault:String=>T,stripEmpty:Boolean,val doc:Document,val topTag:String,toText:V=>String,valueTag:String,toXMLname:String=>String,namespaces:(String,String)*)
         extends super.Params[V,T](noDefault,stripEmpty) {
     doc.setUserData("", this, null)
-    val valueAttrTag = if (asAttr==null) null else if (valueTag!=null && valueTag.length>0) asAttr(valueTag) else null
-    //returns the attribute key for a input key name, or null if not appropriate
-    def attr(s:String) = if (asAttr==null) null else { val r=asAttr(s); if (r==null || r.length==0) null else r }
+    val valueXmlTag = if (valueTag!=null && valueTag.charAt(0)=='@') (true,valueTag.substring(1)) else (false,valueTag)
+    val hasNS = !namespaces.isEmpty
+    //returns the pair (isAttribute,XML name) for a given string ; eliminates matches with the valueTag (conflict)
+    def xmlName(s:String):(Boolean,String) = {
+      val r= (if (toXMLname==null) s else toXMLname(s)) match {
+        case `valueTag` => null
+        case t          => t
+      }
+      if (r!=null && r.charAt(0)=='@') (true,r.substring(1)) else (false,r)
+    }
     //returns the text value for v or null if not appropriate
     def text(v:Option[V]) = if (toText==null || v==None) null else toText(v.get)
+    //builds a top element for the relevant data by following the creation rules
+    def mkElt(v:Option[V], vTxt:String):Element = {
+      val nd = doc.createElement(topTag)
+      nd.setUserData("", v, null)
+      if (hasNS) for (x <- namespaces)
+        nd.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:" + x._2, x._1)
+      if (vTxt!=null) {
+        //case 1: V text is an attribute
+        if (valueXmlTag._1)
+          nd.setAttribute(valueXmlTag._2,vTxt)
+        //case 2: V text is a text node inside a standard element node
+        else if (valueXmlTag._2!=null) {
+          val elt1 = doc.createElement(valueXmlTag._2)
+          elt1.appendChild(doc.createTextNode(vTxt))
+          nd.appendChild(elt1)
+        //case 3: V text is a text node
+        } else {
+          nd.appendChild(doc.createTextNode(vTxt))
+        }
+      }
+      nd
+    }
+    //renames an element
+    def rename(elt:Element, key:String, xmlTag:String):Element = {
+      val nd = doc.renameNode(elt, null, xmlTag).asInstanceOf[Element]
+      if (key!=xmlTag) nd.setUserData("$", key, null)
+      nd
+    }
+    //builds an attribute for the relevant data by following the creation rules
+    def mkAttr(v:Option[V], vTxt:String, key:String, xmlTag:String):Attr = {
+      val nd = doc.createAttribute(xmlTag)
+      nd.setUserData("", v, null)
+      if (key!=xmlTag) nd.setUserData("$", key, null)
+      if (vTxt!=null)
+          nd.asInstanceOf[Attr].setValue(vTxt)
+      nd
+    }
+    //builds a new node from V and a set of (K,T), using the appropriate data from this Param
+    def buildNode(v: Option[V], t: GenTraversableOnce[(K, T)]):Node = {
+      val elt = mkElt(v,text(v))
+      for (x <- t) if (!stripEmpty || !x._2.isNonSignificant) xmlName(x._1) match {
+        case (_,null)                   => //no tag, no node -pas de bras, pas de chocolat-
+        case (false,tag)                => elt.appendChild(rename(x._2.elt.asInstanceOf[Element], x._1, tag))
+        case (true,tag) if x._2.isEmpty => elt.setAttributeNode(mkAttr(getData[V](x._2.elt),x._2.getTextValue,x._1,tag))
+        case (true,tag)                 => throw new IllegalStateException(s"a non empty Node cannot be an attribute: key=${x._1}, tag=$tag, value=${x._2.value}")
+      }
+      elt
+    }
   }
   object Params {
     //a simplified factory with standard defaults ; attributes are recognized by starting with @ (which anyway is not valid for elements)
-    def apply[V](doc:Document,toText:V=>String,attrTag:String):Params[V,Tree[V]] = new Params[V,Tree[V]](PrefixTreeLikeBuilder.noElt,true,doc,"_",toText,attrTag,x=>{if (x(0)=='@') x.substring(1) else null })
-    def apply[V](noDefault:String=>Nothing,stripEmpty:Boolean,doc:Document,topTag:String,toText:V=>String,valueTag:String,asAttr:String=>String):Params[V,Tree[V]] = new Params[V,Tree[V]](noDefault,stripEmpty,doc,topTag,toText,valueTag,asAttr)
+    def apply[V](doc:Document,toText:V=>String,attrTag:String):Params[V,Tree[V]] =
+      new Params[V,Tree[V]](PrefixTreeLikeBuilder.noElt,true,doc,"_",toText,attrTag,null)
+    //a full factory
+    def apply[V](noDefault:String=>Nothing,stripEmpty:Boolean,doc:Document,topTag:String,toText:V=>String,valueTag:String,toXmlTag:String=>String,namespaces:(String,String)*):Params[V,Tree[V]] =
+      new Params[V,Tree[V]](noDefault,stripEmpty,doc,topTag,toText,valueTag,toXmlTag,namespaces:_*)
   }
+
+  def setNamespace(elt:Element, ns:String, prefix:String) =
+    elt.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:" + prefix, ns)
 
   /** The concrete wrapper.
    *  All it takes is a Node that contains the appropriate (Option[V],P0[V]) in its user data key "".
    *  Note that of course, children must have been themselves properly built!
    */
-  implicit final class Abstract[V](val elt:Node) extends DOMPrefixTree[V] with super.Abstract[V] {
+  final class Abstract[V](val elt:Node) extends DOMPrefixTree[V] with super.Abstract[V] {
     def value:Option[V] = getData(elt)
     val params:P0[V]    = getParams(elt)
     def iterator:Iterator[(String, Repr)] = {
-      val i0 = elt.getChildNodes.filter { x=>
+      val i0 = NodeListSeq(elt.getChildNodes).filter { x=>
         //yields all children: only keep Element which don't match the possible V text node
-        x.getNodeType==Node.ELEMENT_NODE && params.valueTag!=x.getNodeName
+        x.getNodeType==Node.ELEMENT_NODE && (params.valueXmlTag._1 || params.valueXmlTag._2!=x.getNodeName)
       }
-      val i = if (params.asAttr!=null) { //some legitimate nodes may appear as attributes
-        val i1 = elt.getAttributes.filter { x=>
-          params.valueAttrTag!=x.getNodeName  //the V text value attribute would not qualify
-        }
-        i1 ++ i0
-      } else i0
-      i.map { e=>
-        val name = e match {
-          case a:Attr    => a.getUserData("$").asInstanceOf[String]
-          case n:Element => n.getNodeName
+      val i1 = AttrListSeq(elt.getAttributes).filter { x=>
+        (!params.valueXmlTag._1 || params.valueXmlTag._2!=x.getNodeName) && !(params.hasNS && x.getNodeName.startsWith("xmlns:"))  //the V text value attribute would not qualify, as would not the namespaces declarations
+      }
+      val i = i1 ++ i0
+      i.view.map { e=>
+        val name = e.getUserData("$") match {
+          case null     => e.getNodeName
+          case s:String => s
         }
         (name,new Abstract[V](e))
-      }
+      }.iterator
     }
     def get(key: String): Option[Repr] = elt match {
-      case e:Element => e.getElementsByTagName(key).item(0) match {
-                          case null => params.attr(key) match {
-                            case null => None
-                            case attr => Some(new Abstract[V](e.getAttributeNode(attr)))
-                          }
-                          case e1 => Some(new Abstract[V](e1))
-                        }
+      case e:Element => params.xmlName(key) match {
+        case (_,null)     => None
+        case (true,name)  => Option(e.getAttributeNode(name)).map(new Abstract[V](_))
+        case (false,name) => Option(e.getElementsByTagName(name).item(0)).map(new Abstract[V](_))
+      }
       case _ => None
     }
-    def getAll(key: String): Iterator[Repr] = elt match {
-      case e:Element => val l=e.getElementsByTagName(key)
-                        if (l.getLength>0) l.map { e1=> new Abstract[V](e1) }
-                        else {
-                          params.attr(key) match {
-                            case null => Iterator.empty
-                            case attr => Some(new Abstract[V](e.getAttributeNode(attr))).iterator
-                          }
-                        }
-      case _         => Iterator.empty
+    def getAll(key: String): Seq[Repr] = elt match {
+      case e:Element => params.xmlName(key) match {
+        case (_,null)     => Seq.empty
+        case (true,name)  => e.getAttributeNode(name) match { case null=>Seq.empty; case a=>Seq(new Abstract[V](a))}
+        case (false,name) => NodeListSeq(e.getElementsByTagName(name)).map(new Abstract[V](_))
+      }
+      case _         => Seq.empty
     }
+    def getTextValue:String = params.valueXmlTag match {
+      case (_,null)     => elt.getLastChild.getTextContent
+      case (false,name) => elt.getLastChild.getTextContent
+      case (true,name)  => elt.asInstanceOf[Element].getAttribute(name)
+    }
+    override def isEmpty: Boolean = elt.getChildNodes.getLength<=1 && size==0
     override def newBuilder = super[Abstract].newBuilder
   }
 
@@ -170,41 +282,9 @@ object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
       type Params = P0[V]
       val params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[String,V,Repr] = builder[V](params)
-
-      def apply(v: Option[V], t: GenTraversableOnce[(K, Repr)], d: K=>Repr):Repr = {
-        val elt = params.doc.createElement(params.topTag)
-        elt.setUserData("", v, null)  //XXX data handler
-        for (x <- t) if (!params.stripEmpty || !x._2.isNonSignificant) {
-          val attr = params.attr(x._1)
-          if (attr==null || !x._2.isEmpty) //standard node
-            elt.appendChild(params.doc.renameNode(x._2.elt, null, x._1))
-          else { //degen existing node as attribute
-            val a = params.doc.createAttribute(attr)
-            val v1 = getData[V](x._2.elt)
-            a.setUserData("", v1, null)
-            a.setUserData("$", x._1, null)  //keep initial name
-            val t1 = params.text(v1)
-            if (t1!=null) a.setValue(t1) //recompute text rather than find it
-            elt.setAttributeNode(a)
-          }
-        }
-        val txt = params.text(v)
-        if (txt!=null) {
-          //case 1: V text is an attribute
-          if (params.valueAttrTag!=null && params.valueAttrTag.length>0)
-            elt.setAttribute(params.valueAttrTag,txt)
-          //case 2: V text is a text node inside a standard element node
-          else if (params.valueTag!=null && params.valueTag.length>0) {
-            val elt1 = params.doc.createElement(params.valueTag)
-            elt1.appendChild(params.doc.createTextNode(txt))
-            elt.appendChild(elt1)
-          //case 3: V text is a text node
-          } else {
-            elt.appendChild(params.doc.createTextNode(txt))
-          }
-        }
-        new Abstract[V](elt)
-      }
+      def apply(v: Option[V], t: GenTraversableOnce[(K, Repr)], d: K=>Repr):Repr = new Abstract[V](params.buildNode(v, t))
     }
   }
+
+  def bind[V](elt:Node):DOMPrefixTree[V] = new Abstract(elt)
 }

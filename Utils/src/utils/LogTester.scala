@@ -20,7 +20,7 @@ import scala.annotation.tailrec
  *  Each test must thus run in a single directory, which usually is fine because that directory
  *  may contain any data specific for that test.
  *  Reaching data files in the test directory is solved by using the file method which is provided.
- *  
+ *
  *  @param junit, indicates if junit is used, in which case junit methods are used.
  *         otherwise, the result is printed on the console.
  *  @param handlers, a list of handlers to check for false positive (i.e. expected
@@ -30,7 +30,7 @@ class LogTester(name:String,handlers:LogTester.Comparator*) extends LogTester.So
   val comp = if (handlers.isEmpty) null else handlers.reduce(_+_)
   val dir = new File(".").toURI.resolve(new URI(s"$name"))
   def apply(name:String) = dir.resolve(new URI(name).getPath)
-  
+
   /**
    * The test may produce up to three outputs:
    * - String output, for comparison with a reference
@@ -39,7 +39,7 @@ class LogTester(name:String,handlers:LogTester.Comparator*) extends LogTester.So
    * When running junit, we don't want console output, but we want file output to be able to analyze
    * the possible differences.
    * When running on the fly, we want all outputs.
-   * @param testToDo, the test to do. 
+   * @param testToDo, the test to do.
    * @param junit, true if junit is to be used
    * @param dryRun, true if we don't want the file to be created
    */
@@ -67,23 +67,23 @@ class LogTester(name:String,handlers:LogTester.Comparator*) extends LogTester.So
 
 object LogTester {
   private[this] val p1 = Pattern.compile("\\s*")
-  
+
   implicit class PExc(out:PrintWriter) {
     /** utility to write an expected exception result */
-    def printExc(f: =>Any,msg:String=null):Unit = try { f } catch { case e:Throwable => if (msg==null) out.println(e) else out.println(msg) }
+    def printExc(f: =>Any,msg:String=null):Unit = try { val r=f; out.println(s"Exception expected ; found $r") } catch { case e:Throwable => if (msg==null) out.println(e) else out.println(msg) }
   }
-  
+
   /** used by client code to resolve files in the test directory. name is relative to that directory. */
   trait Solver {
     def apply(name:String):URI
   }
-  
+
   /** a stub for client code testing. Fill up apply using file if necessary. */
   trait Tester { self=>
     def apply(file:Solver,out:PrintWriter):Any
   }
-  
-  
+
+
   /** tester that uses the standard setup */
   trait StandardTester extends Tester { self=>
     val handlers = Seq.empty[LogTester.Comparator]
@@ -119,7 +119,7 @@ object LogTester {
     }
     def apply(start1:Int,idx1:Int,s1:String,start2:Int,idx2:Int,s2:String):Option[(Int,Int)]
   }
-  
+
   abstract class DHandler extends Comparator { self=>
     //compares two inputs for that handler.
     //returns the next index to use in case of a match.
@@ -128,9 +128,9 @@ object LogTester {
       val n2 = self(start2,idx2,s2)
       if (n1<0 || n2<0) None else Some((n1,n2))
     }
-    def apply(start:Int,idx:Int,s:String):Int 
+    def apply(start:Int,idx:Int,s:String):Int
   }
-  
+
   //don't compare object addresses! we identify them by their format: @hexsequence
   object checkAddress extends DHandler {
     val p = Pattern.compile("@[0-9a-f]{4,}")
@@ -155,9 +155,9 @@ object LogTester {
           if (r<=idx) -1 else r  //prevents infinite loops in case of a second ? in the query part
         }
       }
-    }    
+    }
   }
-    
+
   /** This utility compares two strings. If they differ, the onFail method is called and a precise message
    *  highlighting the differences is printed.
    */
@@ -195,8 +195,8 @@ object LogTester {
           }
         }
       }
-    } 
+    }
     checkSection(0,0)
-  }  
-  
+  }
+
 }

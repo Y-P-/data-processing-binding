@@ -400,11 +400,11 @@ object PrefixLoop {
    */
   trait SameKeyDefault extends TreeRB {
     override type L=K
-    final protected def buildDefault(ctx:Context,defa:K=>This): L=>R = l => stdDefault(ctx,(l,defa(l)))
+    final protected def buildDefault(ctx:Context,defa:K=>This): L=>R = if (defa==null) null else l => stdDefault(ctx,(l,defa(l)))
   }
   trait OtherKeyDefault extends TreeRB {
     def reverseKey: L=>K
-    final protected def buildDefault(ctx:Context,defa:K=>This): L=>R = if (reverseKey==null) null else l => {
+    final protected def buildDefault(ctx:Context,defa:K=>This): L=>R = if (reverseKey==null || defa==null) null else l => {
       val k = reverseKey(l)
       stdDefault(ctx,(k,defa(k)))
     }
