@@ -14,7 +14,7 @@ import scala.annotation.tailrec
  *
  *  Methods are provided to go both ways between PrefixTreeLike and PrefixTraversableOnce.
  *
- *  For more information about PrefixTreeLike, se that class description which contains additional information.
+ *  For more information about PrefixTreeLike, see that class description which contains additional information.
  *
  *  Methods in this class often come by three:
  *

@@ -50,10 +50,11 @@ object P {
     var g:this.type=>Unit = _
     var cur:(K,P) = _
     var f1:((K,P))=>Any = _
-    class P(key:K,val prev:(K,P)) extends Traversable[(K,P)] with PrefixTraversableOnce[K,V,P] {
+    class P(key:K,val prev:(K,P)) extends Iterator[(K,P)] with PrefixTraversableOnce[K,V,P] {
       cur = (key,this)
       var value:Option[V] = None
-      def foreach[U](f:((K,P))=>U) = { if (f1==null) { f1=f; g(O.this) } }
+      def next:(K,P)
+      def hasNext:Boolean
       override def stringPrefix = super[PrefixTraversableOnce].stringPrefix
     }
     def push(key:K):Unit   = new P(key,cur)
