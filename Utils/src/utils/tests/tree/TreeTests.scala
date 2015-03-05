@@ -50,9 +50,9 @@ class TreeTests extends StandardTester {
     t(26,testPartition)
     t(27,testMutable)
     t(28,testInfinite)
-    t(29,testDOM1)
-    t(30,testDOM2)
-    t(31,testDOM3)
+    //t(29,testDOM1)
+    //t(30,testDOM2)
+    //t(31,testDOM3)
     t(32,testDOM4)
 	}
 }
@@ -601,15 +601,8 @@ object TreeTests {
     //check that the DOMPrefixTree behaves well first by printing it then by copying it back into a PrefixTree
     out.println(dom)
     out.println(dom.copy[Int,PrefixTree[String,Int]])
-    //transform with xsl
-    /*
-    val r = dom.transform("src/utils/tests/tree/transform.xsl",dom.params.doc)
-    val dom1 = DOMPrefixTree.bind(r)
-    dom1.asXml(out, false)
-    out.println(dom1)
-    */
-    val r0 = dom.find("/_/d").item(0)
-    val r = DOMPrefixTree.bind(r0)
+    //check that XPath finds nodes that are DOMPrefixTree
+    val r = DOMPrefixTree.bind(dom.find("my0-ns:d").item(0))
     r.asXml(out,false)
     out.println
     out.println(r)
@@ -628,7 +621,7 @@ object TreeTests {
   }
   def testDOM4(implicit out:PrintWriter) = {
     //some leaves as attributes, use of namespace and renaming of some nodes
-    testDOM(out,DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case x=>x},("my-ns","x")))
+    testDOM(out,DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case "f"=>"x:ff";case x=>x},"my0-ns",("my-ns","x")))
   }
 
   def main(args:Array[String]):Unit = {

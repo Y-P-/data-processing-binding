@@ -53,8 +53,8 @@ object P {
     class P(key:K,val prev:(K,P)) extends Iterator[(K,P)] with PrefixTraversableOnce[K,V,P] {
       cur = (key,this)
       var value:Option[V] = None
-      def next:(K,P)
-      def hasNext:Boolean
+      def next:(K,P) = null
+      def hasNext:Boolean = true
       override def stringPrefix = super[PrefixTraversableOnce].stringPrefix
     }
     def push(key:K):Unit   = new P(key,cur)
