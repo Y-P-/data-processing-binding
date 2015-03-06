@@ -50,9 +50,9 @@ class TreeTests extends StandardTester {
     t(26,testPartition)
     t(27,testMutable)
     t(28,testInfinite)
-    //t(29,testDOM1)
-    //t(30,testDOM2)
-    //t(31,testDOM3)
+    t(29,testDOM1)
+    t(30,testDOM2)
+    t(31,testDOM3)
     t(32,testDOM4)
 	}
 }
@@ -585,7 +585,7 @@ object TreeTests {
     out.println(xm1.xdeepFoldLeft("","z",false) { (u,kv)=> u+kv._2.value.get })
   }
 
-  def testDOM(implicit out:PrintWriter, params:DOMPrefixTree.P0[Int]) = {
+  def testDOM(implicit out:PrintWriter, params:DOMPrefixTree.P0[Int], findXpath:String*) = {
     params.doc.createElementNS("urn:my-namespace", "x")
     //copy m to DOMPrefixTree
     val dom = m.copy[Int,DOMPrefixTree[Int]]
@@ -602,26 +602,28 @@ object TreeTests {
     out.println(dom)
     out.println(dom.copy[Int,PrefixTree[String,Int]])
     //check that XPath finds nodes that are DOMPrefixTree
-    val r = DOMPrefixTree.bind(dom.find("my0-ns:d").item(0))
-    r.asXml(out,false)
-    out.println
-    out.println(r)
+    for (xpath <- findXpath) {
+      val r = DOMPrefixTree.bind(dom.find(xpath).item(0))
+      r.asXml(out,false)
+      out.println
+      out.println(r)
+    }
   }
   def testDOM1(implicit out:PrintWriter) = {
     //value as text node
-    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,null))
+    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,null),"d","*[text()=6]")
   }
   def testDOM2(implicit out:PrintWriter) = {
     //value as attribute
-    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"@val"))
+    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"@val"),"d","*[x]")
   }
   def testDOM3(implicit out:PrintWriter) = {
     //value in embedded element
-    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"val"))
+    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"val"),"d","*[val=5]")
   }
   def testDOM4(implicit out:PrintWriter) = {
     //some leaves as attributes, use of namespace and renaming of some nodes
-    testDOM(out,DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case "f"=>"x:ff";case x=>x},"my0-ns",("my-ns","x")))
+    testDOM(out,DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case "f"=>"x:ff";case x=>x},"my0-ns",("my-ns","x")),"my0-ns:d","my-ns:*")
   }
 
   def main(args:Array[String]):Unit = {
