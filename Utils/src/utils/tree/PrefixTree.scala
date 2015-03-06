@@ -37,6 +37,7 @@ abstract class PrefixTree[K,+V] protected extends PrefixTreeLike.Abstract[K,V,Pr
 object PrefixTree extends PrefixTreeLikeBuilder.Factory2 {
   type Tree[k,+v] = PrefixTree[k, v]
   type P0[k,+v]   = Params[k,v,PrefixTree[k, v]]
+  type Bld[k,v]   = PrefixTreeLikeBuilder[k, v, PrefixTree[k, v]]
 
   /** The actual Parameters required to build a PrefixTree.
    */
@@ -64,14 +65,14 @@ object PrefixTree extends PrefixTreeLikeBuilder.Factory2 {
   class Abstract[K,V] protected (implicit val params:P0[K,V]) extends PrefixTree[K, V] with super.Abstract[K,V] {
     def tree: Map[K,Repr] = params.emptyMap
     override def isNonSignificant = false
-    override def newBuilder = super[Abstract].newBuilder
+    override def newBuilder:Bld[K, V] { type Params=P0[K,V] } = super[Abstract].newBuilder
   }
 
   /** A factory for working with varied map kinds if necessary.
    *  We choose to internally subclass Abstract so as to minimize the memory footprint for each node.
    */
-  implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] { type Params=P0[K,V] } = {
-    new PrefixTreeLikeBuilder[K, V, PrefixTree[K, V]] {
+  implicit def builder[K,V](implicit p:P0[K,V]):Bld[K, V] { type Params=P0[K,V] } = {
+    new PrefixTreeLikeBuilder[K, V, Tree[K, V]] {
       type Params = P0[K,V]
       val params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,Repr] = builder[K,V](params)

@@ -65,15 +65,18 @@ object TreeTests {
    * Testing with tree:
    * /(7) => { d/4 => { a/1, b/2 }, e/5 => { c/3 }, f/6 => { d/4 => { a/1, b/2 }, x/5 => { c/3 } } }
    */
-  val c1:StringTree[Int]  = StringTree(Some(1))
-  val c2  = StringTree(2)
-  val c3  = StringTree(3)
-  val c11 = StringTree(4,Seq("a"->c1,"b"->c2))
-  val c12 = StringTree(5,"c"->c3)
-  val c13 = StringTree(6,"d"->c11,"x"->c12)
-  val m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13))
+  val x = StringTree(1)  //note that with the implicit toBuilder in Factory2, we can use this; using a builder as below is preferred
+
+  val sbd = StringTree.builder[Int]
+  val c1:StringTree[Int] = sbd(Some(1))
+  val c2  = sbd(2)
+  val c3  = sbd(3)
+  val c11 = sbd(4,Seq("a"->c1,"b"->c2))
+  val c12 = sbd(5,"c"->c3)
+  val c13 = sbd(6,"d"->c11,"x"->c12)
+  val m   = sbd(7,Seq("d"->c11,"e"->c12,"f"->c13))
   //an extract: (7) => { d/4 => { a/1 }, f/6 => { d/4 => { b/2 } } }
-  val m0  = StringTree(7,Seq("d"->StringTree(4,Seq("a"->c1),(x:String)=>m),"f"->StringTree(6,"d"->StringTree(4,Seq("b"->c2)))))
+  val m0  = sbd(7,Seq("d"->sbd(4,Seq("a"->c1),(x:String)=>m),"f"->sbd(6,"d"->sbd(4,Seq("b"->c2)))))
 
   /*
    * almost same basic tree with complex default everywhere ; c13 differs (subtrees d and x reversed).
@@ -107,13 +110,13 @@ object TreeTests {
       case "r" => c12
       case _   => c1
     }
-    c1  = StringTree(1,f1)
-    c2  = StringTree(2,f2)
-    c3  = StringTree(3,f3)
-    c11 = StringTree(4,Seq("a"->c1,"b"->c2),f4)
-    c12 = StringTree(5,Seq("c"->c3),f1)
-    c13 = StringTree(6,Seq("d"->c12,"x"->c11),f2)
-    m   = StringTree(7,Seq("d"->c11,"e"->c12,"f"->c13),f3)
+    c1  = sbd(1,f1)
+    c2  = sbd(2,f2)
+    c3  = sbd(3,f3)
+    c11 = sbd(4,Seq("a"->c1,"b"->c2),f4)
+    c12 = sbd(5,Seq("c"->c3),f1)
+    c13 = sbd(6,Seq("d"->c12,"x"->c11),f2)
+    m   = sbd(7,Seq("d"->c11,"e"->c12,"f"->c13),f3)
     (m,Array(m,c1,c2,c3,c11,c12,c13)) //an array for mapping operation from Int => StringTree[Int]
   }
 
@@ -159,7 +162,7 @@ object TreeTests {
   //note that while the next test looks like it should yield the same results, it does not.
   //this comes from the fact that expansion in sequence view is 'immediate', whereas it is hierarchical
   //in the normal flatMap: hence while we have the same tree structure, some values do differ.
-  def testSeqFlatMap(implicit out:PrintWriter) = StringTree.fromFlat(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
+  def testSeqFlatMap(implicit out:PrintWriter) = sbd.fromFlat(m.seqView().flatMap(mapper _)).seqView().foreach(out.println)
 
   //tests FlatMap
   //For any level, we have:
@@ -191,7 +194,7 @@ object TreeTests {
     out.println(m1("x")("a")("z").value)  //7
   }
 
-  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(StringTree.fromFlat(Seq(
+  def testBuildFromCanonical(implicit out:PrintWriter) = out.println(sbd.fromFlat(Seq(
       (Seq("x","y"),1),
       (Seq("x","y","z"),2),
       (Seq("x"),3),
@@ -202,13 +205,15 @@ object TreeTests {
     )))
 
   def testConstant(implicit out:PrintWriter) = {
-    val c = StringTree.constant(3)
+    val sbd = StringTree.builder[Int]
+    val c = sbd.constant(3)
     //test that constant works
     out.println(c)
     out.println(c("a"))
     out.println(c("a")("b")("c"))
     //tests that constant works on flatmap as expected
-    val c2 = StringTree.constant(5.01)
+    val sbd1 = StringTree.builder[Double]
+    val c2 = sbd1.constant(5.01)
     val c1 = c.flatMap[Double,StringTree[Double]](MERGE)((i:Int)=> if (i==3) c2 else null)
     out.println(c1)
     out.println(c1("a"))
@@ -295,7 +300,8 @@ object TreeTests {
     val op1:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"$v1+$v2"
     val op2:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"$v1*$v2"
     val op3:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"${(v1+v2)}"
-    val opX = PrefixTree.fromFlat(Seq(
+
+    val opX = PrefixTree.fromFlat(Seq(   //Using the implicit just for fun
           (Seq("d"),op1),
           (Seq("d","a"),op2),
           (Seq("f"),op3),
@@ -324,9 +330,10 @@ object TreeTests {
     val op3:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"${(v1+v2)}"
     val opc:O = (t1,t2)=>for (v1<-t1.value; v2<-t2.value) yield s"$v1%$v2"
 
-    val opx = PrefixTree.constant[String,O](opc)
+    val tbd = PrefixTree.builder[String,O]
+    val opx = tbd.constant(opc)
 
-    val opX = PrefixTree.fromFlat2(Seq(
+    val opX = tbd.fromFlat2(Seq(
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(null,null)),
           (Seq("f"),(op3,opx)),
@@ -334,7 +341,7 @@ object TreeTests {
       ))
     //note here that f->d exists but has no op: default is not used, and being not strict, this will
     //not stop the tree exploration. But f->d won't have any value.
-    val opY = PrefixTree.fromFlat2(Seq(
+    val opY = tbd.fromFlat2(Seq(
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(op2,opx)),
           (Seq("f","d"),(op1,opx))
@@ -365,16 +372,17 @@ object TreeTests {
     val op3:F = new F { def merge(x:Int, y:Int) = s"${x+y}" }
     val opc:F = new F { def merge(x:Int, y:Int) = s"$x%$y" }
 
-    val opx = PrefixTree.constant[String,F](opc)
+    val tbd = PrefixTree.builder[String,F]
+    val opx = tbd.constant(opc)
 
-    val opX = PrefixTree.fromFlat2(Seq(
+    val opX = tbd.fromFlat2(Seq(
           (Seq(),(op1,opx)),
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(null,null)),
           (Seq("f"),(op3,opx)),
           (Seq("f","d","b"),(op2,opx))
       ))
-    val opY = PrefixTree.fromFlat2(Seq(
+    val opY = tbd.fromFlat2(Seq(
           (Seq(),(op1,opx)),
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(op2,opx)),
@@ -399,16 +407,17 @@ object TreeTests {
     val op3:F = new F { def merge(x:Int, y:Int) = s"${x+y}" }
     val opc:F = new F { def merge(x:Int, y:Int) = s"$x%$y" }
 
-    val opx = PrefixTree.constant[String,F](opc)
+    val tbd = PrefixTree.builder[String,F]
+    val opx = tbd.constant(opc)
 
-    val opX = PrefixTree.fromFlat2(Seq(
+    val opX = tbd.fromFlat2(Seq(
           (Seq(),(op1,opx)),
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(null,null)),
           (Seq("f"),(op3,opx)),
           (Seq("f","d","b"),(op2,opx))
       ))
-    val opY = PrefixTree.fromFlat2(Seq(
+    val opY = tbd.fromFlat2(Seq(
           (Seq(),(op1,opx)),
           (Seq("d"),(op1,opx)),
           (Seq("d","a"),(op2,opx)),
@@ -431,7 +440,8 @@ object TreeTests {
     }
     val op1 = op("X")
     val op2 = op("Y")
-    val opX = PrefixTree.fromFlat2(Seq(
+    val tbd = PrefixTree.builder[String,F]
+    val opX = tbd.fromFlat2(Seq(
         (Seq(),(op1,PrefixTree.constant[String,F](op1))),
         (Seq("f"),(op2,PrefixTree.constant[String,F](op2)))
       ))
@@ -467,7 +477,8 @@ object TreeTests {
     }
     val op1 = op("X")
     val op2 = op("Y")
-    val opX:PrefixTree[String,F] = PrefixTree.fromFlat2(Seq(
+    val tbd = PrefixTree.builder[String,F]
+    val opX:PrefixTree[String,F] = tbd.fromFlat2(Seq(
         (Seq(),(op1,PrefixTree.constant[String,F](op1))),
         (Seq("f"),(op2,PrefixTree.constant[String,F](op2)))
       ))
@@ -603,7 +614,7 @@ object TreeTests {
     out.println(dom.copy[Int,PrefixTree[String,Int]])
     //check that XPath finds nodes that are DOMPrefixTree
     for (xpath <- findXpath) {
-      val r = DOMPrefixTree.bind(dom.find(xpath).item(0))
+      val r = DOMPrefixTree(dom.find(xpath).item(0))
       r.asXml(out,false)
       out.println
       out.println(r)

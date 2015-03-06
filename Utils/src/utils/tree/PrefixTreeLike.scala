@@ -132,7 +132,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    *  It can be used to build elements of the same tree kind.
    *  we must make a concrete implementation here or this `newBuilder` is not accounted for properly.
    */
-  protected[this] override def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] = ???
+  protected[this] override def newBuilder:PrefixTreeLikeBuilder[K,V,Repr] { type Params=self.Params } = ???
 
   /** Optionally returns the value associated with a key.
    *  The basic supposition is that keys found in the iterator yield a value, others yield a None.

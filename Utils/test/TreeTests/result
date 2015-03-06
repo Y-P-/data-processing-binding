@@ -213,7 +213,7 @@ z->(Some(1)){a->(Some(2)){a->(Some(3)){a->(Some(1)){}b->(Some(2)){}c->(Some(4)){
 123124213114
 122134312141
 --------29--------
-<_><d><a>1</a><b>2</b>4</d><e><c>3</c>5</e><f><d><a>1</a><b>2</b>4</d><x><c>3</c>5</x>6</f>7</_>
+<_>7<d>4<a>1</a><b>2</b></d><e>5<c>3</c></e><f>6<d>4<a>1</a><b>2</b></d><x>5<c>3</c></x></f></_>
 Some(1)
 Some(6)
 Some(7)
@@ -221,6 +221,10 @@ java.util.NoSuchElementException: key not found val
 java.util.NoSuchElementException: key not found @val
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
+<d>4<a>1</a><b>2</b></d>
+Tree{4}(a -> Tree{1}(), b -> Tree{2}())
+<f>6<d>4<a>1</a><b>2</b></d><x>5<c>3</c></x></f>
+Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))
 --------30--------
 <_ val="7"><d val="4"><a val="1"/><b val="2"/></d><e val="5"><c val="3"/></e><f val="6"><d val="4"><a val="1"/><b val="2"/></d><x val="5"><c val="3"/></x></f></_>
 Some(1)
@@ -230,8 +234,12 @@ java.util.NoSuchElementException: key not found val
 java.util.NoSuchElementException: key not found @val
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
+<d val="4"><a val="1"/><b val="2"/></d>
+Tree{4}(a -> Tree{1}(), b -> Tree{2}())
+<f val="6"><d val="4"><a val="1"/><b val="2"/></d><x val="5"><c val="3"/></x></f>
+Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))
 --------31--------
-<_><d><a><val>1</val></a><b><val>2</val></b><val>4</val></d><e><c><val>3</val></c><val>5</val></e><f><d><a><val>1</val></a><b><val>2</val></b><val>4</val></d><x><c><val>3</val></c><val>5</val></x><val>6</val></f><val>7</val></_>
+<_><val>7</val><d><val>4</val><a><val>1</val></a><b><val>2</val></b></d><e><val>5</val><c><val>3</val></c></e><f><val>6</val><d><val>4</val><a><val>1</val></a><b><val>2</val></b></d><x><val>5</val><c><val>3</val></c></x></f></_>
 Some(1)
 Some(6)
 Some(7)
@@ -239,8 +247,12 @@ java.util.NoSuchElementException: key not found val
 java.util.NoSuchElementException: key not found @val
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
+<d><val>4</val><a><val>1</val></a><b><val>2</val></b></d>
+Tree{4}(a -> Tree{1}(), b -> Tree{2}())
+<e><val>5</val><c><val>3</val></c></e>
+Tree{5}(c -> Tree{3}())
 --------32--------
-<_ val="7"><d a="1" b="2" val="4"/><e c="3" val="5"/><f val="6"><d a="1" b="2" val="4"/><x c="3" val="5"/></f></_>
+<_ xmlns="my0-ns" xmlns:x="my-ns" xmlns:ns0="my0-ns" ns0:val="7"><d ns0:val="4" x:aa="1" x:bb="2"/><e ns0:val="5" x:cc="3"/><x:ff ns0:val="6"><d ns0:val="4" x:aa="1" x:bb="2"/><x ns0:val="5" x:cc="3"/></x:ff></_>
 Some(1)
 Some(6)
 Some(7)
@@ -248,3 +260,7 @@ java.util.NoSuchElementException: key not found val
 java.util.NoSuchElementException: key not found @val
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
 Tree{7}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), e -> Tree{5}(c -> Tree{3}()), f -> Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}())))
+<d xmlns="my0-ns" xmlns:x="my-ns" xmlns:ns0="my0-ns" ns0:val="4" x:aa="1" x:bb="2"/>
+Tree{4}(a -> Tree{1}(), b -> Tree{2}())
+<x:ff xmlns:x="my-ns" xmlns="my0-ns" xmlns:ns0="my0-ns" ns0:val="6"><d ns0:val="4" x:aa="1" x:bb="2"/><x ns0:val="5" x:cc="3"/></x:ff>
+Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))

@@ -16,6 +16,7 @@ abstract class StringTree[+V] extends PrefixTree[String,V] with PrefixTreeLike[S
 object StringTree extends PrefixTreeLikeBuilder.Factory1[String] {
   type Tree[+v] = StringTree[v]
   type P0[+v]   = Params[v,Tree[v]]
+  type Bld[v]   = PrefixTreeLikeBuilder[String, v, Tree[v]]
 
   /** The full actual StringTree class used. It is designed to be sub-classed to minimize memory footprint.
    */
@@ -43,7 +44,7 @@ object StringTree extends PrefixTreeLikeBuilder.Factory1[String] {
    *  We choose to internally subclass StringTree so as to minimize the memory footprint.
    */
   implicit def builder[V](implicit p:P0[V]):PrefixTreeLikeBuilder[String, V, StringTree[V]] { type Params=P0[V] } = {
-    new PrefixTreeLikeBuilder[String, V, StringTree[V]] {
+    new PrefixTreeLikeBuilder[K, V, Tree[V]] {
       type Params = P0[V]
       def params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,StringTree[V]] = builder[V]

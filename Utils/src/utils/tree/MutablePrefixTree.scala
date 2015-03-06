@@ -26,7 +26,8 @@ abstract class MutablePrefixTree[K,V] protected extends PrefixTree[K,V] with Mut
  */
 object MutablePrefixTree extends PrefixTreeLikeBuilder.Factory2i {
   type Tree[k,v] = MutablePrefixTree[k, v]
-  type P0[k,v]   = Params[k,v,MutablePrefixTree[k, v]]
+  type P0[k,v]   = Params[k,v,Tree[k, v]]
+  type Bld[k,v]  = PrefixTreeLikeBuilder[k, v, Tree[k, v]]
 
   /** The actual Parameters required to build a PrefixTree.
    */
@@ -41,8 +42,8 @@ object MutablePrefixTree extends PrefixTreeLikeBuilder.Factory2i {
 
   /** A factory for working with varied map kinds if necessary.
    */
-  implicit def builder[K,V](implicit p:P0[K,V]):PrefixTreeLikeBuilder[K, V, MutablePrefixTree[K, V]] { type Params=P0[K,V] } = {
-    new PrefixTreeLikeBuilder[K, V, MutablePrefixTree[K, V]] { self=>
+  implicit def builder[K,V](implicit p:P0[K,V]):Bld[K, V] { type Params=P0[K,V] } =
+    new PrefixTreeLikeBuilder[K, V, Tree[K, V]] { self=>
       type Params = P0[K,V]
       val params:Params = p
       def newEmpty:PrefixTreeLikeBuilder[K,V,Repr] = builder[K,V](params)
@@ -58,5 +59,4 @@ object MutablePrefixTree extends PrefixTreeLikeBuilder.Factory2i {
         }
       }
     }
-  }
 }
