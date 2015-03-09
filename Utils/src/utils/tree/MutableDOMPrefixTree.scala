@@ -9,14 +9,16 @@ import org.w3c.dom.{Document,Node}
  *  an "unmutable" DOMPrefixTree by extracting its Node, wrapping it up in a MutableDOMPrefixTree
  *  and applying modifications. Of course, this is highly unadvisable: use the mutable version
  *  if you're not certain that the tree will not mutate!
+ *  Beware that MutableDOMPrefixTree nodes from different documents (i.e. param) won't work
+ *  together!
  */
 abstract class MutableDOMPrefixTree[V] protected extends DOMPrefixTree[V] with PrefixTreeLike[String, V, MutableDOMPrefixTree[V]] with MutablePrefixTreeLike[String,V,MutableDOMPrefixTree[V]] {
-  def value_=(v:Option[V]):Unit      = DOMHelper.setData(elt, v)
   def default_=(d:String=>Repr):Unit = throw new UnsupportedOperationException("DOMPrefixTrees don't support default")
-  def update(k:String,t:MutableDOMPrefixTree[V]):Unit = params.update(elt, k, t.elt, 0)
+  def update(k:String,t:MutableDOMPrefixTree[V]):Unit = params.update(elt, k, 0, t.elt)
 
   //additional methods, in particular in support of the multi-key capability of DOM
-  def update(k:String,idx:Int,t:MutableDOMPrefixTree[V]):Unit = params.update(elt, k, t.elt, idx)
+  def update(k:String,idx:Int,t:MutableDOMPrefixTree[V]):Unit = params.update(elt, k, idx, t.elt)
+  def update(k:String,t:GenTraversableOnce[MutableDOMPrefixTree[V]]):Unit = params.update(elt, k, t.toIterable.map(_.elt))
 }
 
 /** The factory for MutableDOMPrefixTree is almost cut/paste from the immutable version.
@@ -51,6 +53,8 @@ object MutableDOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
   /** Again copy from immutable version.
    */
   final class Abstract[V](val elt:Node) extends MutableDOMPrefixTree[V] with super.Abstract[V] {
+    override type Params = MutableDOMPrefixTree.Params[V]
+    def value_=(v:Option[V]):Unit      = { DOMHelper.setData(elt, v); params.mkTxtNode(elt,v) }
     val params:P0[V] = DOMHelper.getParams(elt)
     def get(key: String): Option[Repr] = Option(params.findNode(elt, key, 0)).map(params.toT)
     def getAll(key: String): Seq[Repr] = params.findAll(elt, key).map(params.toT)

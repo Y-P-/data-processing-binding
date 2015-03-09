@@ -1,7 +1,8 @@
 package utils.tree
 
 import scala.collection.GenTraversableOnce
-import org.w3c.dom.{Document,Element,Node,NodeList,NamedNodeMap,Attr,Text}
+import org.w3c.dom.{Document,Element,Attr,Node,NodeList,NamedNodeMap}
+import org.w3c.dom.Node._
 import javax.xml.XMLConstants
 
 /** Contains some utilities for building DOM trees in a specific way.
@@ -86,12 +87,12 @@ object DOMHelper {
     val vTag = analyzeTag(valueTag)
     val tTag = analyzeTag(topTag)
 
-    def isTreeNode(nd:Node) = nd match {
-      case t:Text => false                                       //no Text node match a tree Node
-      case a:Attr => if (a.getNodeName.startsWith("xml")) false  //special attribute cannot match (restricted name)
+    def isTreeNode(nd:Node) = nd.getNodeType match {
+      case TEXT_NODE      => false                                       //no Text node match a tree Node
+      case ATTRIBUTE_NODE => if (nd.getNodeName.startsWith("xml")) false  //special attribute cannot match (restricted name)
                      else if (vTag._1) !(nd.getLocalName==vTag._3 && nd.getNamespaceURI==vTag._2) //must not match text attribute
                      else true
-      case e:Element => vTag==null || vTag._1 || !(nd.getLocalName==vTag._3 && nd.getNamespaceURI==vTag._2) //must not match text node
+      case ELEMENT_NODE   => vTag==null || vTag._1 || !(nd.getLocalName==vTag._3 && nd.getNamespaceURI==vTag._2) //must not match text node
     }
 
     //return true if the node is an user node (part of the real tree, not added for DOM reasons)
@@ -125,18 +126,43 @@ object DOMHelper {
       }
     }
 
-    //creates the appropriate text representation
-    def mkTxtNode(elt:Element,txt:String):Unit = {
-      if (vTag==null) {                    //case 1: V text is a text node
-        elt.appendChild(doc.createTextNode(txt))
-      } else if (vTag._1) {                    //case 2: V text is an attribute
-        val nd = doc.createAttributeNS(vTag._2,vTag._3)
-        nd.setValue(txt)
-        elt.setAttributeNode(nd)
-      } else {                                 //case 3: V text is a text node inside a standard element node
-        val nd = doc.createElementNS(vTag._2,vTag._3) //build container element
-        nd.appendChild(doc.createTextNode(txt))
-        elt.appendChild(nd)
+    //creates/updates the appropriate text representation
+    def mkTxtNode(node:Node,v:Option[V]):Unit = if (v!=null && v!=None && toText!=null) {
+      val txt = toText(v.get)
+      if (node.getNodeType==ELEMENT_NODE) {
+        val elt = node.asInstanceOf[Element]
+        if (vTag==null) {                        //case 1: V text is a text node
+          val t = doc.createTextNode(txt)
+          if (elt.getFirstChild==null)           //initial creation
+            elt.appendChild(t)                   //append (in first position actually)
+          else if (elt.getFirstChild.getNodeType==TEXT_NODE)
+            elt.replaceChild(t, elt.getFirstChild) //otherwise replace
+          else                                   //there was yet no value txt
+            elt.insertBefore(t, elt.getFirstChild)
+        } else if (vTag._1) {                    //case 2: V text is an attribute
+          val nd = doc.createAttributeNS(vTag._2,vTag._3)
+          nd.setValue(txt)
+          elt.setAttributeNode(nd)
+        } else {                                 //case 3: V text is a text node inside a standard element node
+          val t = doc.createTextNode(txt)
+          if (elt.getFirstChild==null) {
+            val nd = doc.createElementNS(vTag._2,vTag._3) //build container element
+            nd.appendChild(t)
+            elt.appendChild(nd)
+          } else {
+            val nd1 = elt.getElementsByTagNameNS(vTag._2,vTag._3)
+            if (nd1.getLength==0) {               //no text node yet : insert it in the first position
+              val nd = doc.createElementNS(vTag._2,vTag._3) //build container element
+              nd.appendChild(t)
+              elt.insertBefore(nd, elt.getFirstChild)
+            } else {                              //update current text node
+              nd1.item(0).replaceChild(t, nd1.item(0).getFirstChild)
+            }
+          }
+        }
+      } else if (node.getNodeType==ATTRIBUTE_NODE) {
+        val att = node.asInstanceOf[Attr]
+        att.setValue(txt)
       }
     }
 
@@ -148,13 +174,12 @@ object DOMHelper {
         nd.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns", defaultNamespace)
       if (hasNS) for (x <- namespaces)
         nd.setAttributeNS(XMLConstants.XMLNS_ATTRIBUTE_NS_URI, "xmlns:" + x._2, x._1)
-      if (v!=null && v!=None && toText!=null)
-        mkTxtNode(nd,toText(v.get))
+      mkTxtNode(nd,v)
       nd
     }
 
-    //top adopt node with new key
-    def adoptNode(parent:Element, elt:Node, key:String):Unit = {
+    //renames node with a new key
+    def renameNode(elt:Node, key:String):Node = {
       val ak = analyzeKey(key)
       if (ak!=null) {
         val nd0 = if (ak._1) {
@@ -165,16 +190,21 @@ object DOMHelper {
           val txt = getTextValue(elt)
           if (txt!=null)
             nd.setValue(txt)
-          parent.setAttributeNodeNS(nd)
           nd
         } else {
-          val nd = doc.renameNode(elt, ak._2, ak._3)
-          parent.appendChild(nd)
-          nd
+          doc.renameNode(elt, ak._2, ak._3)
         }
         if (key!=ak._3)
           nd0.setUserData("$", key, null)
-      }
+        nd0
+      } else
+        null
+    }
+
+    //parent appends node with new key ; if an attribute, the previous attribute with the same name is replaced
+    def appendNode(parent:Element, elt:Node):Unit = if (elt!=null) elt.getNodeType match {
+      case ELEMENT_NODE   => parent.appendChild(elt)
+      case ATTRIBUTE_NODE => parent.setAttributeNodeNS(elt.asInstanceOf[Attr])
     }
 
     //returns the triplet (isAttribute,namespace,local XML name) for a given string ; eliminates matches with the valueTag (conflict)
@@ -222,16 +252,26 @@ object DOMHelper {
       }
     }
 
-    //finds the first "user" children of the Node having the given key ; includes both attributes and elements if appropriate
-    def findNode(nd:Node, key:String, idx:Int): Node = {
+    //finds the child of the Node having the given key ; includes both attributes and elements if appropriate
+    //returns null if not found
+    def findNode(nd:Node, key:String, idx:Int): Node = findNodes(nd,key) match {
+      case null => null
+      case list => if (list.getLength>idx) list.item(idx) else null
+    }
+
+    //finds all nodes for a given key ; returns null if either the node is not eligible for children
+    //or if the key is not eligible as a child key
+    def findNodes(nd:Node, key:String): NodeList = {
       val ak = analyzeKey(key)
       if (ak==null || !nd.isInstanceOf[Element] || ak==vTag)
         null
-      else if (ak._1)
-        if (idx==0) nd.asInstanceOf[Element].getAttributeNodeNS(ak._2,ak._4) else null
-      else {
-        val r = nd.asInstanceOf[Element].getElementsByTagNameNS(ak._2,ak._4)
-        if (r.getLength>0) r.item(idx) else null
+      else if (ak._1) {
+        new NodeList {
+          def getLength = 1
+          def item(idx:Int) = if (idx==0) nd.asInstanceOf[Element].getAttributeNodeNS(ak._2,ak._4) else throw new ArrayIndexOutOfBoundsException(idx)
+        }
+      } else {
+        nd.asInstanceOf[Element].getElementsByTagNameNS(ak._2,ak._4)
       }
     }
 
@@ -239,24 +279,25 @@ object DOMHelper {
     def buildNode(v: Option[V], t: GenTraversableOnce[(String, T)]):Node = {
       val elt = mkTopNode(v)
       for (x <- t) if (!stripEmpty || !canIgnore(x._2.elt))
-        adoptNode(elt,x._2.elt,x._1)
+        appendNode(elt,renameNode(x._2.elt,x._1))
       elt
     }
 
     //finds the text value for V in the Node
-    def getTextValue(nd:Node):String = nd match {
-      case a:Attr    => a.getValue
-      case e:Element => if (vTag!=null && vTag._1) e.getAttributeNS(vTag._2,vTag._3)
-                        else                       e.getFirstChild.getTextContent
+    def getTextValue(nd:Node):String = nd.getNodeType match {
+      case ELEMENT_NODE   => val e = nd.asInstanceOf[Element]
+                             if (vTag!=null && vTag._1) e.getAttributeNS(vTag._2,vTag._3)
+                             else                       e.getFirstChild.getTextContent
+      case ATTRIBUTE_NODE => nd.asInstanceOf[Attr].getValue
     }
 
     //tells whether nd has 'proper' children (i.e. these children that contain values)
     def hasChildren(nd:Node):Boolean = nd match {
       case e:Element => e.getChildNodes.getLength match {
         case 0 => false
-        case 1 => e.getLastChild match {
-          case t:Text    => false
-          case e:Element => vTag==null || !(e.getLocalName==vTag._3 && e.getNamespaceURI==vTag._2)
+        case 1 => e.getLastChild.getNodeType match {
+          case TEXT_NODE    => false
+          case ELEMENT_NODE => vTag==null || !(e.getLocalName==vTag._3 && e.getNamespaceURI==vTag._2)
         }
         case _ => true
       }
@@ -269,13 +310,57 @@ object DOMHelper {
       case _           => false
     })
 
-    //update key in parent with given Node
-    def update(parent:Node, key:String, nd:Node, idx:Int):Unit = parent match {
-      case e:Element => findNode(parent,key,idx) match {
-        case null => adoptNode(e, nd, key)
-        case e    => parent.replaceChild(e, nd)
+    //update key/index in parent with given Node ; we do the best to preserve the node position
+    //the Node may be converted if it is not the appropriate type for the key
+    //if the key is not found and idx is 0, then append an appropriate child
+    //if the parent is not eligible for children the method also fails
+    //returns true in case of success
+    def update(parent:Node, key:String, idx:Int, nd:Node):Unit = parent.getNodeType match {
+      case ELEMENT_NODE => {
+        val p         = parent.asInstanceOf[Element]
+        val nd0       = renameNode(nd, key)           //prepare new node with correct name; this may change nd type
+        val toReplace = findNode(parent,key,idx)
+        if (toReplace==null) {                        //nothing to update! check why and possibly append
+          if (idx==0) appendNode(p, nd0)              //only if idx==0
+          else throw new IllegalArgumentException(s"updating $parent ($key,$idx) is not a valid operation")
+        } else { //note that nd0 and toReplace have the same kind by construction! (key defines type)
+          toReplace.getNodeType match {
+            case ELEMENT_NODE   => p.replaceChild(nd0, toReplace)
+            case ATTRIBUTE_NODE => p.setAttributeNode(nd0.asInstanceOf[Attr])
+          }
+        }
       }
-      case _ => throw new IllegalStateException(s"a attribute node cannot hold any children: key=$key")
+      case _ => throw new IllegalArgumentException(s"updating an non Element node with $key is not a valid operation")
+    }
+
+    //replace key in parent with all given Nodes ; inserted nodes may have their type changed on update.
+    def update(parent:Node, key:String, nodes:GenTraversableOnce[Node]):Unit = parent.getNodeType match {
+      case ELEMENT_NODE => {
+        val p         = parent.asInstanceOf[Element]
+        val toReplace = findNodes(parent,key)
+        if (toReplace==null)
+          throw new IllegalArgumentException(s"updating $parent ($key) is not a valid operation")
+        else if (toReplace.getLength==0) {   //nothing to update! check why and possibly append
+          for (nd <- nodes) appendNode(p, renameNode(nd, key))
+        } else {
+          var idx = 0
+          if (toReplace.item(0).getNodeType==ATTRIBUTE_NODE) {
+            for (nd <- nodes) {
+              if (idx>1) throw new IllegalArgumentException(s"updating $parent ($key) with multiple attributes is not a valid operation")
+              p.setAttributeNode(renameNode(nd, key).asInstanceOf[Attr])
+              idx += 1
+            }
+          } else {
+            for (nd <- nodes) {
+              val e1  = toReplace.item(idx)
+              val nd1 = renameNode(nd, key)
+              if (e1!=null) p.replaceChild(nd1, e1) else p.appendChild(nd1)
+              idx += 1
+            }
+          }
+        }
+      }
+      case _ => throw new IllegalArgumentException(s"updating an non Element node with $key is not a valid operation")
     }
 
   }

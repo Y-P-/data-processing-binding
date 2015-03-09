@@ -125,7 +125,7 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
 
   /** The general parameters used for building the tree.
    */
-  type Params <: PrefixTreeLike.Params[K,V,Repr]
+  protected[this] type Params <: PrefixTreeLike.Params[K,V,Repr]
   def params:Params
 
   /** A new instance of builder similar to the one used to build this tree element.

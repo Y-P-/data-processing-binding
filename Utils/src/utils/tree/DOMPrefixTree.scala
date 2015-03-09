@@ -150,13 +150,13 @@ object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
    *  Note that of course, children must have been themselves properly built!
    */
   final class Abstract[V](val elt:Node) extends DOMPrefixTree[V] with super.Abstract[V] {
-    val params:P0[V]        = DOMHelper.getParams(elt)
+    val params:P0[V] = DOMHelper.getParams(elt)
     def get(key: String): Option[Repr] = Option(params.findNode(elt, key, 0)).map(params.toT)
     def getAll(key: String): Seq[Repr] = params.findAll(elt, key).map(params.toT)
     override def newBuilder = super[Abstract].newBuilder
   }
 
-  /** The PrefixTreeLikeBuilder for DOM has an additionnal constructor (from DOM Node)
+  /** The PrefixTreeLikeBuilder for DOM has an additional constructor (from DOM Node)
    */
   abstract class Builder[V,Tree<:PrefixTreeLike[String,V,Tree]] extends PrefixTreeLikeBuilder[String, V, Tree] {
     def apply(elt:Node):Repr
