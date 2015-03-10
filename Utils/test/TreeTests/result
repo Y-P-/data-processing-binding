@@ -265,4 +265,22 @@ Tree{4}(a -> Tree{1}(), b -> Tree{2}())
 <x:ff xmlns:x="my-ns" xmlns="my0-ns" xmlns:ns0="my0-ns" ns0:val="6"><d ns0:val="4" x:aa="1" x:bb="2"/><x ns0:val="5" x:cc="3"/></x:ff>
 Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))
 --------33--------
-<_>7<d>9<a>1</a><b>2</b></d><e>5<c>9<a>1</a><b>2</b></c></e><f>6<d>4<a>1</a><b>2</b></d><x>5<c>3</c></x></f></_>
+Some(9)
+Tree{9}(a -> Tree{1}(), b -> Tree{2}())
+<_>7<d>9<a>1</a><b>2</b></d><e>5<c>9<a>1</a><b>2</b></c></e><z>9<a>1</a><b>2</b></z><z>6<d>4<a>1</a><b>2</b></d><x>5<c>3</c></x></z></_>
+Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))
+--------34--------
+Some(9)
+Tree{9}(a -> Tree{1}(), b -> Tree{2}())
+<_ val="7"><d val="9"><a val="1"/><b val="2"/></d><e val="5"><c val="9"><a val="1"/><b val="2"/></c></e><z val="9"><a val="1"/><b val="2"/></z><z val="6"><d val="4"><a val="1"/><b val="2"/></d><x val="5"><c val="3"/></x></z></_>
+Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))
+--------35--------
+Some(9)
+Tree{9}(a -> Tree{1}(), b -> Tree{2}())
+<_><val>7</val><d><val>9</val><a><val>1</val></a><b><val>2</val></b></d><e><val>5</val><c><val>9</val><a><val>1</val></a><b><val>2</val></b></c></e><z><val>9</val><a><val>1</val></a><b><val>2</val></b></z><z><val>6</val><d><val>4</val><a><val>1</val></a><b><val>2</val></b></d><x><val>5</val><c><val>3</val></c></x></z></_>
+Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))
+--------36--------
+Some(9)
+Tree{9}(a -> Tree{1}(), b -> Tree{2}())
+<_ xmlns="my0-ns" xmlns:x="my-ns" xmlns:ns0="my0-ns" ns0:val="7"><d ns0:val="9" x:aa="1" x:bb="2"/><e ns0:val="5" x:cc="9"/><z ns0:val="9" x:aa="1" x:bb="2"/><z ns0:val="6"><d ns0:val="4" x:aa="1" x:bb="2"/><x ns0:val="5" x:cc="3"/></z></_>
+Tree{6}(d -> Tree{4}(a -> Tree{1}(), b -> Tree{2}()), x -> Tree{5}(c -> Tree{3}()))
