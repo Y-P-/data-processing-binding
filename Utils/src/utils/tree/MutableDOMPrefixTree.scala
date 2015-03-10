@@ -11,13 +11,22 @@ import org.w3c.dom.{Document,Node}
  *  if you're not certain that the tree will not mutate!
  *  Beware that MutableDOMPrefixTree nodes from different documents (i.e. param) won't work
  *  together!
+ *
+ *  NOTE: using attributes other than for representing the node text value is not advised.
+ *        updating an attribute with a node may fail ; there may be problems of cardinalities
+ *        etc... it is error prone, and all possible combinations aren't yet tested.
+ *
+ *  NOTE: as you're dealing with DOM underground, you may have surprises.
+ *        For example, writing dom("x")("y") = dom("z"), which should work, will indeed
+ *        move the "z" node into "x", renaming it "y". That's possibly not what you
+ *        wish! You may have to clone the DOM elements, wrap them up and copy them...
  */
 abstract class MutableDOMPrefixTree[V] protected extends DOMPrefixTree[V] with PrefixTreeLike[String, V, MutableDOMPrefixTree[V]] with MutablePrefixTreeLike[String,V,MutableDOMPrefixTree[V]] {
   def default_=(d:String=>Repr):Unit = throw new UnsupportedOperationException("DOMPrefixTrees don't support default")
-  def update(k:String,t:MutableDOMPrefixTree[V]):Unit = params.update(elt, k, 0, t.elt)
+  def update(k:String,t:MutableDOMPrefixTree[V]):Unit = update(k, 0, t)
 
   //additional methods, in particular in support of the multi-key capability of DOM
-  def update(k:String,idx:Int,t:MutableDOMPrefixTree[V]):Unit = params.update(elt, k, idx, t.elt)
+  def update(k:String,idx:Int,t:MutableDOMPrefixTree[V]):Unit = params.update(elt, k, idx, if (t==null) null else t.elt)
   def update(k:String,t:GenTraversableOnce[MutableDOMPrefixTree[V]]):Unit = params.update(elt, k, t.toIterable.map(_.elt))
 }
 
@@ -31,7 +40,7 @@ object MutableDOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
   type Bld[v]  = DOMPrefixTree.Builder[v,Tree[v]]  //the builder pattern from immutable is OK
 
   /** Copy from the immutable version!
-   *  Of course different because the factory (this object) is different!
+   *  Of course different because the factory (the MutableDOMPrefixTree object) is different!
    */
   class Params[V](noDefault:String=>Tree[V],stripEmpty:Boolean,val doc:Document,val topTag:String, val toText:V=>String, val valueTag:String, val toXMLname:String=>String, val defaultNamespace:String, val namespaces:(String,String)*)
         extends super.Params[V,Tree[V]](noDefault,stripEmpty) with DOMHelper.Params[V,Tree[V]] {
@@ -54,10 +63,14 @@ object MutableDOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
    */
   final class Abstract[V](val elt:Node) extends MutableDOMPrefixTree[V] with super.Abstract[V] {
     override type Params = MutableDOMPrefixTree.Params[V]
-    def value_=(v:Option[V]):Unit      = { DOMHelper.setData(elt, v); params.mkTxtNode(elt,v) }
+    def value_=(v:Option[V]):Unit = { if (v==null) throw new IllegalArgumentException("value cannot be null"); DOMHelper.setData(elt, v); params.mkTxtNode(elt,v) }
     val params:P0[V] = DOMHelper.getParams(elt)
-    def get(key: String): Option[Repr] = Option(params.findNode(elt, key, 0)).map(params.toT)
-    def getAll(key: String): Seq[Repr] = params.findAll(elt, key).map(params.toT)
+    def getAll(key: String): Seq[Repr] = params.findAll(elt, key).map(new Abstract[V](_))
+    def get(key: String, idx:Int): Option[Repr] = Option(params.findNode(elt, key, idx)).map(new Abstract(_))
+    def apply(key: String, idx:Int): Repr = params.findNode(elt, key, idx) match {
+      case null => noKey(key)
+      case nd   => new Abstract(nd)
+    }
     override def newBuilder = super[Abstract].newBuilder
   }
 

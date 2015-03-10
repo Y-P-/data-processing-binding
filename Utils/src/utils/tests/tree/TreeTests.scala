@@ -54,7 +54,10 @@ class TreeTests extends StandardTester {
     t(30,testDOM2)
     t(31,testDOM3)
     t(32,testDOM4)
-    t(33,testMutableDOM)
+    t(33,testMutableDOM1)
+    t(34,testMutableDOM2)
+    t(35,testMutableDOM3)
+    t(36,testMutableDOM4)
 	}
 }
 
@@ -635,16 +638,35 @@ object TreeTests {
   }
   def testDOM4(implicit out:PrintWriter) = {
     //some leaves as attributes, use of namespace and renaming of some nodes
-    testDOM(out,DOMPrefixTree.Params[Int](PrefixTreeLikeBuilder.noElt,true,javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case "f"=>"x:ff";case x=>x},"my0-ns",("my-ns","x")),"my0-ns:d","my-ns:*")
+    testDOM(out,DOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case "f"=>"x:ff";case x=>x},"my0-ns",("my-ns","x")),"my0-ns:d","my-ns:*")
   }
 
-  def testMutableDOM(implicit out:PrintWriter) = {
-    implicit val params = MutableDOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,null)
+  def testMutableDOM(implicit out:PrintWriter, params:MutableDOMPrefixTree.Params[Int]) = {
     val dom = m.copy[Int,MutableDOMPrefixTree[Int]]
     dom("d").value = Some(9)
-    dom("e")("c") = MutableDOMPrefixTree[Int](dom("d").elt.cloneNode(true))
+    val d0 = dom("d")
+    out.println(d0.value)
+    val d1 = MutableDOMPrefixTree[Int](d0.elt.cloneNode(true))
+    out.println(d1)       //value survives after clone
+    dom("e")("c") = d1    //->e->c now contains what contained ->d
+    dom("z") = Seq(MutableDOMPrefixTree[Int](d0.elt.cloneNode(true)),MutableDOMPrefixTree[Int](dom("f").elt.cloneNode(true))) //same, for ->z (new key), and multiple occurences
+    dom("f") = null.asInstanceOf[MutableDOMPrefixTree[Int]] //clear f
     dom.asXml(out, false)
     out.println
+    out.println(dom("z",1))
+  }
+
+  def testMutableDOM1(implicit out:PrintWriter) = {
+    testMutableDOM(out,MutableDOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,null))
+  }
+  def testMutableDOM2(implicit out:PrintWriter) = {
+    testMutableDOM(out,MutableDOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"@val"))
+  }
+  def testMutableDOM3(implicit out:PrintWriter) = {
+    testMutableDOM(out,MutableDOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,(_:Int).toString,"val"))
+  }
+  def testMutableDOM4(implicit out:PrintWriter) = {
+    testMutableDOM(out,MutableDOMPrefixTree.Params[Int](javax.xml.parsers.DocumentBuilderFactory.newInstance.newDocumentBuilder.newDocument,"_",(_:Int).toString,"@val",(_:String) match {case "a"=>"@x:aa";case "b"=>"@x:bb";case "c"=>"@x:cc";case "f"=>"x:ff";case x=>x},"my0-ns",("my-ns","x")))
   }
 
   def main(args:Array[String]):Unit = {

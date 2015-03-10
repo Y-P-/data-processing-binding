@@ -17,7 +17,7 @@ abstract class MutablePrefixTree[K,V] protected extends PrefixTree[K,V] with Mut
   def default_=(d:K=>Repr):Unit
   def tree_=(t:Map[K,Repr]):Unit
   override def tree: Map[K,Repr]
-  def update(k:K,t:Repr):Unit = tree(k)=t
+  def update(k:K,t:Repr):Unit = if (t==null) t.tree.remove(k) else tree(k)=t
 }
 
 /** The PrefixTree object contains:

@@ -209,9 +209,13 @@ trait PrefixTreeLike[K, +V, +This <: PrefixTreeLike[K, V, This]]
    */
   @throws(classOf[java.util.NoSuchElementException])
   def apply(key: K): This = get(key) match {
-    case None => if (default!=null) try { default(key) } catch { case e:PrefixTreeLike.NoDefault[K] => params.noDefault(key) } else params.noDefault(key)
+    case None => noKey(key)
     case Some(value) => value
   }
+
+  /** Does what is necessary when a key is not found.
+   */
+  protected def noKey(key:K) = if (default!=null) try { default(key) } catch { case e:PrefixTreeLike.NoDefault[K] => params.noDefault(key) } else params.noDefault(key)
 
   /** As apply above, but for a succession of `keys`.
    */

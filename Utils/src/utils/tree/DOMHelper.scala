@@ -1,7 +1,7 @@
 package utils.tree
 
 import scala.collection.GenTraversableOnce
-import org.w3c.dom.{Document,Element,Attr,Node,NodeList,NamedNodeMap}
+import org.w3c.dom.{Document,Element,Attr,Node,NodeList,NamedNodeMap,UserDataHandler}
 import org.w3c.dom.Node._
 import javax.xml.XMLConstants
 
@@ -13,7 +13,7 @@ object DOMHelper {
   def getData[V](elt:Node):Option[V] =
     elt.getUserData("").asInstanceOf[Option[V]]
   def setData[V](elt:Node,v:Option[V]):Unit =
-    elt.setUserData("",v,null)
+    elt.setUserData("",v,handler)
 
   def getParams[P](elt:Node):P   = {
     val p = elt.getOwnerDocument.getUserData("")
@@ -43,6 +43,18 @@ object DOMHelper {
   trait DOMContainer {
     //embedded node
     def elt:Node
+  }
+
+  /** Handler for our data: copy!
+   */
+  object handler extends UserDataHandler {
+    import UserDataHandler._
+    def handle(op:Short,key:String,data:Object,src:Node,dst:Node) = {
+      if (op==NODE_CLONED)
+        dst.setUserData(key, data, handler)
+      else if (op!=NODE_DELETED)
+        src.setUserData(key, data, handler)
+    }
   }
 
   /** Some data and methods required to properly build the DOM.
@@ -186,7 +198,6 @@ object DOMHelper {
           if (hasChildren(elt))
             throw new IllegalStateException(s"a non empty Node cannot be transformed as an attribute: key=$key")
           val nd = doc.createAttributeNS(ak._2,ak._3)
-          nd.setUserData("", getData[V](elt), null)
           val txt = getTextValue(elt)
           if (txt!=null)
             nd.setValue(txt)
@@ -194,8 +205,9 @@ object DOMHelper {
         } else {
           doc.renameNode(elt, ak._2, ak._3)
         }
+        setData(nd0, getData[V](elt))
         if (key!=ak._3)
-          nd0.setUserData("$", key, null)
+          nd0.setUserData("$", key, handler)
         nd0
       } else
         null
@@ -314,19 +326,26 @@ object DOMHelper {
     //the Node may be converted if it is not the appropriate type for the key
     //if the key is not found and idx is 0, then append an appropriate child
     //if the parent is not eligible for children the method also fails
-    //returns true in case of success
+    //if nd is null, removes the corresponding child instead
     def update(parent:Node, key:String, idx:Int, nd:Node):Unit = parent.getNodeType match {
       case ELEMENT_NODE => {
         val p         = parent.asInstanceOf[Element]
-        val nd0       = renameNode(nd, key)           //prepare new node with correct name; this may change nd type
+        val nd0       = if (nd!=null) renameNode(nd, key) else null  //prepare new node with correct name; this may change nd type
         val toReplace = findNode(parent,key,idx)
         if (toReplace==null) {                        //nothing to update! check why and possibly append
-          if (idx==0) appendNode(p, nd0)              //only if idx==0
-          else throw new IllegalArgumentException(s"updating $parent ($key,$idx) is not a valid operation")
-        } else { //note that nd0 and toReplace have the same kind by construction! (key defines type)
+          if (nd!=null) {                             //otherwise nothing to remove!
+            if (idx==0) appendNode(p, nd0)              //only if idx==0
+            else throw new IllegalArgumentException(s"updating $parent ($key,$idx) is not a valid operation")
+          }
+        } else if (nd!=null) { //note that nd0 and toReplace have the same kind by construction! (key defines type)
           toReplace.getNodeType match {
             case ELEMENT_NODE   => p.replaceChild(nd0, toReplace)
             case ATTRIBUTE_NODE => p.setAttributeNode(nd0.asInstanceOf[Attr])
+          }
+        } else {
+          toReplace.getNodeType match {
+            case ELEMENT_NODE   => p.removeChild(toReplace)
+            case ATTRIBUTE_NODE => p.removeAttributeNode(toReplace.asInstanceOf[Attr])
           }
         }
       }

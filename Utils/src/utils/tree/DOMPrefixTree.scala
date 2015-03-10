@@ -71,10 +71,13 @@ abstract class DOMPrefixTree[+V] protected extends PrefixTreeLike.Abstract[Strin
   def getTextValue:String               = params.getTextValue(elt)
   override def isEmpty: Boolean         = !params.hasChildren(elt)
   override def isNonSignificant:Boolean = params.canIgnore(elt)
+  def get(key: String): Option[Repr]    = get(key,0)
 
   //additionnal methods
   /** recovers all children having the same tag */
   def getAll(key: String): Seq[Repr]
+  def get(key:String,idx:Int):Option[Repr]
+  def apply(key:String,idx:Int):Repr
 
   /** XML representation of this Node
    */
@@ -151,8 +154,12 @@ object DOMPrefixTree extends PrefixTreeLikeBuilder.Factory1i[String] {
    */
   final class Abstract[V](val elt:Node) extends DOMPrefixTree[V] with super.Abstract[V] {
     val params:P0[V] = DOMHelper.getParams(elt)
-    def get(key: String): Option[Repr] = Option(params.findNode(elt, key, 0)).map(params.toT)
-    def getAll(key: String): Seq[Repr] = params.findAll(elt, key).map(params.toT)
+    def getAll(key: String): Seq[Repr] = params.findAll(elt, key).map(new Abstract(_))
+    def get(key: String, idx:Int): Option[Repr] = Option(params.findNode(elt, key, idx)).map(new Abstract(_))
+    def apply(key: String, idx:Int): Repr = params.findNode(elt, key, idx) match {
+      case null => noKey(key)
+      case nd   => new Abstract(nd)
+    }
     override def newBuilder = super[Abstract].newBuilder
   }
 
